@@ -1,9 +1,0 @@
-LICENSE
-README.md
-pyproject.toml
-src/jstream/__init__.py
-src/jstream/stream.py
-src/jstream.egg-info/PKG-INFO
-src/jstream.egg-info/SOURCES.txt
-src/jstream.egg-info/dependency_links.txt
-src/jstream.egg-info/top_level.txt
