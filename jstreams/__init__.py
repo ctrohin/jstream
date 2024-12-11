@@ -1,4 +1,4 @@
-from stream import (
+from jstreams.stream import (
     each,
     dictUpdate,
     Stream,
@@ -17,6 +17,10 @@ from stream import (
     optional,
 )
 
+from jstreams.tryOpt import (
+    Try,
+    ErrorLog,
+)
 __all__ = [
     "each",
     "dictUpdate",
@@ -34,4 +38,6 @@ __all__ = [
     "ClassOps",
     "stream",
     "optional",
+    "Try",
+    "ErrorLog",
 ]

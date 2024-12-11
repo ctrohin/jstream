@@ -1,1 +1,5 @@
 .ruff_cache
+out
+__pycache__
+dist
+get-pip.py
