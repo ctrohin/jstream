@@ -12,6 +12,8 @@ pip install jstreams
 
 ## Usage
 
+### Streams
+
 ```python
 from jstreams import Stream
 
@@ -79,6 +81,66 @@ print(Stream([1, 2, 3, 4, 20, 5, 6]).reduce(max).getActual())
 print(Stream(["A", None, "B", None, None, "C", None, None]).nonNull().toList())
 # Will output ["A", "B", "C"]
 
+```
+
+### Opt
+```python
+from jstreams import Opt
+
+# Checks if the value given is present
+Opt(None).isPresent() # Will return False
+Opt("test").isPresent() # Will return True
+
+
+# There are two ways of getting the value from the Opt object. The get returns a non optional
+# value and  will raise a value error if the object is None. On the other hand, getActual returns
+# an optional object and does not raise a value error
+Opt("test").get() # Does not fail, and returns the string "test"
+Opt(None).get() # Raises ValueError since None cannot be casted to any type
+Opt(None).getActual() # Returns None, does not raise value error
+
+# The ifPresent method will execute a lambda function if the object is present
+Opt("test").ifPresent(lambda s: print(s)) # Will print "test"
+Opt(None).ifPresent(lambda s: print(s)) # Does nothing, since the object is None
+
+# The getOrElse method will return the value of the Opt if not None, otherwise the given parameter
+Opt("test").getOrElse("test1") # Will return "test", since the value is not None
+Opt(None).getOrElse("test1") # Will return "test1", since the value is  None
+
+# The getOrElseGet method will return the value of the Opt if not None, otherwise it will execute 
+# the given function and return its value
+Opt("test").getOrElseGet(lambda: "test1") # Will return "test", since the value is not None
+Opt(None).getOrElseGet(lambda: "test1") # Will return "test1", since the value is  None
+
+# stream will convert the object into a stream.
+Opt("test").stream() # Is equivalent with Stream(["test"])
+Opt(["test"]).stream() # Is equivalent with Stream([["test"]]). Notice the list stacking
+
+# flatStream will convert the object into a stream, with the advantage that it can
+# detect whether the object is a list and avoids stacking lists of lists.
+Opt("test").flatStream() # Is equivalent with Stream(["test"])
+Opt(["test", "test1", "test2"]).flatStream() # Is equivalent with Stream(["test", "test1", "test2"])
+
+```
+
+### Try
+```python
+# The Try class handles a chain of function calls with error handling
+
+def throwErr() -> None:
+    raise ValueError("Test")
+
+def returnStr() -> str:
+    return "test"
+
+# It is important to call the get method, as this method actually triggers the entire chain
+Try(throwErr).onFailure(lambda e: print(e)).get() # The onFailure is called
+
+Try(returnStr).andThen(lambda s: print(s)).get() # Will print out "test"
+
+# The of method can actually be used as a method to inject a value into a Try without
+# actually calling a method or lambda
+Try.of("test").andThen(lambda s: print(s)).get() # Will print out "test"
 ```
 
 ## License

@@ -10,7 +10,7 @@ class ErrorLog(Protocol):
 
 
 class Try(Generic[T]):
-    __slots__ = ("__fn", "__thenChain", "__onFailure", "__errorLog", "__errorMessage")
+    __slots__ = ("__fn", "__thenChain", "__onFailure", "__errorLog", "__errorMessage", "__hasFailed")
 
     def __init__(self, fn: Callable[[], T]):
         self.__fn = fn
@@ -18,6 +18,11 @@ class Try(Generic[T]):
         self.__onFailure: Optional[Callable[[BaseException], Any]] = None
         self.__errorLog: Optional[ErrorLog] = None
         self.__errorMessage: Optional[str] = None
+        self.__hasFailed = False
+
+    @staticmethod
+    def of(val: T) -> "Try[T]":
+        return Try(lambda: val)
 
     def andThen(self, fn: Callable[[T], Any]) -> "Try[T]":
         self.__thenChain.append(fn)
@@ -39,9 +44,14 @@ class Try(Generic[T]):
                 fn(val)
             return Opt(val)
         except Exception as e:
+            self.__hasFailed = True
             if self.__onFailure is not None:
                 self.__onFailure(e)
             if self.__errorLog is not None and self.__errorMessage is not None:
                 self.__errorLog.error(self.__errorMessage)  # type: ignore[no-untyped-call]
                 self.__errorLog.error(e, exc_info=True)  # type: ignore[no-untyped-call]
         return Opt(None)
+
+    def hasFailed(self) -> bool:
+        self.get()
+        return self.__hasFailed

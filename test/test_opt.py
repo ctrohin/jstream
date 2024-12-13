@@ -50,7 +50,7 @@ class TestOpt(BaseTestCase):
         self.assertEqual(Opt(None).getOrElseGet(lambda: "str"), "str")
 
         self.assertIsNotNone(Opt("test").getOrElseGet(lambda: "str"))
-        self.assertEqual(Opt("test").getOrElse(lambda: "str"), "test")
+        self.assertEqual(Opt("test").getOrElseGet(lambda: "str"), "test")
 
     def test_opt_stream(self) -> None:
         """
