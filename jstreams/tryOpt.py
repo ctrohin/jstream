@@ -3,6 +3,7 @@ from typing import TypeVar, Callable, Optional, Any, Generic, Protocol
 from jstreams.stream import Opt
 
 T = TypeVar("T")
+K = TypeVar("K")
 
 class ErrorLog(Protocol):
     def error(self, msg, *args, **kwargs):  # type: ignore[no-untyped-def]
@@ -19,10 +20,6 @@ class Try(Generic[T]):
         self.__errorLog: Optional[ErrorLog] = None
         self.__errorMessage: Optional[str] = None
         self.__hasFailed = False
-
-    @staticmethod
-    def of(val: T) -> "Try[T]":
-        return Try(lambda: val)
 
     def andThen(self, fn: Callable[[T], Any]) -> "Try[T]":
         self.__thenChain.append(fn)
@@ -55,3 +52,7 @@ class Try(Generic[T]):
     def hasFailed(self) -> bool:
         self.get()
         return self.__hasFailed
+    
+    @staticmethod
+    def of(val: K) -> "Try[K]":
+        return Try(lambda: val)

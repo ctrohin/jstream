@@ -162,6 +162,10 @@ class Opt(Generic[T]):
         if self.__val is not None:
             action(self.__val)
 
+    def ifPresentWith(self, withVal: K, action: Callable[[T, K], Any]) -> None:
+        if self.__val is not None:
+            action(self.__val, withVal)
+
     def ifPresentOrElse(
         self, action: Callable[[T], Any], emptyAction: Callable[[], Any]
     ) -> None:
@@ -170,10 +174,25 @@ class Opt(Generic[T]):
         else:
             emptyAction()
 
+    def ifPresentOrElseWith(
+        self, withVal: K, action: Callable[[T, K], Any], emptyAction: Callable[[K], Any]
+    ) -> None:
+        if self.__val is not None:
+            action(self.__val, withVal)
+        else:
+            emptyAction(withVal)
+
     def filter(self, predicate: Callable[[T], bool]) -> "Opt[T]":
         if self.__val is None:
             return self
         if predicate(self.__val):
+            return self
+        return Opt(None)
+
+    def filterWith(self, withVal: K, predicate: Callable[[T, K], bool]) -> "Opt[T]":
+        if self.__val is None:
+            return self
+        if predicate(self.__val, withVal):
             return self
         return Opt(None)
 
@@ -182,10 +201,20 @@ class Opt(Generic[T]):
             return Opt(None)
         return Opt(mapper(self.__val))
 
+    def mapWith(self, withVal: K, mapper: Callable[[T, K], V]) -> "Opt[V]":
+        if self.__val is None:
+            return Opt(None)
+        return Opt(mapper(self.__val, withVal))
+
     def orElse(self, supplier: Callable[[], T]) -> "Opt[T]":
         if self.isPresent():
             return self
         return Opt(supplier())
+
+    def orElseWith(self, withVal: K, supplier: Callable[[K], T]) -> "Opt[T]":
+        if self.isPresent():
+            return self
+        return Opt(supplier(withVal))
 
     def stream(self) -> "Stream[T]":
         if self.__val is not None:

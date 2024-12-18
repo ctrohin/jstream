@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: jstreams
-Version: 1.0.8
+Version: 1.0.12
 Summary: A package providing streams and optional functionality similar to Java streams and optionals.
 Author: Cristian Trohin
 Author-email: Cristian Trohin <cristi.trohin@gmail.com>
