@@ -8,7 +8,7 @@ class TestStream(BaseTestCase):
         Test stream map function
         """
         self.assertEqual(
-            Stream(["Test", "Best", "Lest"]).map(str.upper).collect(),
+            Stream(["Test", "Best", "Lest"]).map(str.upper).toList(),
             ["TEST", "BEST", "LEST"],
         )
 
@@ -19,7 +19,7 @@ class TestStream(BaseTestCase):
         self.assertEqual(
             Stream(["Test", "Best", "Lest"])
             .filter(lambda s: s.startswith("T"))
-            .collect(),
+            .toList(),
             ["Test"],
         )
         self.assertFalse(
@@ -36,7 +36,7 @@ class TestStream(BaseTestCase):
         self.assertEqual(
             Stream(["Test", "Best", "Lest"])
             .filter(lambda s: s.startswith("X"))
-            .collect(),
+            .toList(),
             [],
         )
 
@@ -243,6 +243,13 @@ class TestStream(BaseTestCase):
             .dropWhile(lambda e: e.startswith("a"))
             .toList(),
             ["b", "c", "d"],
+        )
+
+        self.assertEqual(
+            Stream(["a1", "a2", "a3", "a4", "a5", "a6"])
+            .dropWhile(lambda e: e.startswith("a"))
+            .toList(),
+            [],
         )
 
     def test_stream_concat(self) -> None:

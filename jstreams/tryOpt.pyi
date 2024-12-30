@@ -3,6 +3,7 @@ from typing import Any, Callable, Generic, Protocol, TypeVar
 
 T = TypeVar('T')
 K = TypeVar('K')
+V = TypeVar('V')
 
 class ErrorLog(Protocol):
     def error(self, msg, *args, **kwargs): ...

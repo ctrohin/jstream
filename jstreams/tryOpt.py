@@ -4,6 +4,7 @@ from jstreams.stream import Opt
 
 T = TypeVar("T")
 K = TypeVar("K")
+V = TypeVar("V")
 
 class ErrorLog(Protocol):
     def error(self, msg, *args, **kwargs):  # type: ignore[no-untyped-def]

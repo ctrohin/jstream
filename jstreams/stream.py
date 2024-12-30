@@ -1,4 +1,5 @@
-from typing import Callable, Iterable, Any, Optional, TypeVar, Generic, cast, Union
+from typing import Callable, Iterable, Any, Iterator, Optional, TypeVar, Generic, cast, Union
+from abc import ABC
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -6,9 +7,15 @@ K = TypeVar("K")
 C = TypeVar("C")
 
 
-def isEmptyOrNone(obj: Union[list[Any], dict[Any, Any], str, None, Any]) -> bool:
+def isEmptyOrNone(obj: Union[list[Any], dict[Any, Any], str, None, Any, Iterable[Any]]) -> bool:
     if obj is None:
         return True
+    if isinstance(obj, Iterable):
+        count = 0
+        for _ in obj:
+            count += 1
+        return count == 0
+        
     return len(obj) == 0
 
 
@@ -248,6 +255,169 @@ class ClassOps:
     def instanceOf(self, obj: Any) -> bool:
         return isinstance(obj, self.__classType)
 
+class _GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
+    __slots__ = ("_iterable", "_iterator")
+    def __init__(self, it: Iterable[T]) -> None:
+        self._iterable = it
+        self._iterator = self._iterable.__iter__()
+
+    def _prepare(self) -> None:
+        pass
+    
+    def __iter__(self) -> Iterator[T]:
+        self._iterator = self._iterable.__iter__()
+        self._prepare()
+        return self
+
+class _FilterIterable(_GenericIterable[T]):
+    __slots__ = ("__filterFn",)
+    def __init__(self, it: Iterable[T], fn: Callable[[T], bool]) -> None:
+        super().__init__(it)
+        self.__filterFn = fn
+    
+    def __next__(self) -> Optional[T]:
+        while True:
+            nextObj = self._iterator.__next__()
+            if self.__filterFn(nextObj):
+                return nextObj
+
+class _CastIterable(Generic[T], Iterator[T], Iterable[T]):
+    __slots__ = ("__iterable", "__iterator", "__type")
+    def __init__(self, it: Iterable[V], typ: type[T]) -> None:
+        self.__iterable = it
+        self.__iterator = self.__iterable.__iter__()
+        self.__type = typ
+
+    def __iter__(self) -> Iterator[T]:
+        self.__iterator = self.__iterable.__iter__()
+        return self
+
+    def __next__(self) -> Optional[T]:
+        nextObj = self.__iterator.__next__()
+        return cast(self.__type, nextObj) # type: ignore[valid-type]
+
+class _SkipIterable(_GenericIterable[T]):
+    __slots__ = ("__count",)
+    def __init__(self, it: Iterable[T], count: int) -> None:
+        super().__init__(it)
+        self.__count = count
+
+    def _prepare(self) -> None:
+        try:
+            count = 0
+            while count < self.__count:
+                self._iterator.__next__()
+                count += 1
+        except StopIteration:
+            pass
+        
+    def __next__(self) -> Optional[T]:
+        return self._iterator.__next__()
+
+class _LimitIterable(_GenericIterable[T]):
+    __slots__ = ("__count", "__currentCount")
+    def __init__(self, it: Iterable[T], count: int) -> None:
+        super().__init__(it)
+        self.__count = count
+        self.__currentCount = 0
+
+    def _prepare(self) -> None:
+        self.__currentCount = 0
+        
+    def __next__(self) -> Optional[T]:
+        if  self.__currentCount >= self.__count:
+            raise StopIteration()
+        
+        obj = self._iterator.__next__()
+        self.__currentCount += 1
+        return obj
+
+class _TakeWhileIterable(_GenericIterable[T]):
+    __slots__ = ("__fn", "__done")
+    def __init__(self, it: Iterable[T], fn: Callable[[T], bool]) -> None:
+        super().__init__(it)
+        self.__done = False
+        self.__fn = fn
+        
+    def _prepare(self) -> None:
+        self.__done = False
+        
+    def __next__(self) -> Optional[T]:
+        if self.__done:
+            raise StopIteration()
+        
+        obj = self._iterator.__next__()
+        if not self.__fn(obj):
+            self.__done = True
+            raise StopIteration()
+        
+        return obj
+
+class _DropWhileIterable(_GenericIterable[T]):
+    __slots__ = ("__fn", "__done")
+    def __init__(self, it: Iterable[T], fn: Callable[[T], bool]) -> None:
+        super().__init__(it)
+        self.__done = False
+        self.__fn = fn
+        
+    def _prepare(self) -> None:
+        self.__done = False
+        
+    def __next__(self) -> Optional[T]:
+        if self.__done:
+            return self._iterator.__next__()
+        while not self.__done:
+            obj = self._iterator.__next__()
+            if not self.__fn(obj):
+                self.__done = True
+                return obj
+
+class _ConcatIterable(_GenericIterable[T]):
+    __slots__ = ("__iterable2", "__iterator2", "__done")
+    def __init__(self, it1: Iterable[T], it2: Iterable[T]) -> None:
+        super().__init__(it1)
+        self.__done = False
+        self.__iterable2 = it2
+        self.__iterator2 = self.__iterable2.__iter__()
+        
+    def _prepare(self) -> None:
+        self.__done = False
+        self.__iterator2 = self.__iterable2.__iter__()
+        
+    def __next__(self) -> Optional[T]:
+        if self.__done:
+            return self.__iterator2.__next__()
+        else:
+            try:
+                return self._iterator.__next__()
+            except StopIteration:
+                self.__done = True
+                return self.__next__()
+            
+class _DistinctIterable(_GenericIterable[T]):
+    __slots__ = ("__set",)
+    def __init__(self, it: Iterable[T]) -> None:
+        super().__init__(it)
+        self.__set = set()
+        
+    def _prepare(self) -> None:
+        self.__set = set()
+
+    def __next__(self) -> Optional[T]:
+        obj = self._iterator.__next__()
+        if obj not in self.__set:
+            self.__set.add(obj)
+            return obj
+        return self.__next__()
+
+class _MapIterable(_GenericIterable[T]):
+    __slots__ = ("__fn",)
+    def __init__(self, it: Iterable[T], mapper: Callable[[T], V]) -> None:
+        super().__init__(it)
+        self.__fn = mapper
+        
+    def __next__(self) -> Optional[V]:
+        return self.__fn(self._iterator.__next__())
 
 class Stream(Generic[T]):
     __slots__ = ("__arg",)
@@ -260,7 +430,15 @@ class Stream(Generic[T]):
         return Stream(arg)
 
     def map(self, mapper: Callable[[T], V]) -> "Stream[V]":
-        return Stream(mapIt(self.__arg, mapper))
+        """
+        Produces a new stream by mapping the stream elements using the given mapper function.
+        Args:
+            mapper (Callable[[T], V]): The mapper function
+
+        Returns:
+            Stream[V]: The result stream
+        """
+        return Stream(_MapIterable(self.__arg, mapper))
 
     def flatMap(self, mapper: Callable[[T], Iterable[V]]) -> "Stream[V]":
         return Stream(flatMap(self.__arg, mapper))
@@ -272,10 +450,10 @@ class Stream(Generic[T]):
         return Opt(findFirst(self.__arg, predicate))
 
     def filter(self, predicate: Callable[[T], bool]) -> "Stream[T]":
-        return Stream(matching(self.__arg, predicate))
+        return Stream(_FilterIterable(self.__arg, predicate))
 
     def cast(self, castTo: type[V]) -> "Stream[V]":
-        return self.map(lambda e: cast(castTo, e))  # type: ignore[valid-type]
+        return Stream(_CastIterable(self.__arg, castTo))
 
     def anyMatch(self, predicate: Callable[[T], bool]) -> bool:
         return self.filter(predicate).isNotEmpty()
@@ -297,6 +475,9 @@ class Stream(Generic[T]):
 
     def toList(self) -> list[T]:
         return list(self.__arg)
+    
+    def toSet(self) -> set[T]:
+        return set(self.__arg)
 
     def each(self, action: Callable[[T], Any]) -> None:
         each(self.__arg, action)
@@ -305,16 +486,16 @@ class Stream(Generic[T]):
         return self.filter(ClassOps(theType).instanceOf).cast(theType)
 
     def skip(self, count: int) -> "Stream[T]":
-        return Stream(list(self.__arg)[count:])
+        return Stream(_SkipIterable(self.__arg, count))
 
     def limit(self, count: int) -> "Stream[T]":
-        return Stream(list(self.__arg)[:count])
+        return Stream(_LimitIterable(self.__arg, count))
 
     def takeWhile(self, predicate: Callable[[T], bool]) -> "Stream[T]":
-        return Stream(takeWhile(self.__arg, predicate))
+        return Stream(_TakeWhileIterable(self.__arg, predicate))
 
     def dropWhile(self, predicate: Callable[[T], bool]) -> "Stream[T]":
-        return Stream(dropWhile(self.__arg, predicate))
+        return Stream(_DropWhileIterable(self.__arg, predicate))
 
     def reduce(self, reducer: Callable[[T, T], T]) -> Opt[T]:
         return Opt(reduce(self.__arg, reducer))
@@ -333,14 +514,10 @@ class Stream(Generic[T]):
     def distinct(self) -> "Stream[T]":
         if self.__arg is None:
             return self
-        elSet: list[T] = []
-        for el in self.__arg:
-            if el not in elSet:
-                elSet.append(el)
-        return Stream(elSet)
+        return Stream(_DistinctIterable(self.__arg))
 
     def concat(self, newStream: "Stream[T]") -> "Stream[T]":
-        return Stream([*self.toList(), *newStream.toList()])
+        return Stream(_ConcatIterable(self.__arg, newStream.__arg))
 
 
 def stream(it: Iterable[T]) -> Stream[T]:
