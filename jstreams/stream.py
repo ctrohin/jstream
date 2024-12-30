@@ -10,12 +10,11 @@ C = TypeVar("C")
 def isEmptyOrNone(obj: Union[list[Any], dict[Any, Any], str, None, Any, Iterable[Any]]) -> bool:
     if obj is None:
         return True
+    
     if isinstance(obj, Iterable):
-        count = 0
         for _ in obj:
-            count += 1
-        return count == 0
-        
+            return False
+    
     return len(obj) == 0
 
 
@@ -254,6 +253,9 @@ class ClassOps:
 
     def instanceOf(self, obj: Any) -> bool:
         return isinstance(obj, self.__classType)
+    
+    def subClassOf(self, typ: type) -> bool:
+        return issubclass(typ, self.__classType)
 
 class _GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
     __slots__ = ("_iterable", "_iterator")
@@ -441,88 +443,308 @@ class Stream(Generic[T]):
         return Stream(_MapIterable(self.__arg, mapper))
 
     def flatMap(self, mapper: Callable[[T], Iterable[V]]) -> "Stream[V]":
+        """
+        Produces a flat stream by mapping an element of this stream to an iterable, then concatenates
+        the iterables into a single stream.
+        Args:
+            mapper (Callable[[T], Iterable[V]]): The mapper function
+
+        Returns:
+            Stream[V]: the result stream
+        """
         return Stream(flatMap(self.__arg, mapper))
 
-    def first(self) -> Optional[T]:
-        return findFirst(self.__arg, lambda e: True)
+    def first(self) -> Opt[T]:
+        """
+        Finds and returns the first element of the stream.
+        
+        Returns:
+            Opt[T]: First element
+        """
+        return self.findFirst(lambda e: True)
 
     def findFirst(self, predicate: Callable[[T], bool]) -> Opt[T]:
+        """
+        Finds and returns the first element matching the predicate
+        
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+
+        Returns:
+            Opt[T]: The firs element found
+        """
         return Opt(findFirst(self.__arg, predicate))
 
     def filter(self, predicate: Callable[[T], bool]) -> "Stream[T]":
+        """
+        Returns a stream of objects that match the given predicate
+
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+
+        Returns:
+            Stream[T]: The stream of filtered objects
+        """
         return Stream(_FilterIterable(self.__arg, predicate))
 
     def cast(self, castTo: type[V]) -> "Stream[V]":
+        """
+        Returns a stream of objects casted to the given type. Useful when receiving untyped data lists
+        and they need to be used in a typed context.
+
+        Args:
+            castTo (type[V]): The type all objects will be casted to
+
+        Returns:
+            Stream[V]: The stream of casted objects
+        """
         return Stream(_CastIterable(self.__arg, castTo))
 
     def anyMatch(self, predicate: Callable[[T], bool]) -> bool:
+        """
+        Checks if any stream object matches the given predicate
+
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+
+        Returns:
+            bool: True if any object matches, False otherwise
+        """
         return self.filter(predicate).isNotEmpty()
 
     def noneMatch(self, predicate: Callable[[T], bool]) -> bool:
+        """
+        Checks if none of the stream objects matches the given predicate. This is the inverse of 'anyMatch`
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+
+        Returns:
+            bool: True if no object matches, False otherwise
+        """
         return self.filter(predicate).isEmpty()
 
     def allMatch(self, predicate: Callable[[T], bool]) -> bool:
+        """
+        Checks if all of the stream objects matche the given predicate.
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+
+        Returns:
+            bool: True if all objects matche, False otherwise
+        """
         return len(self.filter(predicate).toList()) == len(list(self.__arg))
 
     def isEmpty(self) -> bool:
+        """
+        Checks if the stream is empty
+
+        Returns:
+            bool: True if the stream is empty, False otherwise
+        """
         return isEmptyOrNone(self.__arg)
 
     def isNotEmpty(self) -> bool:
+        """
+        Checks if the stream is not empty
+
+        Returns:
+            bool: True if the stream is not empty, False otherwise
+        """
         return not isEmptyOrNone(self.__arg)
 
     def collect(self) -> Iterable[T]:
+        """
+        Returns an iterable with the content of the stream
+
+        Returns:
+            Iterable[T]: The iterable
+        """
         return self.__arg
 
     def toList(self) -> list[T]:
+        """
+        Creates a list with the contents of the stream
+
+        Returns:
+            list[T]: The list
+        """
         return list(self.__arg)
     
     def toSet(self) -> set[T]:
+        """
+        Creates a set witht he contents of the stream
+
+        Returns:
+            set[T]: The set
+        """
         return set(self.__arg)
 
     def each(self, action: Callable[[T], Any]) -> None:
+        """
+        Executes the action callable for each of the stream's elements
+        
+        Args:
+            action (Callable[[T], Any]): The action
+        """
         each(self.__arg, action)
 
     def ofType(self, theType: type[V]) -> "Stream[V]":
+        """
+        Returns all items of the given type as a stream
+
+        Args:
+            theType (type[V]): The given type
+
+        Returns:
+            Stream[V]: The result stream
+        """
         return self.filter(ClassOps(theType).instanceOf).cast(theType)
 
     def skip(self, count: int) -> "Stream[T]":
+        """
+        Returns a stream without the first number of items specified by 'count'
+
+        Args:
+            count (int): How many items should be skipped
+
+        Returns:
+            Stream[T]: The result stream
+        """
         return Stream(_SkipIterable(self.__arg, count))
 
     def limit(self, count: int) -> "Stream[T]":
+        """
+        Returns a stream limited to the first 'count' items of this stream
+
+        Args:
+            count (int): The max amount of items
+
+        Returns:
+            Stream[T]: The result stream
+        """
         return Stream(_LimitIterable(self.__arg, count))
 
     def takeWhile(self, predicate: Callable[[T], bool]) -> "Stream[T]":
+        """
+        Returns a stream of elements until the first element that DOES NOT match the given predicate
+
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+
+        Returns:
+            Stream[T]: The result stream
+        """
         return Stream(_TakeWhileIterable(self.__arg, predicate))
 
     def dropWhile(self, predicate: Callable[[T], bool]) -> "Stream[T]":
+        """
+        Returns a stream of elements by dropping the first elements that match the given predicate
+
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+
+        Returns:
+            Stream[T]: The result stream
+        """
         return Stream(_DropWhileIterable(self.__arg, predicate))
 
     def reduce(self, reducer: Callable[[T, T], T]) -> Opt[T]:
+        """
+        Reduces a stream to a single value. The reducer function takes two values and
+        returns only one. This function can be used to find min or max from a stream of ints.
+
+        Args:
+            reducer (Callable[[T, T], T]): The reducer function
+
+        Returns:
+            Opt[T]: The resulting optional
+        """
         return Opt(reduce(self.__arg, reducer))
 
     def nonNull(self) -> "Stream[T]":
+        """
+        Returns a stream of non null objects from this stream
+
+        Returns:
+            Stream[T]: The result stream
+        """
         return self.filter(isNotNone)
 
     def sort(self, comparator: Callable[[T, T], int]) -> "Stream[T]":
+        """
+        Returns a stream with the elements sorted according to the comparator function.
+        CAUTION: This method will actually iterate the entire stream, so if you're using
+        infinite generators, calling this method will block the execution of the program.
+
+        Args:
+            comparator (Callable[[T, T], int]): The comparator function
+
+        Returns:
+            Stream[T]: The resulting stream
+        """
         return Stream(sort(list(self.__arg), comparator))
 
     def reverse(self) -> "Stream[T]":
+        """
+        Returns a the reverted stream.
+        CAUTION: This method will actually iterate the entire stream, so if you're using
+        infinite generators, calling this method will block the execution of the program.
+
+        Returns:
+            Stream[T]: Thje resulting stream
+        """
         elems = list(self.__arg)
         elems.reverse()
         return Stream(elems)
 
     def distinct(self) -> "Stream[T]":
+        """
+        Returns disting elements from the stream.
+        CAUTION: Use this method on stream of items that have the __eq__ method implemented,
+        otherwise the method will consider all values distinct
+
+        Returns:
+            Stream[T]: The resulting stream
+        """
         if self.__arg is None:
             return self
         return Stream(_DistinctIterable(self.__arg))
 
     def concat(self, newStream: "Stream[T]") -> "Stream[T]":
+        """
+        Returns a stream concatenating the values from this stream with the ones
+        from the given stream.
+
+        Args:
+            newStream (Stream[T]): The stream to be concatenated with
+
+        Returns:
+            Stream[T]: The resulting stream
+        """
         return Stream(_ConcatIterable(self.__arg, newStream.__arg))
 
 
 def stream(it: Iterable[T]) -> Stream[T]:
+    """
+    Helper method, equivalent to Stream(it)
+
+    Args:
+        it (Iterable[T]): The iterator
+
+    Returns:
+        Stream[T]: The stream
+    """
     return Stream(it)
 
 
 def optional(val: Optional[T]) -> Opt[T]:
+    """
+    Helper method, equivalent to Opt(val)
+
+    Args:
+        val (Optional[T]): The value
+
+    Returns:
+        Opt[T]: The optional
+    """
     return Opt(val)

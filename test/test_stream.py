@@ -106,7 +106,7 @@ class TestStream(BaseTestCase):
         """
 
         self.assertEqual(
-            Stream(["Test", "Best", "Lest"]).first(),
+            Stream(["Test", "Best", "Lest"]).first().getActual(),
             "Test",
         )
 
@@ -119,7 +119,8 @@ class TestStream(BaseTestCase):
             Stream(["Test1", "Test2", 1, 2])
             .filter(lambda el: el == "Test1")
             .cast(str)
-            .first(),
+            .first()
+            .getActual(),
             "Test1",
         )
 
