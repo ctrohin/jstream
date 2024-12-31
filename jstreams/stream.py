@@ -1,4 +1,4 @@
-from typing import Callable, Iterable, Any, Iterator, Optional, TypeVar, Generic, cast, Union
+from typing import Callable, Iterable, Any, Iterator, Optional, Sized, TypeVar, Generic, cast, Union
 from abc import ABC
 
 T = TypeVar("T")
@@ -14,8 +14,12 @@ def isEmptyOrNone(obj: Union[list[Any], dict[Any, Any], str, None, Any, Iterable
     if isinstance(obj, Iterable):
         for _ in obj:
             return False
+        return True
     
-    return len(obj) == 0
+    if isinstance(obj, Sized):
+        return len(obj) == 0
+
+    return False
 
 
 def cmpToKey(mycmp: Callable[[C, C], int]) -> type:
@@ -47,58 +51,141 @@ def cmpToKey(mycmp: Callable[[C, C], int]) -> type:
     return Key
 
 
-def each(target: Optional[Iterable[T]], fn: Callable[[T], Any]) -> None:
+def each(target: Optional[Iterable[T]], action: Callable[[T], Any]) -> None:
+    """
+    Executes an action on each element of the given iterable
+
+    Args:
+        target (Optional[Iterable[T]]): The target iterable
+        action (Callable[[T], Any]): The action to be executed
+    """
     if target is None:
         return
+    
     for el in target:
-        fn(el)
+        action(el)
 
 
 def findFirst(
-    target: Optional[Iterable[T]], matches: Callable[[T], bool]
+    target: Optional[Iterable[T]], predicate: Callable[[T], bool]
 ) -> Optional[T]:
+    """
+    Retrieves the first element of the given iterable that matches the given predicate
+
+    Args:
+        target (Optional[Iterable[T]]): The target iterable
+        predicate (Callable[[T], bool]): The predicate
+
+    Returns:
+        Optional[T]: The first matching element, or None if no element matches the predicate
+    """
     if target is None:
         return None
+    
     for el in target:
-        if matches(el):
+        if predicate(el):
             return el
     return None
 
 
 def mapIt(target: Iterable[T], mapper: Callable[[T], V]) -> list[V]:
+    """
+    Maps each element of an iterable to a new object produced by the given mapper
+
+    Args:
+        target (Iterable[T]): The target iterable
+        mapper (Callable[[T], V]): The mapper function
+
+    Returns:
+        list[V]: The mapped elements
+    """
+    if target is None:
+        return []
+
     return [mapper(el) for el in target]
 
 
 def flatMap(target: Iterable[T], mapper: Callable[[T], Iterable[V]]) -> list[V]:
+    """
+    Returns a flattened map. The mapper function is called for each element of the target
+    iterable, then all elements are added to a result list. 
+    Ex: flatMap([1, 2], lambda x: [x, x + 1]) returns [1, 2, 2, 3]
+
+    Args:
+        target (Iterable[T]): The target iterable
+        mapper (Callable[[T], Iterable[V]]): The mapper function
+
+    Returns:
+        list[V]: The resulting flattened map
+    """
     ret: list[V] = []
+    if target is None:
+        return ret
+
     for el in target:
         mapped = mapper(el)
         each(mapped, ret.append)
     return ret
 
 
-def matching(target: Iterable[T], matcher: Callable[[T], bool]) -> list[T]:
-    ret: list[T] = []
-    for el in target:
-        if matcher(el):
-            ret.append(el)
-    return ret
+def matching(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
+    """
+    Returns all elements of the target iterable that match the given predicate
 
+    Args:
+        target (Iterable[T]): The target iterable
+        predicate (Callable[[T], bool]): The predicate
 
-def takeWhile(target: Iterable[T], matcher: Callable[[T], bool]) -> list[T]:
+    Returns:
+        list[T]: The matching elements
+    """
     ret: list[T] = []
     if target is None:
         return ret
 
     for el in target:
-        if matcher(el):
+        if predicate(el):
+            ret.append(el)
+    return ret
+
+
+def takeWhile(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
+    """
+    Returns the first batch of elements matching the predicate. Once an element
+    that does not match the predicate is found, the function will return
+
+    Args:
+        target (Iterable[T]): The target iterable
+        predicate (Callable[[T], bool]): The predicate
+
+    Returns:
+        list[T]: The result list
+    """
+    ret: list[T] = []
+    if target is None:
+        return ret
+
+    for el in target:
+        if predicate(el):
             ret.append(el)
         else:
             break
     return ret
 
 
-def dropWhile(target: Iterable[T], matcher: Callable[[T], bool]) -> list[T]:
+def dropWhile(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
+    """
+    Returns the target iterable elements without the first elements that match the
+    predicate. Once an element that does not match the predicate is found, 
+    the function will start adding the remaining elements to the result list
+
+    Args:
+        target (Iterable[T]): The target iterable
+        predicate (Callable[[T], bool]): The predicate
+
+    Returns:
+        list[T]: The result list
+    """
     ret: list[T] = []
     if target is None:
         return ret
@@ -106,7 +193,7 @@ def dropWhile(target: Iterable[T], matcher: Callable[[T], bool]) -> list[T]:
     index = 0
 
     for el in target:
-        if matcher(el):
+        if predicate(el):
             index += 1
         else:
             break
@@ -114,8 +201,20 @@ def dropWhile(target: Iterable[T], matcher: Callable[[T], bool]) -> list[T]:
 
 
 def reduce(target: Iterable[T], reducer: Callable[[T, T], T]) -> Optional[T]:
+    """
+    Reduces an iterable to a single value. The reducer function takes two values and
+    returns only one. This function can be used to find min or max from a stream of ints.
+
+    Args:
+        reducer (Callable[[T, T], T]): The reducer function
+
+    Returns:
+        Optional[T]: The resulting optional
+    """
+    
     if target is None:
         return None
+    
     elemList = list(target)
     if len(elemList) == 0:
         return None
@@ -127,6 +226,16 @@ def reduce(target: Iterable[T], reducer: Callable[[T, T], T]) -> Optional[T]:
 
 
 def isNotNone(element: Optional[T]) -> bool:
+    """
+    Checks if the given element is not None. This function is meant to be used
+    instead of lambdas for non null checks
+
+    Args:
+        element (Optional[T]): The given element
+
+    Returns:
+        bool: True if element is not None, False otherwise
+    """
     return element is not None
 
 
@@ -135,6 +244,18 @@ def dictUpdate(target: dict[K, V], key: K, value: V) -> None:
 
 
 def sort(target: list[T], comparator: Callable[[T, T], int]) -> list[T]:
+    """
+    Returns a list with the elements sorted according to the comparator function.
+    CAUTION: This method will actually iterate the entire iterable, so if you're using
+    infinite generators, calling this method will block the execution of the program.
+
+    Args:
+        comparator (Callable[[T, T], int]): The comparator function
+
+    Returns:
+        list[T]: The resulting list
+    """
+
     return sorted(target, key=cmpToKey(comparator))
 
 
@@ -145,36 +266,107 @@ class Opt(Generic[T]):
         self.__val = val
 
     def get(self) -> T:
+        """
+        Returns the value of the Opt object if present, otherwise will raise a ValueError
+
+        Raises:
+            ValueError: Error raised when the value is None
+
+        Returns:
+            T: The value
+        """
         if self.__val is None:
             raise ValueError("Object is None")
         return self.__val
 
     def getActual(self) -> Optional[T]:
+        """
+        Returns the actual value of the Opt without raising any errors
+
+        Returns:
+            Optional[T]: The value
+        """
         return self.__val
 
     def getOrElse(self, val: T) -> T:
+        """
+        Returns the value of the Opt if present, otherwise return the given parameter as a fallback.
+        This functiona should be used when the given fallback is a constant or it does not require
+        heavy computation
+
+        Args:
+            val (T): The fallback value
+
+        Returns:
+            T: The return value
+        """
         return self.__val if self.__val is not None else val
 
     def getOrElseGet(self, supplier: Callable[[], Optional[T]]) -> Optional[T]:
+        """
+        Returns the value of the Opt if present, otherwise it will call the supplier
+        function and return that value. This function is useful when the fallback value
+        is compute heavy and should only be called when the value of the Opt is None
+
+        Args:
+            supplier (Callable[[], Optional[T]]): _description_
+
+        Returns:
+            Optional[T]: _description_
+        """
         return self.__val if self.__val is not None else supplier()
 
     def isPresent(self) -> bool:
+        """
+        Returns whether the Opt is present
+
+        Returns:
+            bool: True if the Opt has a non null value, False otherwise
+        """
         return self.__val is not None
 
     def isEmpty(self) -> bool:
+        """
+        Returns whether the Opt is empty
+
+        Returns:
+            bool: True if the Opt value is None, False otherwise
+        """
         return self.__val is None
 
     def ifPresent(self, action: Callable[[T], Any]) -> None:
+        """
+        Executes an action on the value of the Opt if the value is present
+
+        Args:
+            action (Callable[[T], Any]): The action
+        """
         if self.__val is not None:
             action(self.__val)
 
     def ifPresentWith(self, withVal: K, action: Callable[[T, K], Any]) -> None:
+        """
+        Executes an action on the value of the Opt if the value is present, by providing
+        the action an additional parameter
+
+        Args:
+            withVal (K): The additional parameter
+            action (Callable[[T, K], Any]): The action
+        """
         if self.__val is not None:
             action(self.__val, withVal)
 
     def ifPresentOrElse(
         self, action: Callable[[T], Any], emptyAction: Callable[[], Any]
     ) -> None:
+        """
+        Executes an action on the value of the Opt if the value is present, or executes
+        the emptyAction if the Opt is empty
+
+        Args:
+            action (Callable[[T], Any]): The action to be executed when present
+            emptyAction (Callable[[], Any]): The action to be executed when empty
+        """
         if self.__val is not None:
             action(self.__val)
         else:
@@ -183,12 +375,30 @@ class Opt(Generic[T]):
     def ifPresentOrElseWith(
         self, withVal: K, action: Callable[[T, K], Any], emptyAction: Callable[[K], Any]
     ) -> None:
+        """
+        Executes an action on the value of the Opt by providing the actions an additional parameter,
+        if the value is present, or executes the emptyAction if the Opt is empty
+
+        Args:
+            withVal (K): The additional parameter
+            action (Callable[[T, K], Any]): The action to be executed when present
+            emptyAction (Callable[[K], Any]): The action to be executed when empty
+        """
         if self.__val is not None:
             action(self.__val, withVal)
         else:
             emptyAction(withVal)
 
     def filter(self, predicate: Callable[[T], bool]) -> "Opt[T]":
+        """
+        Returns the filtered value of the Opt if it matches the given predicate
+
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+
+        Returns:
+            Opt[T]: The resulting Opt
+        """
         if self.__val is None:
             return self
         if predicate(self.__val):
@@ -196,6 +406,17 @@ class Opt(Generic[T]):
         return Opt(None)
 
     def filterWith(self, withVal: K, predicate: Callable[[T, K], bool]) -> "Opt[T]":
+        """
+        Returns the filtered value of the Opt if it matches the given predicate, by 
+        providing the predicat with an additional value
+
+        Args:
+            withVal (K): the additional value
+            predicate (Callable[[T], bool]): The predicate
+
+        Returns:
+            Opt[T]: The resulting Opt
+        """
         if self.__val is None:
             return self
         if predicate(self.__val, withVal):
@@ -203,31 +424,84 @@ class Opt(Generic[T]):
         return Opt(None)
 
     def map(self, mapper: Callable[[T], V]) -> "Opt[V]":
+        """
+        Maps the Opt value into another Opt by applying the mapper function
+
+        Args:
+            mapper (Callable[[T], V]): The mapper function
+
+        Returns:
+            Opt[V]: The resulting Opt
+        """
         if self.__val is None:
             return Opt(None)
         return Opt(mapper(self.__val))
 
     def mapWith(self, withVal: K, mapper: Callable[[T, K], V]) -> "Opt[V]":
+        """
+        Maps the Opt value into another Opt by applying the mapper function with an additional parameter
+
+        Args:
+            withVal (K): The additional parameter
+            mapper (Callable[[T, K], V]): The mapper function
+
+        Returns:
+            Opt[V]: The resulting Opt
+        """
         if self.__val is None:
             return Opt(None)
         return Opt(mapper(self.__val, withVal))
 
     def orElse(self, supplier: Callable[[], T]) -> "Opt[T]":
+        """
+        Returns this Opt if present, otherwise will return the supplier result
+
+        Args:
+            supplier (Callable[[], T]): The fallback supplier
+
+        Returns:
+            Opt[T]: The resulting Opt
+        """
         if self.isPresent():
             return self
         return Opt(supplier())
 
     def orElseWith(self, withVal: K, supplier: Callable[[K], T]) -> "Opt[T]":
+        """
+        Returns this Opt if present, otherwise will return the supplier result with
+        the additional parameter
+
+        Args:
+            withVal (K): The additional parameter
+            supplier (Callable[[K], T]): The supplier
+
+        Returns:
+            Opt[T]: The resulting Opt
+        """
         if self.isPresent():
             return self
         return Opt(supplier(withVal))
 
     def stream(self) -> "Stream[T]":
+        """
+        Returns a Stream containing the current Opt value
+
+        Returns:
+            Stream[T]: The resulting Stream
+        """
         if self.__val is not None:
             return Stream([self.__val])
         return Stream([])
 
     def flatStream(self) -> "Stream[T]":
+        """
+        Returns a Stream containing the current Opt value if the value
+        is not an Iterable, or a Stream containing all the values in 
+        the Opt if the Opt contains an iterable
+
+        Returns:
+            Stream[T]: The resulting Stream
+        """
         if self.__val is not None:
             if isinstance(self.__val, Iterable):
                 return Stream(self.__val)
@@ -235,11 +509,32 @@ class Opt(Generic[T]):
         return Stream([])
 
     def orElseThrow(self) -> T:
+        """
+        Returns the value of the Opt or raise a value error
+
+        Raises:
+            ValueError: The value error
+
+        Returns:
+            T: The value
+        """
         if self.__val is not None:
             return self.__val
         raise ValueError("Object is None")
 
     def orElseThrowFrom(self, exceptionSupplier: Callable[[], BaseException]) -> T:
+        """
+        Returns the value of the Opt or raise an exeption provided by the exception supplier
+
+        Args:
+            exceptionSupplier (Callable[[], BaseException]): The exception supplier
+
+        Raises:
+            exception: The generated exception
+
+        Returns:
+            T: The value
+        """
         if self.__val is not None:
             return self.__val
         raise exceptionSupplier()
@@ -277,26 +572,26 @@ class _FilterIterable(_GenericIterable[T]):
         super().__init__(it)
         self.__filterFn = fn
     
-    def __next__(self) -> Optional[T]:
+    def __next__(self) -> T:
         while True:
             nextObj = self._iterator.__next__()
             if self.__filterFn(nextObj):
                 return nextObj
 
-class _CastIterable(Generic[T], Iterator[T], Iterable[T]):
-    __slots__ = ("__iterable", "__iterator", "__type")
+class _CastIterable(Generic[T, V], Iterator[T], Iterable[T]):
+    __slots__ = ("__iterable", "__iterator", "__tp")
     def __init__(self, it: Iterable[V], typ: type[T]) -> None:
         self.__iterable = it
         self.__iterator = self.__iterable.__iter__()
-        self.__type = typ
+        self.__tp = typ
 
     def __iter__(self) -> Iterator[T]:
         self.__iterator = self.__iterable.__iter__()
         return self
 
-    def __next__(self) -> Optional[T]:
+    def __next__(self) -> T:
         nextObj = self.__iterator.__next__()
-        return cast(self.__type, nextObj) # type: ignore[valid-type]
+        return cast(T, nextObj)
 
 class _SkipIterable(_GenericIterable[T]):
     __slots__ = ("__count",)
@@ -313,7 +608,7 @@ class _SkipIterable(_GenericIterable[T]):
         except StopIteration:
             pass
         
-    def __next__(self) -> Optional[T]:
+    def __next__(self) -> T:
         return self._iterator.__next__()
 
 class _LimitIterable(_GenericIterable[T]):
@@ -326,7 +621,7 @@ class _LimitIterable(_GenericIterable[T]):
     def _prepare(self) -> None:
         self.__currentCount = 0
         
-    def __next__(self) -> Optional[T]:
+    def __next__(self) -> T:
         if  self.__currentCount >= self.__count:
             raise StopIteration()
         
@@ -344,7 +639,7 @@ class _TakeWhileIterable(_GenericIterable[T]):
     def _prepare(self) -> None:
         self.__done = False
         
-    def __next__(self) -> Optional[T]:
+    def __next__(self) -> T:
         if self.__done:
             raise StopIteration()
         
@@ -365,7 +660,7 @@ class _DropWhileIterable(_GenericIterable[T]):
     def _prepare(self) -> None:
         self.__done = False
         
-    def __next__(self) -> Optional[T]:
+    def __next__(self) -> T:
         if self.__done:
             return self._iterator.__next__()
         while not self.__done:
@@ -386,7 +681,7 @@ class _ConcatIterable(_GenericIterable[T]):
         self.__done = False
         self.__iterator2 = self.__iterable2.__iter__()
         
-    def __next__(self) -> Optional[T]:
+    def __next__(self) -> T:
         if self.__done:
             return self.__iterator2.__next__()
         else:
@@ -400,30 +695,40 @@ class _DistinctIterable(_GenericIterable[T]):
     __slots__ = ("__set",)
     def __init__(self, it: Iterable[T]) -> None:
         super().__init__(it)
-        self.__set = set()
+        self.__set: set[T] = set()
         
     def _prepare(self) -> None:
         self.__set = set()
 
-    def __next__(self) -> Optional[T]:
+    def __next__(self) -> T:
         obj = self._iterator.__next__()
         if obj not in self.__set:
             self.__set.add(obj)
             return obj
         return self.__next__()
 
-class _MapIterable(_GenericIterable[T]):
-    __slots__ = ("__fn",)
+
+class _MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
+    __slots__ = ("_iterable", "_iterator", "__fn")
+
     def __init__(self, it: Iterable[T], mapper: Callable[[T], V]) -> None:
-        super().__init__(it)
+        self._iterable = it
+        self._iterator = self._iterable.__iter__()
         self.__fn = mapper
-        
-    def __next__(self) -> Optional[V]:
+
+    def _prepare(self) -> None:
+        pass
+    
+    def __iter__(self) -> Iterator[V]:
+        self._iterator = self._iterable.__iter__()
+        self._prepare()
+        return self
+
+    def __next__(self) -> V:
         return self.__fn(self._iterator.__next__())
 
 class Stream(Generic[T]):
     __slots__ = ("__arg",)
-
     def __init__(self, arg: Iterable[T]) -> None:
         self.__arg = arg
 
@@ -440,6 +745,8 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: The result stream
         """
+        if isEmptyOrNone(self.__arg):
+            return Stream([])
         return Stream(_MapIterable(self.__arg, mapper))
 
     def flatMap(self, mapper: Callable[[T], Iterable[V]]) -> "Stream[V]":
@@ -452,6 +759,9 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: the result stream
         """
+        if isEmptyOrNone(self.__arg):
+            return Stream([])
+
         return Stream(flatMap(self.__arg, mapper))
 
     def first(self) -> Opt[T]:
@@ -485,6 +795,9 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The stream of filtered objects
         """
+        if isEmptyOrNone(self.__arg):
+            return Stream([])
+        
         return Stream(_FilterIterable(self.__arg, predicate))
 
     def cast(self, castTo: type[V]) -> "Stream[V]":
@@ -498,6 +811,8 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: The stream of casted objects
         """
+        if isEmptyOrNone(self.__arg):
+            return Stream([])
         return Stream(_CastIterable(self.__arg, castTo))
 
     def anyMatch(self, predicate: Callable[[T], bool]) -> bool:

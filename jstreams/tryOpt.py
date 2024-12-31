@@ -12,7 +12,7 @@ class ErrorLog(Protocol):
 
 
 class Try(Generic[T]):
-    __slots__ = ("__fn", "__thenChain", "__onFailure", "__errorLog", "__errorMessage", "__hasFailed")
+    __slots__ = ("__fn", "__thenChain", "__onFailure", "__errorLog", "__errorMessage", "__hasFailed", "__logger")
 
     def __init__(self, fn: Callable[[], T]):
         self.__fn = fn
@@ -21,6 +21,14 @@ class Try(Generic[T]):
         self.__errorLog: Optional[ErrorLog] = None
         self.__errorMessage: Optional[str] = None
         self.__hasFailed = False
+
+    def withLogger(self, logger: ErrorLog) -> "Try[T]":
+        self.__errorLog = logger
+        return self
+
+    def withErrorMessage(self, errorMessage: str) -> "Try[T]":
+        self.__errorMessage = errorMessage
+        return self
 
     def andThen(self, fn: Callable[[T], Any]) -> "Try[T]":
         self.__thenChain.append(fn)
@@ -31,9 +39,7 @@ class Try(Generic[T]):
         return self
 
     def onFailureLog(self, message: str, errorLog: ErrorLog) -> "Try[T]":
-        self.__errorLog = errorLog
-        self.__errorMessage = message
-        return self
+        return self.withErrorMessage(message).withLogger(errorLog)
 
     def get(self) -> Opt[T]:
         try:
@@ -45,8 +51,9 @@ class Try(Generic[T]):
             self.__hasFailed = True
             if self.__onFailure is not None:
                 self.__onFailure(e)
-            if self.__errorLog is not None and self.__errorMessage is not None:
-                self.__errorLog.error(self.__errorMessage)  # type: ignore[no-untyped-call]
+            if self.__errorLog is not None:
+                if self.__errorMessage is not None:
+                    self.__errorLog.error(self.__errorMessage)  # type: ignore[no-untyped-call]
                 self.__errorLog.error(e, exc_info=True)  # type: ignore[no-untyped-call]
         return Opt(None)
 
