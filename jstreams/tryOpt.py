@@ -6,13 +6,22 @@ T = TypeVar("T")
 K = TypeVar("K")
 V = TypeVar("V")
 
+
 class ErrorLog(Protocol):
     def error(self, msg, *args, **kwargs):  # type: ignore[no-untyped-def]
         pass
 
 
 class Try(Generic[T]):
-    __slots__ = ("__fn", "__thenChain", "__onFailure", "__errorLog", "__errorMessage", "__hasFailed", "__logger")
+    __slots__ = (
+        "__fn",
+        "__thenChain",
+        "__onFailure",
+        "__errorLog",
+        "__errorMessage",
+        "__hasFailed",
+        "__logger",
+    )
 
     def __init__(self, fn: Callable[[], T]):
         self.__fn = fn
@@ -60,7 +69,7 @@ class Try(Generic[T]):
     def hasFailed(self) -> bool:
         self.get()
         return self.__hasFailed
-    
+
     @staticmethod
     def of(val: K) -> "Try[K]":
         return Try(lambda: val)

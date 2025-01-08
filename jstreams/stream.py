@@ -1,4 +1,15 @@
-from typing import Callable, Iterable, Any, Iterator, Optional, Sized, TypeVar, Generic, cast, Union
+from typing import (
+    Callable,
+    Iterable,
+    Any,
+    Iterator,
+    Optional,
+    Sized,
+    TypeVar,
+    Generic,
+    cast,
+    Union,
+)
 from abc import ABC
 
 T = TypeVar("T")
@@ -7,15 +18,17 @@ K = TypeVar("K")
 C = TypeVar("C")
 
 
-def isEmptyOrNone(obj: Union[list[Any], dict[Any, Any], str, None, Any, Iterable[Any]]) -> bool:
+def isEmptyOrNone(
+    obj: Union[list[Any], dict[Any, Any], str, None, Any, Iterable[Any]],
+) -> bool:
     if obj is None:
         return True
-    
+
     if isinstance(obj, Iterable):
         for _ in obj:
             return False
         return True
-    
+
     if isinstance(obj, Sized):
         return len(obj) == 0
 
@@ -61,7 +74,7 @@ def each(target: Optional[Iterable[T]], action: Callable[[T], Any]) -> None:
     """
     if target is None:
         return
-    
+
     for el in target:
         action(el)
 
@@ -81,7 +94,7 @@ def findFirst(
     """
     if target is None:
         return None
-    
+
     for el in target:
         if predicate(el):
             return el
@@ -108,7 +121,7 @@ def mapIt(target: Iterable[T], mapper: Callable[[T], V]) -> list[V]:
 def flatMap(target: Iterable[T], mapper: Callable[[T], Iterable[V]]) -> list[V]:
     """
     Returns a flattened map. The mapper function is called for each element of the target
-    iterable, then all elements are added to a result list. 
+    iterable, then all elements are added to a result list.
     Ex: flatMap([1, 2], lambda x: [x, x + 1]) returns [1, 2, 2, 3]
 
     Args:
@@ -176,7 +189,7 @@ def takeWhile(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
 def dropWhile(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
     """
     Returns the target iterable elements without the first elements that match the
-    predicate. Once an element that does not match the predicate is found, 
+    predicate. Once an element that does not match the predicate is found,
     the function will start adding the remaining elements to the result list
 
     Args:
@@ -211,10 +224,10 @@ def reduce(target: Iterable[T], reducer: Callable[[T, T], T]) -> Optional[T]:
     Returns:
         Optional[T]: The resulting optional
     """
-    
+
     if target is None:
         return None
-    
+
     elemList = list(target)
     if len(elemList) == 0:
         return None
@@ -407,7 +420,7 @@ class Opt(Generic[T]):
 
     def filterWith(self, withVal: K, predicate: Callable[[T, K], bool]) -> "Opt[T]":
         """
-        Returns the filtered value of the Opt if it matches the given predicate, by 
+        Returns the filtered value of the Opt if it matches the given predicate, by
         providing the predicat with an additional value
 
         Args:
@@ -496,7 +509,7 @@ class Opt(Generic[T]):
     def flatStream(self) -> "Stream[T]":
         """
         Returns a Stream containing the current Opt value if the value
-        is not an Iterable, or a Stream containing all the values in 
+        is not an Iterable, or a Stream containing all the values in
         the Opt if the Opt contains an iterable
 
         Returns:
@@ -548,38 +561,44 @@ class ClassOps:
 
     def instanceOf(self, obj: Any) -> bool:
         return isinstance(obj, self.__classType)
-    
+
     def subClassOf(self, typ: type) -> bool:
         return issubclass(typ, self.__classType)
 
+
 class _GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
     __slots__ = ("_iterable", "_iterator")
+
     def __init__(self, it: Iterable[T]) -> None:
         self._iterable = it
         self._iterator = self._iterable.__iter__()
 
     def _prepare(self) -> None:
         pass
-    
+
     def __iter__(self) -> Iterator[T]:
         self._iterator = self._iterable.__iter__()
         self._prepare()
         return self
 
+
 class _FilterIterable(_GenericIterable[T]):
     __slots__ = ("__filterFn",)
+
     def __init__(self, it: Iterable[T], fn: Callable[[T], bool]) -> None:
         super().__init__(it)
         self.__filterFn = fn
-    
+
     def __next__(self) -> T:
         while True:
             nextObj = self._iterator.__next__()
             if self.__filterFn(nextObj):
                 return nextObj
 
+
 class _CastIterable(Generic[T, V], Iterator[T], Iterable[T]):
     __slots__ = ("__iterable", "__iterator", "__tp")
+
     def __init__(self, it: Iterable[V], typ: type[T]) -> None:
         self.__iterable = it
         self.__iterator = self.__iterable.__iter__()
@@ -593,8 +612,10 @@ class _CastIterable(Generic[T, V], Iterator[T], Iterable[T]):
         nextObj = self.__iterator.__next__()
         return cast(T, nextObj)
 
+
 class _SkipIterable(_GenericIterable[T]):
     __slots__ = ("__count",)
+
     def __init__(self, it: Iterable[T], count: int) -> None:
         super().__init__(it)
         self.__count = count
@@ -607,12 +628,14 @@ class _SkipIterable(_GenericIterable[T]):
                 count += 1
         except StopIteration:
             pass
-        
+
     def __next__(self) -> T:
         return self._iterator.__next__()
 
+
 class _LimitIterable(_GenericIterable[T]):
     __slots__ = ("__count", "__currentCount")
+
     def __init__(self, it: Iterable[T], count: int) -> None:
         super().__init__(it)
         self.__count = count
@@ -620,46 +643,50 @@ class _LimitIterable(_GenericIterable[T]):
 
     def _prepare(self) -> None:
         self.__currentCount = 0
-        
+
     def __next__(self) -> T:
-        if  self.__currentCount >= self.__count:
+        if self.__currentCount >= self.__count:
             raise StopIteration()
-        
+
         obj = self._iterator.__next__()
         self.__currentCount += 1
         return obj
 
+
 class _TakeWhileIterable(_GenericIterable[T]):
     __slots__ = ("__fn", "__done")
+
     def __init__(self, it: Iterable[T], fn: Callable[[T], bool]) -> None:
         super().__init__(it)
         self.__done = False
         self.__fn = fn
-        
+
     def _prepare(self) -> None:
         self.__done = False
-        
+
     def __next__(self) -> T:
         if self.__done:
             raise StopIteration()
-        
+
         obj = self._iterator.__next__()
         if not self.__fn(obj):
             self.__done = True
             raise StopIteration()
-        
+
         return obj
+
 
 class _DropWhileIterable(_GenericIterable[T]):
     __slots__ = ("__fn", "__done")
+
     def __init__(self, it: Iterable[T], fn: Callable[[T], bool]) -> None:
         super().__init__(it)
         self.__done = False
         self.__fn = fn
-        
+
     def _prepare(self) -> None:
         self.__done = False
-        
+
     def __next__(self) -> T:
         if self.__done:
             return self._iterator.__next__()
@@ -669,18 +696,20 @@ class _DropWhileIterable(_GenericIterable[T]):
                 self.__done = True
                 return obj
 
+
 class _ConcatIterable(_GenericIterable[T]):
     __slots__ = ("__iterable2", "__iterator2", "__done")
+
     def __init__(self, it1: Iterable[T], it2: Iterable[T]) -> None:
         super().__init__(it1)
         self.__done = False
         self.__iterable2 = it2
         self.__iterator2 = self.__iterable2.__iter__()
-        
+
     def _prepare(self) -> None:
         self.__done = False
         self.__iterator2 = self.__iterable2.__iter__()
-        
+
     def __next__(self) -> T:
         if self.__done:
             return self.__iterator2.__next__()
@@ -690,13 +719,15 @@ class _ConcatIterable(_GenericIterable[T]):
             except StopIteration:
                 self.__done = True
                 return self.__next__()
-            
+
+
 class _DistinctIterable(_GenericIterable[T]):
     __slots__ = ("__set",)
+
     def __init__(self, it: Iterable[T]) -> None:
         super().__init__(it)
         self.__set: set[T] = set()
-        
+
     def _prepare(self) -> None:
         self.__set = set()
 
@@ -718,7 +749,7 @@ class _MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
 
     def _prepare(self) -> None:
         pass
-    
+
     def __iter__(self) -> Iterator[V]:
         self._iterator = self._iterable.__iter__()
         self._prepare()
@@ -727,8 +758,10 @@ class _MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
     def __next__(self) -> V:
         return self.__fn(self._iterator.__next__())
 
+
 class Stream(Generic[T]):
     __slots__ = ("__arg",)
+
     def __init__(self, arg: Iterable[T]) -> None:
         self.__arg = arg
 
@@ -767,7 +800,7 @@ class Stream(Generic[T]):
     def first(self) -> Opt[T]:
         """
         Finds and returns the first element of the stream.
-        
+
         Returns:
             Opt[T]: First element
         """
@@ -776,7 +809,7 @@ class Stream(Generic[T]):
     def findFirst(self, predicate: Callable[[T], bool]) -> Opt[T]:
         """
         Finds and returns the first element matching the predicate
-        
+
         Args:
             predicate (Callable[[T], bool]): The predicate
 
@@ -797,7 +830,7 @@ class Stream(Generic[T]):
         """
         if isEmptyOrNone(self.__arg):
             return Stream([])
-        
+
         return Stream(_FilterIterable(self.__arg, predicate))
 
     def cast(self, castTo: type[V]) -> "Stream[V]":
@@ -884,7 +917,7 @@ class Stream(Generic[T]):
             list[T]: The list
         """
         return list(self.__arg)
-    
+
     def toSet(self) -> set[T]:
         """
         Creates a set witht he contents of the stream
@@ -897,7 +930,7 @@ class Stream(Generic[T]):
     def each(self, action: Callable[[T], Any]) -> None:
         """
         Executes the action callable for each of the stream's elements
-        
+
         Args:
             action (Callable[[T], Any]): The action
         """
