@@ -1,31 +1,10 @@
 import abc
 from typing import Any, Callable, Generic, TypeVar
 
-__all__ = [
-    "Pipe",
-    "Reduce",
-    "Filter",
-    "Map",
-    "Take",
-    "TakeWhile",
-    "TakeUntil",
-    "DropWhile",
-    "DropUntil",
-    "rxReduce",
-    "rxFilter",
-    "rxMap",
-    "rxTake",
-    "rxTakeWhile",
-    "rxTakeUntil",
-    "rxDropWhile",
-    "rxDropUntil",
-    "RxOperator",
-    "BaseFilteringOperator",
-    "BaseMappingOperator",
-]
+__all__ = ['Pipe', 'Reduce', 'Filter', 'Map', 'Take', 'TakeWhile', 'TakeUntil', 'DropWhile', 'DropUntil', 'rxReduce', 'rxFilter', 'rxMap', 'rxTake', 'rxTakeWhile', 'rxTakeUntil', 'rxDropWhile', 'rxDropUntil', 'RxOperator', 'BaseFilteringOperator', 'BaseMappingOperator']
 
-T = TypeVar("T")
-V = TypeVar("V")
+T = TypeVar('T')
+V = TypeVar('V')
 
 class RxOperator(abc.ABC, Generic[T, V]):
     def __init__(self) -> None: ...
@@ -82,7 +61,5 @@ class DropUntil(BaseFilteringOperator[T]):
 def rxDropUntil(predicate: Callable[[T], bool]) -> RxOperator[T, T]: ...
 
 class Pipe(Generic[T, V]):
-    def __init__(
-        self, inputType: type[T], outputType: type[V], ops: list[RxOperator[Any, Any]]
-    ) -> None: ...
+    def __init__(self, inputType: type[T], outputType: type[V], ops: list[RxOperator[Any, Any]]) -> None: ...
     def apply(self, val: T) -> V | None: ...

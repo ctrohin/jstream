@@ -35,13 +35,14 @@ V = TypeVar("V")
 ErrorHandler = Optional[Callable[[Exception], Any]]
 CompletedHandler = Optional[Callable[[T], Any]]
 NextHandler = Callable[[T], Any]
-
+DisposeHandler = Callable[[], Any]
 
 class ObservableSubscription(Generic[T]):
     __slots__ = (
         "__onNext",
         "__onError",
         "__onCompleted",
+        "__onDispose",
         "__subscriptionId",
         "__paused",
     )
@@ -51,10 +52,12 @@ class ObservableSubscription(Generic[T]):
         onNext: NextHandler[T],
         onError: ErrorHandler = None,
         onCompleted: CompletedHandler[T] = None,
+        onDispose: DisposeHandler = None,
     ) -> None:
         self.__onNext = onNext
         self.__onError = onError
         self.__onCompleted = onCompleted
+        self.__onDispose = onDispose
         self.__subscriptionId = str(int(time() * 100))
         self.__paused = False
 
@@ -80,6 +83,10 @@ class ObservableSubscription(Generic[T]):
 
     def resume(self) -> None:
         self.__paused = False
+        
+    def dispose(self) -> None:
+        if self.__onDispose:
+            self.__onDispose()
 
 
 class _ObservableParent(Generic[T]):
@@ -129,8 +136,9 @@ class _ObservableBase(Generic[T]):
         onNext: NextHandler[T],
         onError: ErrorHandler = None,
         onCompleted: CompletedHandler[T] = None,
+        onDispose: DisposeHandler = None,
     ) -> ObservableSubscription[T]:
-        sub = ObservableSubscription(onNext, onError, onCompleted)
+        sub = ObservableSubscription(onNext, onError, onCompleted, onDispose)
         self.__subscriptions.append(sub)
         if self._parent is not None:
             self._parent.pushToSubOnSubscribe(sub)
@@ -142,6 +150,13 @@ class _ObservableBase(Generic[T]):
             .filter(lambda e: e.getSubscriptionId() == sub.getSubscriptionId())
             .each(self.__subscriptions.remove)
         )
+
+    def dispose(self) -> None:
+        (   
+            Stream(self.__subscriptions)
+            .each(ObservableSubscription.dispose)
+        )
+        self.__subscriptions.clear()
 
     def pause(self, sub: ObservableSubscription[T]) -> None:
         (
@@ -195,12 +210,13 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
         onNext: NextHandler[V],
         onError: ErrorHandler = None,
         onCompleted: CompletedHandler[V] = None,
+        onDispose: DisposeHandler = None,
     ) -> ObservableSubscription[V]:
-        sub = super().subscribe(onNext, onError, onCompleted)
+        sub = super().subscribe(onNext, onError, onCompleted, onDispose)
         if self.__sub is None:
             # If we have no subscription yet, it's enough to subscribe to the parent,
             # as the parent will emit the values
-            self.__parent.subscribe(self.__applyPipeAndEmmit)
+            self.__parent.subscribe(self.__applyPipeAndEmmit, self.onError, self.onCompleted, self.dispose)
         else:
             # If we're already subscribed to the parent, fake a new subscription
             # so that the parent pushes to this subscription

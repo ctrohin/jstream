@@ -198,6 +198,12 @@ subject.subscribe(
 # Will print out "C" as this is the next value stored in the Subject,
 # any new subscription at this point will receive "C"
 subject.onNext("C")
+
+# For long lived subjects and observables, it is wise to call the
+# dispose method so that all subscriptions can be cleared and no
+# references are kept. The subject can be reused, but all 
+# subscriptions will need to be re-registered
+subject.dispose()
 ```
 
 ##### PublishSubject
@@ -221,6 +227,12 @@ subject.onNext("C")
 subject.subscribe(
     lambda s: print(s)
 )
+
+# For long lived subjects and observables, it is wise to call the
+# dispose method so that all subscriptions can be cleared and no
+# references are kept. The subject can be reused, but all 
+# subscriptions will need to be re-registered
+subject.dispose()
 ```
 
 ##### ReplaySubject
@@ -239,6 +251,12 @@ subject.subscribe(
 # Will print out "C" as this is the next value added in the Subject,
 # any new subscription at this point will receive "A", then "B", then "C"
 subject.onNext("C")
+
+# For long lived subjects and observables, it is wise to call the
+# dispose method so that all subscriptions can be cleared and no
+# references are kept. The subject can be reused, but all 
+# subscriptions will need to be re-registered
+subject.dispose()
 ```
 
 #### Operators
@@ -249,8 +267,12 @@ The current operators are:
 - *reduce* - causes the observable to emit a single value produced by the reducer function.
 - *take* - takes a number of values and ignores the rest
 - *takeWhile* - takes values as long as they match the given predicate. Once a value is detected that does not match, no more values will be passing through
+- *takeUntil* - takes values until the first value is found matching the given predicate. Once a value is detected that does not match, no more values will be passing through
+- *drop* - blocks a number of values and allows the rest to pass through
+- *dropWhile* - blocks values that match a given predicate. Once the first value is found not matching, all remaining values are allowed through
+- *dropUntil* - blocks values until the first value that matches a given predicate. Once the first value is found matching, all remaining values are allowed through
 
-##### Map
+##### Map - rxMap
 ```python
 from jstreams import ReplaySubject, rxMap
 
@@ -267,7 +289,7 @@ pipe.subscribe(
 )
 ```
 
-##### Filter
+##### Filter - rxFilter
 ```python
 from jstreams import ReplaySubject, rxFilter
 
@@ -284,7 +306,7 @@ pipe.subscribe(
 )
 ```
 
-##### Reduce
+##### Reduce - rxReduce
 ```python
 from jstreams import ReplaySubject, rxReduce
 
@@ -300,6 +322,102 @@ pipe = subject.pipe(
 pipe.subscribe(
     lambda v: print(v)
 )
+```
+##### Take - rxTake
+```python
+from jstreams import ReplaySubject, rxTake
+
+subject = ReplaySubject([1, 7, 20, 5, 100, 40])
+pipe1 = subject.pipe(
+    rxTake(int, 3)
+)
+# Will print out the first 3 elements, 1, 7 and 20
+pipe1.subscribe(
+    lambda v: print(v)
+)
+# Won't print anything anymore since the first 3 elements were already taken
+subject.onNext(9)
+```
+
+##### TakeWhile - rxTakeWhile
+```python
+from jstreams import ReplaySubject, rxTakeWhile
+
+subject = ReplaySubject([1, 7, 20, 5, 100, 40])
+pipe1 = subject.pipe(
+    rxTakeWhile(lambda v: v < 10)
+)
+# Will print out 1, 7, since 20 is higher than 10
+pipe1.subscribe(
+    lambda v: print(v)
+)
+# Won't print anything since the while condition has already been reached
+subject.onNext(9)
+```
+
+##### TakeUntil - rxTakeUntil
+```python
+from jstreams import ReplaySubject, rxTakeUntil
+
+subject = ReplaySubject([1, 7, 20, 5, 100, 40])
+pipe1 = subject.pipe(
+    rxTakeUntil(lambda v: v > 10)
+)
+# Will print out 1, 7, since 20 is higher than 10, which is our until condition
+pipe1.subscribe(
+    lambda v: print(v)
+)
+# Won't print anything since the until condition has already been reached
+subject.onNext(9)
+```
+
+##### Drop - rxDrop
+```python
+from jstreams import ReplaySubject, rxDrop
+
+subject = ReplaySubject([1, 7, 20, 5, 100, 40])
+self.val = []
+pipe1 = subject.pipe(
+    rxDrop(int, 3)
+)
+# Will print out 5, 100, 50, skipping the first 3 values
+pipe1.subscribe(
+    lambda v: print(v)
+)
+# Will print out 9, since it already skipped the first 3 values
+subject.onNext(9)
+```
+
+##### DropWhile - rxDropWhile
+```python
+from jstreams import ReplaySubject, rxDropWhile
+
+subject = ReplaySubject([1, 7, 20, 5, 100, 40])
+self.val = []
+pipe1 = subject.pipe(
+    rxDropWhile(lambda v: v < 100)
+)
+# Will print 100, 40, since the first items that are less than 100 are dropped
+pipe1.subscribe(lambda v: print(v))
+# Will 9, since the first items that are less than 100 are dropped, and 9 appears after the drop while condition is fulfilled
+subject.onNext(9)
+```
+
+##### DropUntil - rxDropUntil
+```python
+from jstreams import ReplaySubject, rxDropWhile
+
+subject = ReplaySubject([1, 7, 20, 5, 100, 40])
+self.val = []
+pipe1 = subject.pipe(
+    rxDropUntil(lambda v: v > 20)
+)
+# Will print out 100, 40, skipping the rest of the values until the first one 
+# that fulfills the condition appears
+pipe1.subscribe(self.addVal)
+# Will print out 9, since the condition is already fulfilled and all remaining values will
+# flow through
+subject.onNext(9)
 ```
 
 ##### Combining operators
@@ -328,7 +446,7 @@ pipe.subscribe(
 
 As an example, you can see below the implementation of the reduce operator.
 ```python
-class _ReduceOperator(BaseFilteringOperator[T]):
+class ReduceOperator(BaseFilteringOperator[T]):
     def __init__(self, reducer: Callable[[T, T], T]) -> None:
         self.__reducer = reducer
         self.__prevVal: Optional[T] = None
