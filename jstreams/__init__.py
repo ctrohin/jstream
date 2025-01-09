@@ -22,6 +22,29 @@ from jstreams.tryOpt import (
     ErrorLog,
 )
 
+from jstreams.rx import (
+    ObservableSubscription,
+    Observable,
+    Flowable,
+    Single,
+    BehaviorSubject,
+    PublishSubject,
+    ReplaySubject,
+)
+
+from jstreams.rxops import (
+    Pipe,
+    Reduce,
+    Filter,
+    Map,
+    rxReduce,
+    rxFilter,
+    rxMap,
+    RxOperator,
+    BaseFilteringOperator,
+    BaseMappingOperator,
+)
+
 __all__ = [
     "each",
     "dictUpdate",
@@ -41,4 +64,21 @@ __all__ = [
     "optional",
     "Try",
     "ErrorLog",
+    "ObservableSubscription",
+    "Observable",
+    "Flowable",
+    "Single",
+    "BehaviorSubject",
+    "PublishSubject",
+    "ReplaySubject",
+    "Pipe",
+    "Reduce",
+    "Filter",
+    "Map",
+    "rxReduce",
+    "rxFilter",
+    "rxMap",
+    "RxOperator",
+    "BaseFilteringOperator",
+    "BaseMappingOperator",
 ]

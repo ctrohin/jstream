@@ -8,7 +8,7 @@ version = "1.0.14"
 authors = [
     { name="Cristian Trohin", email="cristi.trohin@gmail.com" },
 ]
-description = "A package providing streams and optional functionality similar to Java streams and optionals."
+description = "A package providing streams and optional functionality similar to Java streams and optionals as well as a basic implementation of ReactiveX."
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [

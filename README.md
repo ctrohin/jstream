@@ -1,10 +1,10 @@
 # jstreams
 
-jstreams is a Python library aiming to replicate the Java Streams and Optional functionality. The library is implemented with type safety in mind.
+jstreams is a Python library aiming to replicate the Java Streams and Optional functionality, as well as a basic ReactiveX implementation. The library is implemented with type safety in mind.
 
 ## Installation
 
-Use the package manager [pip](https://pip.pypa.io/en/stable/) to install jstream.
+Use the package manager [pip](https://pip.pypa.io/en/stable/) to install jstreams.
 
 ```bash
 pip install jstreams
@@ -143,6 +143,209 @@ Try(returnStr).andThen(lambda s: print(s)).get() # Will print out "test"
 Try.of("test").andThen(lambda s: print(s)).get() # Will print out "test"
 ```
 
+### ReactiveX
+The **jstreams** library includes a basic implementation of the ReactiveX API including observables, subjects and a handful of reactive operators.
+
+#### Observables
+Observables that are currently implemented in **jstreams** are of two types:
+- *Single* - will only hold a single value
+- *Flowable* - will hold an iterable providing values
+
+##### Single
+```python
+from jstreams import Single
+
+singleObs = Single("test")
+# Will print out "test"
+# When subscribing, the observable will emit the value it holds
+# to the subscriber
+singleObs.subscribe(
+    lambda s: print(s)
+)
+```
+
+##### Flowable
+```python
+from jstreams import Flowable
+
+flowableObs = Flowable(["test1", "test2"])
+# Will print out "test1" then "test2"
+# When subscribing, the observable will emit the values it holds
+# to the subscriber
+flowableObs.subscribe(
+    lambda s: print(s)
+)
+```
+#### Subjects
+**jstreams** implements the following Subject types:
+- *BehaviorSubject* - will only hold a single value, keep it stored, then emit it whenever a subscriber subscribes, then emit any change to all subscribers
+- *PublishSubject* - similar to *BehaviorSubject*, but only emits a change to all subscribers. No emission happens when subscribing
+- *ReplaySubject* - will hold an list of past values and emit them all when subscribing to the subject. Subsequent changes are also emitted
+
+##### BehaviorSubject
+```python
+from jstreams import BehaviorSubject
+
+# Initialize the subject with a default value
+subject = BehaviorSubject("A")
+subject.onNext("B")
+
+# Will print out "B" as this is the current value stored in the Subject
+subject.subscribe(
+    lambda s: print(s)
+)
+
+# Will print out "C" as this is the next value stored in the Subject,
+# any new subscription at this point will receive "C"
+subject.onNext("C")
+```
+
+##### PublishSubject
+```python
+from jstreams import PublishSubject
+
+# Initialize the subject. Since the subject doesn't hold any initial value
+# it cannot infer the type, so the type needs to be specified
+subject = PublishSubject(str)
+
+# Nothing happens at this point, since PublishSubject won't store the current value
+subject.subscribe(
+    lambda s: print(s)
+)
+
+# Will print out "C" as this is the next value sent tothe Subject.
+# Any new subscription after this call not receive a value
+subject.onNext("C")
+
+# No value is sent to the subscriber, so nothing to print
+subject.subscribe(
+    lambda s: print(s)
+)
+```
+
+##### ReplaySubject
+```python
+from jstreams import ReplaySubject
+
+# Initialize the subject with a default value
+subject = ReplaySubject(["A", "B", "C"])
+
+# Will print out "A", then "B", then "C" as this the subject will replay
+# the entire list of values whnever someone subscribes
+subject.subscribe(
+    lambda s: print(s)
+)
+
+# Will print out "C" as this is the next value added in the Subject,
+# any new subscription at this point will receive "A", then "B", then "C"
+subject.onNext("C")
+```
+
+#### Operators
+**jstreams** provides a couple of operators, with more operators in the works.
+The current operators are:
+- *map* - converts a value to a different form or type
+- *filter* - blocks or allows a value to be passed to the subscribers
+- *reduce* - causes the observable to emit a single value produced by the reducer function.
+- *take* - takes a number of values and ignores the rest
+- *takeWhile* - takes values as long as they match the given predicate. Once a value is detected that does not match, no more values will be passing through
+
+##### Map
+```python
+from jstreams import ReplaySubject, rxMap
+
+# Initialize the subject with a default value
+subject = ReplaySubject(["A", "BB", "CCC"])
+# Create an operators pipe
+pipe = subject.pipe(
+    # Map the strings to their length
+    rxMap(lambda s: len(s))
+)
+# Will print out 1, 2, 3, the lengths of the replay values
+pipe.subscribe(
+    lambda v: print(v)
+)
+```
+
+##### Filter
+```python
+from jstreams import ReplaySubject, rxFilter
+
+# Initialize the subject with a default value
+subject = ReplaySubject(["A", "BB", "CCC"])
+# Create an operators pipe
+pipe = subject.pipe(
+    # Filters the values for length higher than 2
+    rxFilter(lambda s: len(s) > 2)
+)
+# Will print out "CCC", as this is the only string with a length higher than 2
+pipe.subscribe(
+    lambda v: print(v)
+)
+```
+
+##### Reduce
+```python
+from jstreams import ReplaySubject, rxReduce
+
+# Initialize the subject with a default value
+subject = ReplaySubject([1, 20, 3, 12])
+# Create an operators pipe
+pipe = subject.pipe(
+    # Reduce the value to max
+    rxReduce(max)
+)
+# Will print out 1, then 20 since 1 is the first value, then 20, as the maximum between 
+# the previous max (1) and the next value (20)
+pipe.subscribe(
+    lambda v: print(v)
+)
+```
+
+##### Combining operators
+```python
+from jstreams import ReplaySubject, rxReduce, rxFilter
+
+# Initialize the subject with a default value
+subject = ReplaySubject([1, 7, 11, 20, 3, 12])
+# Create an operators pipe
+pipe = subject.pipe(
+    # Filters only the values higher than 10
+    rxFilter(lambda v: v > 10)
+    # Reduce the value to max
+    rxReduce(max)
+)
+# Will print out 11, then 20 since 11 is the first value found higher than 10, then 20, as the maximum between the previous max (11) and the next value (20)
+pipe.subscribe(
+    lambda v: print(v)
+)
+```
+
+#### Custom operators
+**jstreams** allows you to implement your own operators using two main base classes:
+- *BaseMappingOperator* - any operator that can transform one value to another
+- *BaseFilteringOperator* - any operator that can allow a value to pass through or not
+
+As an example, you can see below the implementation of the reduce operator.
+```python
+class _ReduceOperator(BaseFilteringOperator[T]):
+    def __init__(self, reducer: Callable[[T, T], T]) -> None:
+        self.__reducer = reducer
+        self.__prevVal: Optional[T] = None
+        super().__init__(self.__mapper)
+
+    def __mapper(self, val: T) -> bool:
+        if self.__prevVal is None:
+            # When reducing, the first value is always returned
+            self.__prevVal = val
+            return True
+        reduced = self.__reducer(self.__prevVal, val)
+        if reduced != self.__prevVal:
+            # Push and store the reduced value only if it's different than the previous value
+            self.__prevVal = reduced
+            return True
+        return False
+```
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
