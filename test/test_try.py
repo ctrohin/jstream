@@ -25,7 +25,8 @@ class CallRegister:
 
     def error(self, msg, *args, **kwargs):
         self.errorLogged = True
-        
+
+
 class TestTry(BaseTestCase):
     def noThrow(self) -> str:
         return "str"
@@ -49,23 +50,38 @@ class TestTry(BaseTestCase):
         mock = CallRegister()
         self.assertIsNone(Try(self.throw).andThen(mock.mth1).get().getActual())
         self.assertFalse(mock.mth1Called)
-        
+
     def test_try_with_error_on_chain(self) -> None:
-        self.assertIsNone(Try(self.noThrow).andThen(self.processThrow).get().getActual())
+        self.assertIsNone(
+            Try(self.noThrow).andThen(self.processThrow).get().getActual()
+        )
 
     def test_try_with_error_on_init_and_onFailure(self) -> None:
         mock = CallRegister()
-        self.assertIsNone(Try(self.throw).andThen(mock.mth1).onFailure(mock.mth2).get().getActual())
+        self.assertIsNone(
+            Try(self.throw).andThen(mock.mth1).onFailure(mock.mth2).get().getActual()
+        )
         self.assertFalse(mock.mth1Called)
         self.assertTrue(mock.mth2Called)
 
     def test_try_with_error_on_chain_and_onFailure(self) -> None:
         mock = CallRegister()
-        self.assertIsNone(Try(self.noThrow).andThen(self.processThrow).onFailure(mock.mth1).get().getActual())
+        self.assertIsNone(
+            Try(self.noThrow)
+            .andThen(self.processThrow)
+            .onFailure(mock.mth1)
+            .get()
+            .getActual()
+        )
         self.assertTrue(mock.mth1Called)
-
 
     def test_try_with_error_on_chain_and_onFailureLog(self) -> None:
         mock = CallRegister()
-        self.assertIsNone(Try(self.noThrow).andThen(self.processThrow).onFailureLog("Test", mock).get().getActual())
+        self.assertIsNone(
+            Try(self.noThrow)
+            .andThen(self.processThrow)
+            .onFailureLog("Test", mock)
+            .get()
+            .getActual()
+        )
         self.assertTrue(mock.errorLogged)

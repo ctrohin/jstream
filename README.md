@@ -439,6 +439,25 @@ pipe.subscribe(
 )
 ```
 
+##### Chaining pipes
+**jstreams** allows pipes to be chained
+```python
+subject = ReplaySubject(range(1, 100))
+self.val = []
+chainedPipe = (
+    subject.pipe(
+        rxTakeUntil(lambda e: e > 20)
+    )
+    .pipe(
+        rxFilter(lambda e: e < 10)
+    )
+    .subscribe(self.addVal)
+)
+
+chainedPipe.dispose()
+
+```
+
 #### Custom operators
 **jstreams** allows you to implement your own operators using two main base classes:
 - *BaseMappingOperator* - any operator that can transform one value to another
