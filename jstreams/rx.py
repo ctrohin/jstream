@@ -38,6 +38,11 @@ NextHandler = Callable[[T], Any]
 DisposeHandler = Optional[Callable[[], Any]]
 
 
+class MultipleSubscriptionsException(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
 class ObservableSubscription(Generic[T]):
     __slots__ = (
         "__onNext",
@@ -113,7 +118,7 @@ class _ObservableBase(Generic[T]):
     __slots__ = ("__subscriptions", "_parent", "_lastVal")
 
     def __init__(self) -> None:
-        self.__subscriptions: list[ObservableSubscription[T]] = []
+        self.__subscriptions: list[ObservableSubscription[Any]] = []
         self._parent: Optional[_ObservableParent[T]] = None
         self._lastVal: Optional[T] = None
 
@@ -124,7 +129,7 @@ class _ObservableBase(Generic[T]):
             for sub in self.__subscriptions:
                 self.pushToSubscription(sub, val)
 
-    def pushToSubscription(self, sub: ObservableSubscription[T], val: T) -> None:
+    def pushToSubscription(self, sub: ObservableSubscription[Any], val: T) -> None:
         if not sub.isPaused():
             try:
                 sub.onNext(val)
@@ -138,14 +143,14 @@ class _ObservableBase(Generic[T]):
         onError: ErrorHandler = None,
         onCompleted: CompletedHandler[T] = None,
         onDispose: DisposeHandler = None,
-    ) -> ObservableSubscription[T]:
+    ) -> ObservableSubscription[Any]:
         sub = ObservableSubscription(onNext, onError, onCompleted, onDispose)
         self.__subscriptions.append(sub)
         if self._parent is not None:
             self._parent.pushToSubOnSubscribe(sub)
         return sub
 
-    def cancel(self, sub: ObservableSubscription[T]) -> None:
+    def cancel(self, sub: ObservableSubscription[Any]) -> None:
         (
             Stream(self.__subscriptions)
             .filter(lambda e: e.getSubscriptionId() == sub.getSubscriptionId())
@@ -153,37 +158,37 @@ class _ObservableBase(Generic[T]):
         )
 
     def dispose(self) -> None:
-        (Stream(self.__subscriptions).each(ObservableSubscription.dispose))
+        (Stream(self.__subscriptions).each(lambda s: s.dispose()))
         self.__subscriptions.clear()
 
-    def pause(self, sub: ObservableSubscription[T]) -> None:
+    def pause(self, sub: ObservableSubscription[Any]) -> None:
         (
             Stream(self.__subscriptions)
             .filter(lambda e: e.getSubscriptionId() == sub.getSubscriptionId())
-            .each(ObservableSubscription.pause)
+            .each(lambda s: s.pause())
         )
 
-    def resume(self, sub: ObservableSubscription[T]) -> None:
+    def resume(self, sub: ObservableSubscription[Any]) -> None:
         (
             Stream(self.__subscriptions)
             .filter(lambda e: e.getSubscriptionId() == sub.getSubscriptionId())
-            .each(ObservableSubscription.resume)
+            .each(lambda s: s.resume())
         )
 
     def pauseAll(self) -> None:
-        (Stream(self.__subscriptions).each(ObservableSubscription.pause))
+        (Stream(self.__subscriptions).each(lambda s: s.pause()))
 
     def resumePaused(self) -> None:
         (
             Stream(self.__subscriptions)
             .filter(ObservableSubscription.isPaused)
-            .each(ObservableSubscription.resume)
+            .each(lambda s: s.resume())
         )
 
     def onCompleted(self, val: Optional[T]) -> None:
         (Stream(self.__subscriptions).each(lambda s: s.onCompleted(val)))
         # Clear all subscriptions. This subject is out of business
-        self.__subscriptions.clear()
+        self.dispose()
 
     def onError(self, ex: Exception) -> None:
         (Stream(self.__subscriptions).each(lambda s: s.onError(ex)))
@@ -195,12 +200,11 @@ class _Observable(_ObservableBase[T], _ObservableParent[T]):
 
 
 class _PipeObservable(Generic[T, V], _Observable[V]):
-    __slots__ = ("__pipe", "__parent", "__sub")
+    __slots__ = ("__pipe", "__parent")
 
     def __init__(self, parent: _Observable[T], pipe: Pipe[T, V]) -> None:
         self.__pipe = pipe
         self.__parent = parent
-        self.__sub: Optional[ObservableSubscription[T]] = None
         super().__init__()
 
     def subscribe(
@@ -209,37 +213,48 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
         onError: ErrorHandler = None,
         onCompleted: CompletedHandler[V] = None,
         onDispose: DisposeHandler = None,
-    ) -> ObservableSubscription[V]:
-        sub = super().subscribe(onNext, onError, onCompleted, onDispose)
-        if self.__sub is None:
-            # If we have no subscription yet, it's enough to subscribe to the parent,
-            # as the parent will emit the values
-            self.__parent.subscribe(
-                self.__applyPipeAndEmmit,
-                self.onError,
-                lambda e: self.onCompleted(self.__pipe.apply(e) if e else None),
-                self.dispose,
-            )
-        else:
-            # If we're already subscribed to the parent, fake a new subscription
-            # so that the parent pushes to this subscription
-            self.__parent.pushToSubOnSubscribe(self.__buildOneTimeSub(sub))
-        return sub
+    ) -> ObservableSubscription[Any]:
+        """
+        Subscribe to this pipe
 
-    def __buildOneTimeSub(
-        self, sub: ObservableSubscription[V]
-    ) -> ObservableSubscription[T]:
-        def buildOneTimeHandler(val: T) -> None:
-            result = self.__pipe.apply(val)
+        Args:
+            onNext (NextHandler[V]): On next handler for incoming values
+            onError (ErrorHandler, optional): Error handler. Defaults to None.
+            onCompleted (CompletedHandler[V], optional): Competed handler. Defaults to None.
+            onDispose (DisposeHandler, optional): Dispose handler. Defaults to None.
+
+        Returns:
+            ObservableSubscription[V]: The subscription
+        """
+        wrappedOnNext, wrappedOnCompleted = self.__wrap(onNext, onCompleted)
+        return self.__parent.subscribe(
+            wrappedOnNext, onError, wrappedOnCompleted, onDispose
+        )
+
+    def __wrap(
+        self, onNext: Callable[[V], Any], onCompleted: CompletedHandler[V]
+    ) -> tuple[Callable[[T], Any], CompletedHandler[T]]:
+        clonePipe = self.__pipe.clone()
+
+        def onNextWrapped(val: T) -> None:
+            result = clonePipe.apply(val)
             if result is not None:
-                sub.onNext(result)
+                onNext(result)
 
-        return ObservableSubscription(buildOneTimeHandler)
+        def onCompletedWrapped(val: Optional[T]) -> None:
+            if val is None or onCompleted is None:
+                return
+            result = clonePipe.apply(val)
+            if result is not None:
+                onCompleted(result)
 
-    def __applyPipeAndEmmit(self, val: T) -> None:
-        result = self.__pipe.apply(val)
-        if result is not None:
-            self._notifyAllSubs(result)
+        return (onNextWrapped, onCompletedWrapped)
+
+    def cancel(self, sub: ObservableSubscription[Any]) -> None:
+        self.__parent.cancel(sub)
+
+    def pause(self, sub: ObservableSubscription[Any]) -> None:
+        self.__parent.pause(sub)
 
     @overload
     def pipe(
@@ -445,7 +460,7 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
             .nonNull()
             .toList()
         )
-        return _PipeObservable(self, Pipe(T, Any, opList))  # type: ignore
+        return _PipeObservable(self, Pipe(T, V, opList))  # type: ignore
 
 
 class Observable(_Observable[T]):
@@ -732,7 +747,6 @@ class ReplaySubject(Flowable[T], _OnNext[T]):
     def push(self) -> None:
         super().push()
         for v in self.__valueList:
-            print(f"Notified for {v}\n")
             self._notifyAllSubs(v)
 
     def pushToSubOnSubscribe(self, sub: ObservableSubscription[T]) -> None:

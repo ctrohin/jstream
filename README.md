@@ -443,19 +443,21 @@ pipe.subscribe(
 **jstreams** allows pipes to be chained
 ```python
 subject = ReplaySubject(range(1, 100))
-self.val = []
-chainedPipe = (
-    subject.pipe(
-        rxTakeUntil(lambda e: e > 20)
-    )
-    .pipe(
-        rxFilter(lambda e: e < 10)
-    )
-    .subscribe(self.addVal)
-)
+val = []
+val2 = []
+chainedPipe = subject.pipe(
+                rxTakeUntil(lambda e: e > 20)
+            )
+            .pipe(
+                rxFilter(lambda e: e < 10)
+            )
+# val will contain 0..9
+chainedPipe.subscribe(val.append)
 
-chainedPipe.dispose()
-
+# pipes allow multiple subscriptions
+val2 = []
+# val2 will contain 0..9
+chainedPipe.subscribe(val2.append)
 ```
 
 #### Custom operators

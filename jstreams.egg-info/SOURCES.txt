@@ -5,6 +5,10 @@ setup.py
 jstreams/__init__.py
 jstreams/__init__.pyi
 jstreams/py.typed
+jstreams/rx.py
+jstreams/rx.pyi
+jstreams/rxops.py
+jstreams/rxops.pyi
 jstreams/stream.py
 jstreams/stream.pyi
 jstreams/tryOpt.py
@@ -14,5 +18,6 @@ jstreams.egg-info/SOURCES.txt
 jstreams.egg-info/dependency_links.txt
 jstreams.egg-info/top_level.txt
 test/test_opt.py
+test/test_rx.py
 test/test_stream.py
 test/test_try.py

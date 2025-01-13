@@ -246,10 +246,14 @@ class TestRx(BaseTestCase):
     def test_replay_subject_with_pipe_chaining(self) -> None:
         subject = ReplaySubject(range(1, 100))
         self.val = []
+        self.val2 = []
         chainedPipe = (
             subject.pipe(rxTakeUntil(lambda e: e > 20))
-            .pipe(rxFilter(lambda e: e < 10))
-            .subscribe(self.addVal)
+            .pipe(rxFilter(lambda e: e % 2 == 0))
+            .pipe(rxTakeWhile(lambda e: e < 10))
         )
+        chainedPipe.subscribe(self.addVal)
+        chainedPipe.subscribe(self.addVal2)
         chainedPipe.dispose()
-        self.assertListEqual(self.val, list(range(1, 10)))
+        self.assertListEqual(self.val, [2, 4, 6, 8])
+        self.assertListEqual(self.val2, [2, 4, 6, 8])

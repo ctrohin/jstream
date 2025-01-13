@@ -1,5 +1,8 @@
 import abc
+from copy import deepcopy
 from typing import Any, Callable, Generic, TypeVar, cast, Optional
+
+from jstreams import Stream
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -7,6 +10,9 @@ V = TypeVar("V")
 
 class RxOperator(Generic[T, V], abc.ABC):
     def __init__(self) -> None:
+        pass
+
+    def init(self) -> None:
         pass
 
 
@@ -41,6 +47,9 @@ class Reduce(BaseFilteringOperator[T]):
         self.__reducer = reducer
         self.__prevVal: Optional[T] = None
         super().__init__(self.__mapper)
+
+    def init(self) -> None:
+        self.__prevVal = None
 
     def __mapper(self, val: T) -> bool:
         if self.__prevVal is None:
@@ -129,6 +138,9 @@ class Take(BaseFilteringOperator[T]):
         self.__currentlyPushed = 0
         super().__init__(self.__take)
 
+    def init(self) -> None:
+        self.__currentlyPushed = 0
+
     def __take(self, val: T) -> bool:
         if self.__currentlyPushed >= self.__count:
             return False
@@ -161,6 +173,9 @@ class TakeWhile(BaseFilteringOperator[T]):
         self.__fn = predicate
         self.__shouldPush = True
         super().__init__(self.__take)
+
+    def init(self) -> None:
+        self.__shouldPush = True
 
     def __take(self, val: T) -> bool:
         if not self.__shouldPush:
@@ -195,6 +210,9 @@ class TakeUntil(BaseFilteringOperator[T]):
         self.__fn = predicate
         self.__shouldPush = True
         super().__init__(self.__take)
+
+    def init(self) -> None:
+        self.__shouldPush = True
 
     def __take(self, val: T) -> bool:
         if not self.__shouldPush:
@@ -231,6 +249,9 @@ class Drop(BaseFilteringOperator[T]):
         self.__currentlyDropped = 0
         super().__init__(self.__drop)
 
+    def init(self) -> None:
+        self.__currentlyDropped = 0
+
     def __drop(self, val: T) -> bool:
         if self.__currentlyDropped < self.__count:
             self.__currentlyDropped += 1
@@ -263,6 +284,9 @@ class DropWhile(BaseFilteringOperator[T]):
         self.__fn = predicate
         self.__shouldPush = False
         super().__init__(self.__drop)
+
+    def init(self) -> None:
+        self.__shouldPush = False
 
     def __drop(self, val: T) -> bool:
         if self.__shouldPush:
@@ -298,6 +322,9 @@ class DropUntil(BaseFilteringOperator[T]):
         self.__fn = predicate
         self.__shouldPush = False
         super().__init__(self.__drop)
+
+    def init(self) -> None:
+        self.__shouldPush = False
 
     def __drop(self, val: T) -> bool:
         if self.__shouldPush:
@@ -340,6 +367,12 @@ class Pipe(Generic[T, V]):
             if isinstance(op, BaseMappingOperator):
                 v = op.transform(v)
         return cast(V, v)
+
+    def clone(self) -> "Pipe[T, V]":
+        return Pipe(T, V, deepcopy(self.__operators))  # type: ignore[misc]
+
+    def init(self) -> None:
+        Stream(self.__operators).each(lambda op: op.init())
 
 
 __all__ = [
