@@ -1,5 +1,4 @@
 from threading import Lock
-from time import time
 from typing import (
     Callable,
     Generic,
@@ -11,6 +10,7 @@ from typing import (
     Any,
     overload,
 )
+import uuid
 
 from jstreams.stream import Stream
 from jstreams.rxops import Pipe, RxOperator
@@ -42,9 +42,9 @@ class MultipleSubscriptionsException(Exception):
     def __init__(self, message: str) -> None:
         super().__init__(message)
 
-
 class ObservableSubscription(Generic[T]):
     __slots__ = (
+        "__parent",
         "__onNext",
         "__onError",
         "__onCompleted",
@@ -55,16 +55,18 @@ class ObservableSubscription(Generic[T]):
 
     def __init__(
         self,
+        parent: Any,
         onNext: NextHandler[T],
         onError: ErrorHandler = None,
         onCompleted: CompletedHandler[T] = None,
         onDispose: DisposeHandler = None,
     ) -> None:
+        self.__parent = parent
         self.__onNext = onNext
         self.__onError = onError
         self.__onCompleted = onCompleted
         self.__onDispose = onDispose
-        self.__subscriptionId = str(int(time() * 100))
+        self.__subscriptionId = str(uuid.uuid4())
         self.__paused = False
 
     def getSubscriptionId(self) -> str:
@@ -93,6 +95,10 @@ class ObservableSubscription(Generic[T]):
     def dispose(self) -> None:
         if self.__onDispose:
             self.__onDispose()
+            
+    def cancel(self) -> None:
+        if hasattr(self.__parent, "cancel"):
+            self.__parent.cancel(self)
 
 
 class _ObservableParent(Generic[T]):
@@ -144,7 +150,7 @@ class _ObservableBase(Generic[T]):
         onCompleted: CompletedHandler[T] = None,
         onDispose: DisposeHandler = None,
     ) -> ObservableSubscription[Any]:
-        sub = ObservableSubscription(onNext, onError, onCompleted, onDispose)
+        sub = ObservableSubscription(self, onNext, onError, onCompleted, onDispose)
         self.__subscriptions.append(sub)
         if self._parent is not None:
             self._parent.pushToSubOnSubscribe(sub)
