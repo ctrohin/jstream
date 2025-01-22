@@ -1,7 +1,7 @@
 Metadata-Version: 2.2
 Name: jstreams
-Version: 2.0.0
-Summary: A package providing streams and optional functionality similar to Java streams and optionals as well as a basic implementation of ReactiveX.
+Version: 2.0.2
+Summary: A package providing streams and optional functionality similar to Java streams and optionals, a vavr.io Try minimal implementation, threading utilities such as JavaScript-like setTimer and setInterval,1 as well as a basic implementation of ReactiveX.
 Author: Cristian Trohin
 Author-email: Cristian Trohin <cristi.trohin@gmail.com>
 Project-URL: Homepage, https://github.com/ctrohin/jstream
@@ -16,7 +16,13 @@ Dynamic: author
 
 # jstreams
 
-jstreams is a Python library aiming to replicate the Java Streams and Optional functionality, as well as a basic ReactiveX implementation. The library is implemented with type safety in mind.
+jstreams is a Python library aiming to replicate the following:
+- Java Streams and Optional functionality
+- a basic ReactiveX implementation
+- a minimal replication of Java's vavr.io Try
+- some utility classes for threads as well as JavaScript-like timer and interval functionality
+
+The library is implemented with type safety in mind.
 
 ## Installation
 
@@ -459,19 +465,21 @@ pipe.subscribe(
 **jstreams** allows pipes to be chained
 ```python
 subject = ReplaySubject(range(1, 100))
-self.val = []
-chainedPipe = (
-    subject.pipe(
-        rxTakeUntil(lambda e: e > 20)
-    )
-    .pipe(
-        rxFilter(lambda e: e < 10)
-    )
-    .subscribe(self.addVal)
-)
+val = []
+val2 = []
+chainedPipe = subject.pipe(
+                rxTakeUntil(lambda e: e > 20)
+            )
+            .pipe(
+                rxFilter(lambda e: e < 10)
+            )
+# val will contain 0..9
+chainedPipe.subscribe(val.append)
 
-chainedPipe.dispose()
-
+# pipes allow multiple subscriptions
+val2 = []
+# val2 will contain 0..9
+chainedPipe.subscribe(val2.append)
 ```
 
 #### Custom operators
@@ -499,6 +507,124 @@ class ReduceOperator(BaseFilteringOperator[T]):
             return True
         return False
 ```
+
+### Threads
+
+#### LoopingThread
+
+```python
+from jstreams import LoopingThread
+from time import sleep
+
+class MyThread(LoopingThread):
+    def __init__(self) -> None:
+        LoopingThread.__init__(self)
+        self.count = 0
+    
+    def loop(self) -> None:
+        # Write here the code that you want executed in a loop
+        self.count += 1
+        print(f"Executed {self.count} times")
+        # This thread calls the loop implementation with no delay. Any sleeps need to be handled in the loop method
+        sleep(1)
+thread = MyThread()
+thread.start()
+sleep(5)
+# Stop the thread from loopiong
+thread.cancel()
+```
+
+#### CallbackLoopingThread
+This looping thread doesn't require overriding the loop method. Instead, you provide a callback
+```python
+from jstreams import import CallbackLoopingThread
+from time import sleep
+
+def threadCallback() -> None:
+    print("Callback executed")
+    sleep(1)
+
+thread = CallbackLoopingThread(threadCallback)
+# will print "Callback executed" until the thread is cancelled
+thread.start()
+
+sleep(5)
+# Stops the thread from looping
+thread.cancel()
+```
+#### Timer
+The Timer thread will start counting down to the given time period, and execute the provided callback once the time period has ellapsed. The timer can be cancelled before the period expires.
+```python
+from jstreams import import Timer
+from time import sleep
+
+timer = Timer(10, 1, lambda: print("Executed"))
+timer.start()
+# After 10 seconds "Executed" will be printed
+```
+
+```python
+from jstreams import import Timer
+from time import sleep
+
+# The first parameter is the time period, the second is the cancelPollingInterval.
+# The cancel polling interval is used by the timer to check if cancel was called on the timer.
+timer = Timer(10, 1, lambda: print("Executed"))
+timer.start()
+sleep(5)
+timer.cancel()
+# Nothing will be printed, as this timer has been canceled before the period could ellapse
+```
+
+#### Interval
+The interval executes a given callback at fixed intervals of time.
+```python
+from jstreams import Interval
+from time import sleep
+interval = Interval(2, lambda: print("Interval executed"))
+interval.start()
+# Will print "Interval executed" every 2 seconds
+sleep(10)
+# Stops the interval from executing
+interval.cancel()
+```
+
+#### CountdownTimer
+The countdown timer is similar in functionality with the Timer class, with the exception that this timer cannot be canceled. Once started, the callback will always execute after the period has ellapsed.
+```python
+from jstreams import CountdownTimer
+
+CountdownTimer(5, lambda: print("Countdown executed")).start()
+# Will always print "Countdown executed" after 5 seconds
+```
+
+#### JS-like usage
+jstreams also provides some helper functions to simplify the usage of timers in the style of JavaScript.
+
+```python
+from jstreams import setTimer, setInterval, clear
+
+# Starts a timer for 5 seconds
+setTimer(5, lambda: print("Timer done"))
+
+# Starts an interval at 5 seconds
+setInterval(5, lambda: print("Interval executed"))
+
+# Starts another timer for 10 seconds
+timer = setTimer(10, lambda: print("Second timer done"))
+# Wait 5 seconds
+sleep(5)
+# Clear the timer. The timer will not complete, since it was cancelled
+clear(timer)
+
+# Starts another interval at 2 seconds
+interval = setInterval(2, lambda: print("Second interval executed"))
+# Allow the interval to execute for 10 seconds
+sleep(10)
+# Cancel the interval. This interval will stop executing the callback
+clear(interval)
+```
+
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)

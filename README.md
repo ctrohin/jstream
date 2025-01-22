@@ -1,6 +1,13 @@
 # jstreams
 
-jstreams is a Python library aiming to replicate the Java Streams and Optional functionality, as well as a basic ReactiveX implementation. The library is implemented with type safety in mind.
+jstreams is a Python library aiming to replicate the following:
+- Java Streams and Optional functionality
+- a basic ReactiveX implementation
+- a minimal replication of Java's vavr.io Try
+- a basic dependency injection container
+- some utility classes for threads as well as JavaScript-like timer and interval functionality
+
+The library is implemented with type safety in mind.
 
 ## Installation
 
@@ -485,6 +492,245 @@ class ReduceOperator(BaseFilteringOperator[T]):
             return True
         return False
 ```
+
+### Dependency injection container
+The dependency injection container built into **jstreams** is a simple and straightforward implementation, providing two sets of methods for:
+- providing dependencies
+- retrieving dependencies
+The container does not support parameter injection or constructor injection.
+
+#### How can I use the dependency injection container
+The idea behind the DI container is to use interfaces in order to provide functionality in applications.
+```python
+import abc
+from jstreams import Injector
+
+# Use the abstraction of interfaces
+class MyInterface(abc):
+    def doSomething(self) -> None:
+        pass
+
+# This is the actual class we want to use
+class MyConcreteClass(MyInterface):
+    def doSomething(self) -> None:
+        print("Something got done")
+
+Injector.provide(MyInterface, MyConcreteClass())
+
+# When the functionality defined by the interface is needed, you can retrieve it
+myObj = Injector.get(MyInterface)
+myObj.doSomething()
+
+# Then, during testing, you can mock the interface
+class MyInterfaceMock(MyInterface):
+    def __init__(self) -> None:
+        self.methodCalled = False
+    
+    def doSomething(self) -> None:
+        self.methodCalled = True
+
+# the provide it to the injector before executing your tests
+mock = MyInterfaceMock()
+Injector.provide(MyInterface, mock)
+## execute test code
+# then check if the execution happened
+assertTrue(mock.methodCalled)
+```
+
+#### Providing and retrieving non qualified dependencies
+```python
+from jstreams import Injector, injector
+from mypackage import MyClass, MyOtherClass
+
+# Providing a single dependency using the Injector object
+Injector.provide(MyClass, MyClass())
+# or use the helper function
+injector().provide(MyClass, MyClass())
+
+# Providing multiple dependecies
+Injector.provideDependencies({
+    MyClass: MyClass(),
+    MyOtherClass: MyOtherClass(),
+})
+
+# Retrieve using get. This method will raise a ValueError if no object was provided for MyClass
+myClass = Injector.get(MyClass)
+# or use the helper function
+myClass = injector().get(MyClass)
+
+# Retrieve using find. This method returns an Optional and does not raise a ValueError. The missing dependency needs to be handled by the caller
+myOtherClass = Injector.find(MyOtherClass)
+# or user the helper function
+myOtherClass = injector().find(MyOtherClass)
+```
+
+
+#### Providing and retrieving qualified dependencies
+```python
+from jstreams import Injector, injector
+from mypackage import MyClass, MyNotCalledClass
+
+# Providing a single dependency using the Injector object and a qualified name
+Injector.provide(MyClass, MyClass(), "qualifiedName")
+# or use the helper function
+injector().provide(MyClass, MyClass(), "differentName")
+
+
+# Retrieve the first object using get by its name. This method will raise a ValueError if no object was provided for MyClass and the given qualifier
+myClass = Injector.get(MyClass, "qualifiedName")
+# Retrieve the second provided object by its qualified name. 
+myClassDifferentInstance = injector().get(MyClass, "differentName")
+
+# Retrieve using find. This method returns an Optional and does not raise a ValueError. The missing dependency needs to be handled by the caller
+myClass = Injector.find(MyClass, "qualifiedName")
+# or use the helper function
+myClassDifferentInstance = injector().find(MyClass, "differentName")
+
+# Using defaults. This method will try to resolve the object for MyNotCalledClass, and if no object is found, the builder function provider will be called and its return value returned and used by the container for the given class.
+myNotCalledObject = Injector.findOr(MyNotCalledClass, lambda: MyNotCalledClass())
+```
+
+#### Providing and retrieving variables
+```python
+from jstreams import Injector
+
+# Provide a single variable of type string
+Injector.provideVar(str, "myString", "myStringValue")
+
+# Provide a single variable of type int
+Injector.provideVar(int, "myInt", 7)
+
+# Provide multiple variables
+Injector.provideVariables([
+    (str, "myString", "myStringValue"),
+    (int, "myInt", 7),
+])
+
+# Retrieving a variable value using get. This method will raise a ValueError if no object was provided for the variable class and the given name
+myString = Injector.getVar(str, "myString")
+# retrieving another value using find. This method returns an Optional and does not raise a ValueError. The missing value needs to be handled by the caller
+myInt = Injector.findVar(int, "myInt")
+# retrieving a value with a default fallback if the value is not present
+myString = Injector.findVarOr(str, "myStrint", "defaultValue")
+```
+
+### Threads
+
+#### LoopingThread
+
+```python
+from jstreams import LoopingThread
+from time import sleep
+
+class MyThread(LoopingThread):
+    def __init__(self) -> None:
+        LoopingThread.__init__(self)
+        self.count = 0
+    
+    def loop(self) -> None:
+        # Write here the code that you want executed in a loop
+        self.count += 1
+        print(f"Executed {self.count} times")
+        # This thread calls the loop implementation with no delay. Any sleeps need to be handled in the loop method
+        sleep(1)
+thread = MyThread()
+thread.start()
+sleep(5)
+# Stop the thread from loopiong
+thread.cancel()
+```
+
+#### CallbackLoopingThread
+This looping thread doesn't require overriding the loop method. Instead, you provide a callback
+```python
+from jstreams import import CallbackLoopingThread
+from time import sleep
+
+def threadCallback() -> None:
+    print("Callback executed")
+    sleep(1)
+
+thread = CallbackLoopingThread(threadCallback)
+# will print "Callback executed" until the thread is cancelled
+thread.start()
+
+sleep(5)
+# Stops the thread from looping
+thread.cancel()
+```
+#### Timer
+The Timer thread will start counting down to the given time period, and execute the provided callback once the time period has ellapsed. The timer can be cancelled before the period expires.
+```python
+from jstreams import import Timer
+from time import sleep
+
+timer = Timer(10, 1, lambda: print("Executed"))
+timer.start()
+# After 10 seconds "Executed" will be printed
+```
+
+```python
+from jstreams import import Timer
+from time import sleep
+
+# The first parameter is the time period, the second is the cancelPollingInterval.
+# The cancel polling interval is used by the timer to check if cancel was called on the timer.
+timer = Timer(10, 1, lambda: print("Executed"))
+timer.start()
+sleep(5)
+timer.cancel()
+# Nothing will be printed, as this timer has been canceled before the period could ellapse
+```
+
+#### Interval
+The interval executes a given callback at fixed intervals of time.
+```python
+from jstreams import Interval
+from time import sleep
+interval = Interval(2, lambda: print("Interval executed"))
+interval.start()
+# Will print "Interval executed" every 2 seconds
+sleep(10)
+# Stops the interval from executing
+interval.cancel()
+```
+
+#### CountdownTimer
+The countdown timer is similar in functionality with the Timer class, with the exception that this timer cannot be canceled. Once started, the callback will always execute after the period has ellapsed.
+```python
+from jstreams import CountdownTimer
+
+CountdownTimer(5, lambda: print("Countdown executed")).start()
+# Will always print "Countdown executed" after 5 seconds
+```
+
+#### JS-like usage
+jstreams also provides some helper functions to simplify the usage of timers in the style of JavaScript.
+
+```python
+from jstreams import setTimer, setInterval, clear
+
+# Starts a timer for 5 seconds
+setTimer(5, lambda: print("Timer done"))
+
+# Starts an interval at 5 seconds
+setInterval(5, lambda: print("Interval executed"))
+
+# Starts another timer for 10 seconds
+timer = setTimer(10, lambda: print("Second timer done"))
+# Wait 5 seconds
+sleep(5)
+# Clear the timer. The timer will not complete, since it was cancelled
+clear(timer)
+
+# Starts another interval at 2 seconds
+interval = setInterval(2, lambda: print("Second interval executed"))
+# Allow the interval to execute for 10 seconds
+sleep(10)
+# Cancel the interval. This interval will stop executing the callback
+clear(interval)
+```
+
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)

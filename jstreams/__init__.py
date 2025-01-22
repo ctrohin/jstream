@@ -45,6 +45,30 @@ from jstreams.rxops import (
     BaseMappingOperator,
 )
 
+from jstreams.thread import (
+    LoopingThread,
+    CallbackLoopingThread,
+    cancelThread,
+)
+
+from jstreams.timer import (
+    Timer,
+    Interval,
+    CountdownTimer,
+    setTimer,
+    setInterval,
+    clear,
+)
+
+from jstreams.ioc import (
+    Injector,
+    injector,
+)
+
+from jstreams.noop import (
+    NoOp,
+    NoOpCls,
+)
 __all__ = [
     "each",
     "dictUpdate",
@@ -81,4 +105,17 @@ __all__ = [
     "RxOperator",
     "BaseFilteringOperator",
     "BaseMappingOperator",
+    "LoopingThread",
+    "CallbackLoopingThread",
+    "Timer",
+    "Interval",
+    "CountdownTimer",
+    "cancelThread",
+    "setTimer",
+    "setInterval",
+    "clear",
+    "Injector",
+    "injector",
+    "NoOp",
+    "NoOpCls",
 ]

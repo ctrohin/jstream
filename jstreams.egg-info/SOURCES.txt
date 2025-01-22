@@ -11,6 +11,10 @@ jstreams/rxops.py
 jstreams/rxops.pyi
 jstreams/stream.py
 jstreams/stream.pyi
+jstreams/thread.py
+jstreams/thread.pyi
+jstreams/timer.py
+jstreams/timer.pyi
 jstreams/tryOpt.py
 jstreams/tryOpt.pyi
 jstreams.egg-info/PKG-INFO
