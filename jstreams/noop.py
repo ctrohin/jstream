@@ -42,4 +42,7 @@ class NoOpCls:
 
 NoOp = NoOpCls()
 
-__all__ = ["NoOp", "NoOpCls"]
+def noop() -> NoOpCls:
+    return NoOp
+
+__all__ = ["noop", "NoOpCls"]

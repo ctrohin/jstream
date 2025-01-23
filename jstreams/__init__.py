@@ -61,13 +61,14 @@ from jstreams.timer import (
 )
 
 from jstreams.ioc import (
-    Injector,
     injector,
+    AutoInit,
+    AutoStart,
 )
 
 from jstreams.noop import (
-    NoOp,
     NoOpCls,
+    noop,
 )
 __all__ = [
     "each",
@@ -116,6 +117,6 @@ __all__ = [
     "clear",
     "Injector",
     "injector",
-    "NoOp",
     "NoOpCls",
+    "noop",
 ]

@@ -1,7 +1,7 @@
 from _typeshed import Incomplete
 from typing import Any
 
-__all__ = ['NoOp', 'NoOpCls']
+__all__ = ['noop', 'NoOpCls']
 
 class NoOpCls:
     level: Incomplete
@@ -11,4 +11,4 @@ class NoOpCls:
     def __getitem__(self, item: Any) -> Any: ...
     def __enter__(self) -> Any: ...
 
-NoOp: Incomplete
+def noop() -> NoOpCls: ...

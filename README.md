@@ -503,7 +503,7 @@ The container does not support parameter injection or constructor injection.
 The idea behind the DI container is to use interfaces in order to provide functionality in applications.
 ```python
 import abc
-from jstreams import Injector
+from jstreams import injector
 
 # Use the abstraction of interfaces
 class MyInterface(abc):
@@ -515,10 +515,10 @@ class MyConcreteClass(MyInterface):
     def doSomething(self) -> None:
         print("Something got done")
 
-Injector.provide(MyInterface, MyConcreteClass())
+injector().provide(MyInterface, MyConcreteClass())
 
 # When the functionality defined by the interface is needed, you can retrieve it
-myObj = Injector.get(MyInterface)
+myObj = injector().get(MyInterface)
 myObj.doSomething()
 
 # Then, during testing, you can mock the interface
@@ -531,7 +531,7 @@ class MyInterfaceMock(MyInterface):
 
 # the provide it to the injector before executing your tests
 mock = MyInterfaceMock()
-Injector.provide(MyInterface, mock)
+injector().provide(MyInterface, mock)
 ## execute test code
 # then check if the execution happened
 assertTrue(mock.methodCalled)
@@ -539,79 +539,70 @@ assertTrue(mock.methodCalled)
 
 #### Providing and retrieving non qualified dependencies
 ```python
-from jstreams import Injector, injector
+from jstreams import injector
 from mypackage import MyClass, MyOtherClass
 
 # Providing a single dependency using the Injector object
-Injector.provide(MyClass, MyClass())
-# or use the helper function
 injector().provide(MyClass, MyClass())
 
 # Providing multiple dependecies
-Injector.provideDependencies({
+injector().provideDependencies({
     MyClass: MyClass(),
     MyOtherClass: MyOtherClass(),
 })
 
 # Retrieve using get. This method will raise a ValueError if no object was provided for MyClass
-myClass = Injector.get(MyClass)
-# or use the helper function
 myClass = injector().get(MyClass)
 
 # Retrieve using find. This method returns an Optional and does not raise a ValueError. The missing dependency needs to be handled by the caller
-myOtherClass = Injector.find(MyOtherClass)
-# or user the helper function
 myOtherClass = injector().find(MyOtherClass)
 ```
 
 
 #### Providing and retrieving qualified dependencies
 ```python
-from jstreams import Injector, injector
+from jstreams import injector
 from mypackage import MyClass, MyNotCalledClass
 
 # Providing a single dependency using the Injector object and a qualified name
-Injector.provide(MyClass, MyClass(), "qualifiedName")
-# or use the helper function
-injector().provide(MyClass, MyClass(), "differentName")
-
+injector().provide(MyClass, MyClass(), "qualifiedName")
 
 # Retrieve the first object using get by its name. This method will raise a ValueError if no object was provided for MyClass and the given qualifier
-myClass = Injector.get(MyClass, "qualifiedName")
+myClass = injector().get(MyClass, "qualifiedName")
 # Retrieve the second provided object by its qualified name. 
 myClassDifferentInstance = injector().get(MyClass, "differentName")
 
 # Retrieve using find. This method returns an Optional and does not raise a ValueError. The missing dependency needs to be handled by the caller
-myClass = Injector.find(MyClass, "qualifiedName")
-# or use the helper function
+myClass = injector().find(MyClass, "qualifiedName")
+# or get the different instance
 myClassDifferentInstance = injector().find(MyClass, "differentName")
 
 # Using defaults. This method will try to resolve the object for MyNotCalledClass, and if no object is found, the builder function provider will be called and its return value returned and used by the container for the given class.
-myNotCalledObject = Injector.findOr(MyNotCalledClass, lambda: MyNotCalledClass())
+myNotCalledObject = injector().findOr(MyNotCalledClass, lambda: MyNotCalledClass())
 ```
 
 #### Providing and retrieving variables
 ```python
-from jstreams import Injector
+from jstreams import injector
 
 # Provide a single variable of type string
-Injector.provideVar(str, "myString", "myStringValue")
+injector().provideVar(str, "myString", "myStringValue")
 
 # Provide a single variable of type int
-Injector.provideVar(int, "myInt", 7)
+injector().provideVar(int, "myInt", 7)
 
 # Provide multiple variables
-Injector.provideVariables([
+injector().provideVariables([
     (str, "myString", "myStringValue"),
     (int, "myInt", 7),
 ])
 
 # Retrieving a variable value using get. This method will raise a ValueError if no object was provided for the variable class and the given name
-myString = Injector.getVar(str, "myString")
+myString = injector().getVar(str, "myString")
 # retrieving another value using find. This method returns an Optional and does not raise a ValueError. The missing value needs to be handled by the caller
-myInt = Injector.findVar(int, "myInt")
+myInt = injector().findVar(int, "myInt")
 # retrieving a value with a default fallback if the value is not present
-myString = Injector.findVarOr(str, "myStrint", "defaultValue")
+myString = injector().findVarOr(str, "myStrint", "defaultValue")
 ```
 
 ### Threads

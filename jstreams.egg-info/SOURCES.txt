@@ -4,6 +4,10 @@ pyproject.toml
 setup.py
 jstreams/__init__.py
 jstreams/__init__.pyi
+jstreams/ioc.py
+jstreams/ioc.pyi
+jstreams/noop.py
+jstreams/noop.pyi
 jstreams/py.typed
 jstreams/rx.py
 jstreams/rx.pyi
@@ -21,7 +25,9 @@ jstreams.egg-info/PKG-INFO
 jstreams.egg-info/SOURCES.txt
 jstreams.egg-info/dependency_links.txt
 jstreams.egg-info/top_level.txt
+test/test_ioc.py
 test/test_opt.py
 test/test_rx.py
 test/test_stream.py
+test/test_timers.py
 test/test_try.py
