@@ -64,6 +64,8 @@ from jstreams.ioc import (
     injector,
     AutoInit,
     AutoStart,
+    inject,
+    var,
 )
 
 from jstreams.noop import (
@@ -119,4 +121,6 @@ __all__ = [
     "injector",
     "NoOpCls",
     "noop",
+    "inject",
+    "var",
 ]
