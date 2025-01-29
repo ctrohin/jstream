@@ -8,7 +8,7 @@ V = TypeVar("V")
 
 
 class ErrorLog(Protocol):
-    def error(self, msg, *args, **kwargs):  # type: ignore[no-untyped-def]
+    def error(self, msg: Any, *args: Any, **kwargs: Any) -> Any:
         pass
 
 
@@ -62,8 +62,8 @@ class Try(Generic[T]):
                 self.__onFailure(e)
             if self.__errorLog is not None:
                 if self.__errorMessage is not None:
-                    self.__errorLog.error(self.__errorMessage)  # type: ignore[no-untyped-call]
-                self.__errorLog.error(e, exc_info=True)  # type: ignore[no-untyped-call]
+                    self.__errorLog.error(self.__errorMessage)
+                self.__errorLog.error(e, exc_info=True)
         return Opt(None)
 
     def hasFailed(self) -> bool:

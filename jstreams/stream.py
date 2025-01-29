@@ -552,6 +552,39 @@ class Opt(Generic[T]):
             return self.__val
         raise exceptionSupplier()
 
+    def ifPresentMap(self, isPresentMapper: Callable[[T], V], orElseSupplier: Callable[[], Optional[V]]) -> "Opt[V]":
+        """
+        If the optional value is present, returns the value mapped by isPresentMapper wrapped in an Opt.
+        If the optional value is not present, returns the value produced by orElseSupplier
+
+        Args:
+            isPresentMapper (Callable[[T], V]): The presence mapper
+            orElseSupplier (Callable[[], V]): The missing value producer
+
+        Returns:
+            Opt[V]: An optional
+        """
+        if self.__val is None:
+            return Opt(orElseSupplier())
+        return Opt(isPresentMapper(self.__val))
+
+    def ifPresentMapWith(self, withVal: K, isPresentMapper: Callable[[T, K], V], orElseSupplier: Callable[[K], Optional[V]]) -> "Opt[V]":
+        """
+        If the optional value is present, returns the value mapped by isPresentMapper wrapped in an Opt.
+        If the optional value is not present, returns the value produced by orElseSupplier.
+        In addition to ifPresentMap, this method also passes the withVal param to the mapper and supplier
+
+        Args:
+            withVal (K): The additional mapper value
+            isPresentMapper (Callable[[T, K], V]): The presence mapper
+            orElseSupplier (Callable[[K], V]): The missing value producer
+
+        Returns:
+            Opt[V]: An optional
+        """
+        if self.__val is None:
+            return Opt(orElseSupplier(withVal))
+        return Opt(isPresentMapper(self.__val, withVal))
 
 class ClassOps:
     __slots__ = ("__classType",)

@@ -158,5 +158,10 @@ Injector = _Injector.getInstance()
 def injector() -> _Injector:
     return Injector
 
+def inject(className: type[T], qualifier: Optional[str] = None) -> T:
+    return injector().get(className, qualifier)
+    
+def var(className: type[T], qualifier: str) -> T:
+    return injector().getVar(className, qualifier)
 
-__all__ = ["Injector", "AutoStart", "AutoInit", "injector"]
+__all__ = ["Injector", "AutoStart", "AutoInit", "injector", "inject", "var"]

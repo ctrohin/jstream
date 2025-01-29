@@ -3,7 +3,7 @@ from jstreams.noop import NoOpCls
 from threading import Lock
 from typing import Any, Callable, TypeVar
 
-__all__ = ['Injector', 'AutoStart', 'AutoInit', 'injector']
+__all__ = ['Injector', 'AutoStart', 'AutoInit', 'injector', 'inject', 'var']
 
 class AutoStart:
     def start(self) -> None: ...
@@ -43,3 +43,5 @@ class _Injector:
 Injector: Incomplete
 
 def injector() -> _Injector: ...
+def inject(className: type[T], qualifier: str | None = None) -> T: ...
+def var(className: type[T], qualifier: str) -> T: ...
