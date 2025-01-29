@@ -315,14 +315,43 @@ class Opt(Generic[T]):
         """
         return self.__val if self.__val is not None else val
 
-    def getOrElseGet(self, supplier: Callable[[], Optional[T]]) -> Optional[T]:
+    def getOrElseOpt(self, val: Optional[T]) -> Optional[T]:
+        """
+        Returns the value of the Opt if present, otherwise return the given parameter as a fallback.
+        This functiona should be used when the given fallback is a constant or it does not require
+        heavy computation
+
+        Args:
+            val (Optional[T]): The optional fallback value
+
+        Returns:
+            T: The return value
+        """
+        return self.__val if self.__val is not None else val
+
+    def getOrElseGetOpt(self, supplier: Callable[[], Optional[T]]) -> Optional[T]:
         """
         Returns the value of the Opt if present, otherwise it will call the supplier
         function and return that value. This function is useful when the fallback value
         is compute heavy and should only be called when the value of the Opt is None
 
         Args:
-            supplier (Callable[[], Optional[T]]): _description_
+            supplier (Callable[[], T]): The mandatory return supplier
+
+        Returns:
+            Optional[T]: The resulting value
+        """
+        return self.__val if self.__val is not None else supplier()
+
+
+    def getOrElseGet(self, supplier: Callable[[], T]) -> T:
+        """
+        Returns the value of the Opt if present, otherwise it will call the supplier
+        function and return that value. This function is useful when the fallback value
+        is compute heavy and should only be called when the value of the Opt is None
+
+        Args:
+            supplier (Callable[[], T]): The mandatory value supplier
 
         Returns:
             Optional[T]: _description_
@@ -347,17 +376,20 @@ class Opt(Generic[T]):
         """
         return self.__val is None
 
-    def ifPresent(self, action: Callable[[T], Any]) -> None:
+    def ifPresent(self, action: Callable[[T], Any]) -> "Opt[T]":
         """
         Executes an action on the value of the Opt if the value is present
 
         Args:
             action (Callable[[T], Any]): The action
+        Returns:
+            Opt[T]: This optional
         """
         if self.__val is not None:
             action(self.__val)
+        return self
 
-    def ifPresentWith(self, withVal: K, action: Callable[[T, K], Any]) -> None:
+    def ifPresentWith(self, withVal: K, action: Callable[[T, K], Any]) -> "Opt[T]":
         """
         Executes an action on the value of the Opt if the value is present, by providing
         the action an additional parameter
@@ -365,13 +397,16 @@ class Opt(Generic[T]):
         Args:
             withVal (K): The additional parameter
             action (Callable[[T, K], Any]): The action
+        Returns:
+            Opt[T]: This optional
         """
         if self.__val is not None:
             action(self.__val, withVal)
+        return self
 
     def ifPresentOrElse(
         self, action: Callable[[T], Any], emptyAction: Callable[[], Any]
-    ) -> None:
+    ) -> "Opt[T]":
         """
         Executes an action on the value of the Opt if the value is present, or executes
         the emptyAction if the Opt is empty
@@ -379,15 +414,18 @@ class Opt(Generic[T]):
         Args:
             action (Callable[[T], Any]): The action to be executed when present
             emptyAction (Callable[[], Any]): The action to be executed when empty
+        Returns:
+            Opt[T]: This optional
         """
         if self.__val is not None:
             action(self.__val)
         else:
             emptyAction()
+        return self
 
     def ifPresentOrElseWith(
         self, withVal: K, action: Callable[[T, K], Any], emptyAction: Callable[[K], Any]
-    ) -> None:
+    ) -> "Opt[T]":
         """
         Executes an action on the value of the Opt by providing the actions an additional parameter,
         if the value is present, or executes the emptyAction if the Opt is empty
@@ -401,6 +439,7 @@ class Opt(Generic[T]):
             action(self.__val, withVal)
         else:
             emptyAction(withVal)
+        return self
 
     def filter(self, predicate: Callable[[T], bool]) -> "Opt[T]":
         """
@@ -475,6 +514,18 @@ class Opt(Generic[T]):
         Returns:
             Opt[T]: The resulting Opt
         """
+        return self.orElseOpt(supplier)
+
+    def orElseOpt(self, supplier: Callable[[], Optional[T]]) -> "Opt[T]":
+        """
+        Returns this Opt if present, otherwise will return the supplier result
+
+        Args:
+            supplier (Callable[[], Optional[T]]): The fallback supplier
+
+        Returns:
+            Opt[T]: The resulting Opt
+        """
         if self.isPresent():
             return self
         return Opt(supplier())
@@ -487,6 +538,20 @@ class Opt(Generic[T]):
         Args:
             withVal (K): The additional parameter
             supplier (Callable[[K], T]): The supplier
+
+        Returns:
+            Opt[T]: The resulting Opt
+        """
+        return self.orElseWithOpt(withVal, supplier)
+
+    def orElseWithOpt(self, withVal: K, supplier: Callable[[K], Optional[T]]) -> "Opt[T]":
+        """
+        Returns this Opt if present, otherwise will return the supplier result with
+        the additional parameter
+
+        Args:
+            withVal (K): The additional parameter
+            supplier (Callable[[K], Optional[T]]): The supplier
 
         Returns:
             Opt[T]: The resulting Opt
@@ -552,7 +617,11 @@ class Opt(Generic[T]):
             return self.__val
         raise exceptionSupplier()
 
-    def ifPresentMap(self, isPresentMapper: Callable[[T], V], orElseSupplier: Callable[[], Optional[V]]) -> "Opt[V]":
+    def ifPresentMap(
+        self,
+        isPresentMapper: Callable[[T], V],
+        orElseSupplier: Callable[[], Optional[V]],
+    ) -> "Opt[V]":
         """
         If the optional value is present, returns the value mapped by isPresentMapper wrapped in an Opt.
         If the optional value is not present, returns the value produced by orElseSupplier
@@ -568,7 +637,12 @@ class Opt(Generic[T]):
             return Opt(orElseSupplier())
         return Opt(isPresentMapper(self.__val))
 
-    def ifPresentMapWith(self, withVal: K, isPresentMapper: Callable[[T, K], V], orElseSupplier: Callable[[K], Optional[V]]) -> "Opt[V]":
+    def ifPresentMapWith(
+        self,
+        withVal: K,
+        isPresentMapper: Callable[[T, K], V],
+        orElseSupplier: Callable[[K], Optional[V]],
+    ) -> "Opt[V]":
         """
         If the optional value is present, returns the value mapped by isPresentMapper wrapped in an Opt.
         If the optional value is not present, returns the value produced by orElseSupplier.
@@ -585,6 +659,32 @@ class Opt(Generic[T]):
         if self.__val is None:
             return Opt(orElseSupplier(withVal))
         return Opt(isPresentMapper(self.__val, withVal))
+
+    def instanceOf(self, classType: type) -> "Opt[T]":
+        """
+        Equivalent of Opt.filter(lambda val: isinstance(val, classType))
+
+        Args:
+            classType (type): The class type
+
+        Returns:
+            Opt[T]: An optional
+        """
+        if isinstance(self.__val, classType):
+            return self
+        return Opt(None)
+
+    def cast(self, classType: type[V]) -> "Opt[V]":
+        """
+        Equivalent of Opt.map(lambda val: cast(classType, val))
+
+        Args:
+            classType (type[V]): The class type of the new optional
+
+        Returns:
+            Opt[V]: An optional
+        """
+        return Opt(cast(classType, self.__val))
 
 class ClassOps:
     __slots__ = ("__classType",)

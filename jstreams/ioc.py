@@ -1,6 +1,7 @@
 from threading import Lock
 from typing import Any, Callable, Optional, TypeAlias, TypeVar, Union, cast
 from jstreams.noop import NoOp, NoOpCls
+
 AnyDict: TypeAlias = dict[str, Any]
 
 
@@ -58,7 +59,12 @@ class _Injector:
 
     def getVar(self, className: type[T], qualifier: str) -> T:
         if (foundVar := self.findVar(className, qualifier)) is None:
-            raise ValueError("No variable found for class " + str(className) + " and qualifier " + qualifier)
+            raise ValueError(
+                "No variable found for class "
+                + str(className)
+                + " and qualifier "
+                + qualifier
+            )
         return foundVar
 
     def findVar(self, className: type[T], qualifier: str) -> Optional[T]:
@@ -82,7 +88,9 @@ class _Injector:
         foundObj = self._get(className, qualifier)
         return orCall() if foundObj is None else cast(T, foundObj)
 
-    def findNoOp(self, className: type[T], qualifier: Optional[str] = None) -> Union[T, NoOpCls]:
+    def findNoOp(
+        self, className: type[T], qualifier: Optional[str] = None
+    ) -> Union[T, NoOpCls]:
         if (foundObj := self.find(className, qualifier)) is None:
             return NoOp
         return foundObj
@@ -99,7 +107,9 @@ class _Injector:
                     _Injector.instance = _Injector()
         return _Injector.instance
 
-    def provideVarIfNotNull(self, className: type, qualifier: str, value: Any) -> "_Injector":
+    def provideVarIfNotNull(
+        self, className: type, qualifier: str, value: Any
+    ) -> "_Injector":
         if value is not None:
             self.provideVar(className, qualifier, value)
         return self
@@ -114,7 +124,9 @@ class _Injector:
         return self
 
     # Register a component with the container
-    def provide(self, className: type, comp: Any, qualifier: Optional[str] = None) -> "_Injector":
+    def provide(
+        self, className: type, comp: Any, qualifier: Optional[str] = None
+    ) -> "_Injector":
         if (containerDep := self.__components.get(className)) is None:
             containerDep = ContainerDependency()
             self.__components[className] = containerDep
@@ -158,10 +170,13 @@ Injector = _Injector.getInstance()
 def injector() -> _Injector:
     return Injector
 
+
 def inject(className: type[T], qualifier: Optional[str] = None) -> T:
     return injector().get(className, qualifier)
-    
+
+
 def var(className: type[T], qualifier: str) -> T:
     return injector().getVar(className, qualifier)
+
 
 __all__ = ["Injector", "AutoStart", "AutoInit", "injector", "inject", "var"]

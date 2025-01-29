@@ -42,6 +42,7 @@ class MultipleSubscriptionsException(Exception):
     def __init__(self, message: str) -> None:
         super().__init__(message)
 
+
 class ObservableSubscription(Generic[T]):
     __slots__ = (
         "__parent",
@@ -95,7 +96,7 @@ class ObservableSubscription(Generic[T]):
     def dispose(self) -> None:
         if self.__onDispose:
             self.__onDispose()
-            
+
     def cancel(self) -> None:
         if hasattr(self.__parent, "cancel"):
             self.__parent.cancel(self)

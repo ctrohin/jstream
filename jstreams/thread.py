@@ -2,9 +2,11 @@ import abc
 from threading import Thread
 from typing import Any, Callable, Protocol
 
+
 class Cancellable(Protocol):
     def cancel(self) -> None:
         pass
+
 
 class LoopingThread(Thread, abc.ABC, Cancellable):
     """
@@ -55,6 +57,7 @@ class CallbackLoopingThread(LoopingThread):
 
     def loop(self) -> None:
         self.__target()
+
 
 def cancelThread(thread: Cancellable) -> None:
     thread.cancel()

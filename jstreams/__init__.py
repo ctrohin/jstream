@@ -72,6 +72,7 @@ from jstreams.noop import (
     NoOpCls,
     noop,
 )
+
 __all__ = [
     "each",
     "dictUpdate",

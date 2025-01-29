@@ -91,6 +91,7 @@ class Interval(LoopingThread):
         sleep(self.__interval)
         self.__callback()
 
+
 class CountdownTimer(Thread):
     """
     CountdownTimer is similar to Timer, but doesn't poll for cancellation.
@@ -122,15 +123,18 @@ class CountdownTimer(Thread):
         sleep(self.__timeout)
         self.__callback()
 
+
 def setTimer(timeout: float, callback: Callable[[], Any]) -> Cancellable:
     timer = Timer(timeout, 1, callback)
     timer.start()
     return timer
 
+
 def setInterval(interval: float, callback: Callable[[], Any]) -> Cancellable:
     timer = Interval(interval, callback)
     timer.start()
     return timer
+
 
 def clear(cancellable: Cancellable) -> None:
     cancellable.cancel()
