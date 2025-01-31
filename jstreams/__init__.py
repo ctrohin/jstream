@@ -73,6 +73,28 @@ from jstreams.noop import (
     noop,
 )
 
+from jstreams.utils import (
+    requireNotNull,
+    isNumber,
+    toInt,
+    toFloat,
+    asList,
+    keysAsList,
+)
+
+from jstreams.predicate import (
+    isTrue,
+    isFalse,
+    isNone,
+    isIn,
+    isNotIn,
+    equals,
+    isBlank,
+    default,
+    allNone,
+    allNotNone,
+)
+
 __all__ = [
     "each",
     "dictUpdate",
@@ -118,10 +140,25 @@ __all__ = [
     "setTimer",
     "setInterval",
     "clear",
-    "Injector",
     "injector",
     "NoOpCls",
     "noop",
     "inject",
     "var",
+    "requireNotNull",
+    "isNumber",
+    "toInt",
+    "toFloat",
+    "asList",
+    "keysAsList",
+    "isTrue",
+    "isFalse",
+    "isNone",
+    "isIn",
+    "isNotIn",
+    "equals",
+    "isBlank",
+    "default",
+    "allNone",
+    "allNotNone",
 ]

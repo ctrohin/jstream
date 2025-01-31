@@ -404,6 +404,35 @@ class Opt(Generic[T]):
             action(self.__val, withVal)
         return self
 
+    def ifNotPresent(self, action: Callable[[], Any]) -> "Opt[T]":
+        """
+        Executes an action on if the value is not present
+
+        Args:
+            action (Callable[[], Any]): The action
+        Returns:
+            Opt[T]: This optional
+        """
+        if self.__val is None:
+            action()
+        return self
+
+    def ifNotPresentWith(self, withVal: K, action: Callable[[K], Any]) -> "Opt[T]":
+        """
+        Executes an action on if the value is not present, by providing
+        the action an additional parameter
+
+        Args:
+            withVal (K): The additional parameter
+            action (Callable[[K], Any]): The action
+        Returns:
+            Opt[T]: This optional
+        """
+        if self.__val is None:
+            action(withVal)
+        return self
+
+
     def ifPresentOrElse(
         self, action: Callable[[T], Any], emptyAction: Callable[[], Any]
     ) -> "Opt[T]":
@@ -684,7 +713,7 @@ class Opt(Generic[T]):
         Returns:
             Opt[V]: An optional
         """
-        return Opt(cast(classType, self.__val))
+        return Opt(cast(V, self.__val))
 
 class ClassOps:
     __slots__ = ("__classType",)
