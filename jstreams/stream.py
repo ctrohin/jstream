@@ -1082,12 +1082,38 @@ class Stream(Generic[T]):
 
     def toSet(self) -> set[T]:
         """
-        Creates a set witht he contents of the stream
+        Creates a set with the contents of the stream
 
         Returns:
             set[T]: The set
         """
         return set(self.__arg)
+
+    def toDictAsValues(self, keyMapper: Callable[[T], V]) -> dict[V, T]:
+        """
+        Creates a dictionary with the contents of the stream creating keys using
+        the given key mapper
+
+        Args:
+            keyMapper (Callable[[T], V]): The key mapper
+
+        Returns:
+            dict[V, T]: The resulting dictionary
+        """
+        return { keyMapper(v): v for v in self.__arg }
+
+    def toDictAsKeys(self, valueMapper: Callable[[T], V]) -> dict[T, V]:
+        """
+        Creates a dictionary using the contents of the stream as keys and mapping
+        the dictionary values using the given value mapper
+
+        Args:
+            keyMapper (Callable[[T], V]): The value mapper
+
+        Returns:
+            dict[V, T]: The resulting dictionary
+        """
+        return { v: valueMapper(v) for v in self.__arg }
 
     def each(self, action: Callable[[T], Any]) -> None:
         """
@@ -1232,7 +1258,7 @@ class Stream(Generic[T]):
             Stream[T]: The resulting stream
         """
         return Stream(_ConcatIterable(self.__arg, newStream.__arg))
-
+    
 
 def stream(it: Iterable[T]) -> Stream[T]:
     """
