@@ -1,6 +1,6 @@
 Metadata-Version: 2.2
 Name: jstreams
-Version: 3.0.9
+Version: 3.0.10
 Summary: A package providing streams and optional functionality similar to Java streams and optionals, a vavr.io Try minimal implementation, threading utilities such as JavaScript-like setTimer and setInterval,1 as well as a basic implementation of ReactiveX and a dependency injection framework.
 Author: Cristian Trohin
 Author-email: Cristian Trohin <cristi.trohin@gmail.com>
@@ -145,6 +145,77 @@ Opt("test").flatStream() # Is equivalent with Stream(["test"])
 Opt(["test", "test1", "test2"]).flatStream() # Is equivalent with Stream(["test", "test1", "test2"])
 
 ```
+
+### Predicates
+Predicates are functions and function wrappers that can be used to filter streams and optionals. **jstreams** contains a comprehensive list of predefined predicates. The names are pretty self explanatory. Here are some of the predicates included:
+- isTrue
+- isFalse
+- isNone
+- isNotNone
+- isIn
+- isNotIn
+- equals
+- isBlank
+- default
+- allNone
+- allNotNone
+- strContains
+- strContainsIgnoreCase
+- strStartsWith
+- strStartsWithIgnoreCase
+- strEndsWith
+- strEndsWithIgnoreCase
+- strMatches
+- strNotMatches
+- strLongerThan
+- strShorterThan
+- strLongerThanOrEqual
+- strShorterThanOrEqual
+- equalsIgnoreCase
+- isEven
+- isOdd
+- isPositive
+- isNegative
+- isZero
+- isInt
+- isBeween
+- isBeweenClosed
+- isBeweenClosedStart
+- isBeweenClosedEnd
+- not_
+- notStrict
+
+The predicates provided fall into one of two categories:
+- functions - can be applied directly to a value
+- function wrappers - take comparison parameters and then can be applied to a value
+
+Examples:
+```python
+from jstreams import isBlank, isNotBlank, isZero, isBetween, not_
+
+# functions
+isBlank("test") # returns False
+isZero(0) # returns True
+
+# function wrappers
+isBetween(1,10)(5) # First call generates the wraper, that can then be used for the value comparison
+# reusing a function wrapper
+isBetween1And10 = isBetween(1, 10)
+isBetween1And10(5) # Returns True
+isBetween1And10(20) # Returns False
+
+not_(isBlank)("test") # Returns True. The not_ predicate negates the given predicate, in this case isBlank, then applies it to the given value "test"
+
+# Usage with Opt and Stream
+Stream([2, 4, 5, 20, 40]).filter(isBetween(0, 10)).toList() # Results in [2, 4, 5], since the rest of the items are filtered out
+# Usage of not with Opt and Stream
+Stream(["", "", "", "test"]).filter(not_(isBlank)).toList() # Results in ["test"] since the rest of the items are blank
+# this is equivalent to 
+Stream(["", "", "", "test"]).filter(isNotBlank).toList() # isNotBlank is another predefined predicate that uses not_(isBlank) in its actual implementation
+# Check if a stream contains the value 0
+Stream([1, 2, 4, 0, 5]).anyMatch(isZero) # Returns True, since 0 exists in the stream
+```
+
 
 ### Try
 ```python

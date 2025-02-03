@@ -35,3 +35,4 @@ test/test_rx.py
 test/test_stream.py
 test/test_timers.py
 test/test_try.py
+test/test_utils.py
