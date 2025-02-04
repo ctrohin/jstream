@@ -390,7 +390,6 @@ __all__ = [
     "isTrue",
     "isFalse",
     "isNone",
-    "isNotNone",
     "isIn",
     "isNotIn",
     "equals",

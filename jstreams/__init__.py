@@ -86,7 +86,6 @@ from jstreams.predicate import (
     isTrue,
     isFalse,
     isNone,
-    isNotNone,
     isIn,
     isNotIn,
     equals,
