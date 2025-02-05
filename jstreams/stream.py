@@ -17,7 +17,6 @@ V = TypeVar("V")
 K = TypeVar("K")
 C = TypeVar("C")
 
-
 def isEmptyOrNone(
     obj: Union[list[Any], dict[Any, Any], str, None, Any, Iterable[Any]],
 ) -> bool:
@@ -274,10 +273,16 @@ def sort(target: list[T], comparator: Callable[[T, T], int]) -> list[T]:
 
 class Opt(Generic[T]):
     __slots__ = ("__val",)
+    __NONE: "Optional[Opt[Any]]" = None
 
     def __init__(self, val: Optional[T]) -> None:
         self.__val = val
 
+    def __getNone(self) -> "Opt[T]":
+        if Opt.__NONE is None:
+            Opt.__NONE = Opt(None)
+        return cast(Opt[T], Opt.__NONE)
+    
     def get(self) -> T:
         """
         Returns the value of the Opt object if present, otherwise will raise a ValueError
@@ -484,7 +489,7 @@ class Opt(Generic[T]):
             return self
         if predicate(self.__val):
             return self
-        return Opt(None)
+        return self.__getNone()
 
     def filterWith(self, withVal: K, predicate: Callable[[T, K], bool]) -> "Opt[T]":
         """
@@ -502,7 +507,7 @@ class Opt(Generic[T]):
             return self
         if predicate(self.__val, withVal):
             return self
-        return Opt(None)
+        return self.__getNone()
 
     def map(self, mapper: Callable[[T], V]) -> "Opt[V]":
         """
@@ -515,7 +520,7 @@ class Opt(Generic[T]):
             Opt[V]: The resulting Opt
         """
         if self.__val is None:
-            return Opt(None)
+            return cast(Opt[V], self.__getNone())
         return Opt(mapper(self.__val))
 
     def mapWith(self, withVal: K, mapper: Callable[[T, K], V]) -> "Opt[V]":
@@ -530,7 +535,7 @@ class Opt(Generic[T]):
             Opt[V]: The resulting Opt
         """
         if self.__val is None:
-            return Opt(None)
+            return cast(Opt[V], self.__getNone())
         return Opt(mapper(self.__val, withVal))
 
     def orElse(self, supplier: Callable[[], T]) -> "Opt[T]":
@@ -588,6 +593,38 @@ class Opt(Generic[T]):
         if self.isPresent():
             return self
         return Opt(supplier(withVal))
+
+    def ifMatches(self, predicate: Callable[[T], bool], action: Callable[[T], Any]) -> "Opt[T]":
+        """
+        Executes the given action on the value of this Opt, if the value is present and 
+        matches the given predicate. Returns the same Opt
+
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+            action (Callable[[T], Any]): The action to be executed
+
+        Returns:
+            Opt[T]: The same Opt
+        """
+        if self.__val is not None and predicate(self.__val):
+            action(self.__val)
+        return self
+    
+    def ifMatchesOpt(self, predicate: Callable[[Optional[T]], bool], action: Callable[[Optional[T]], Any]) -> "Opt[T]":
+        """
+        Executes the given action on the value of this Opt, regardless of whether the value 
+        is present, if the value matches the given predicate. Returns the same Opt
+
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+            action (Callable[[T], Any]): The action to be executed
+
+        Returns:
+            Opt[T]: The same Opt
+        """
+        if predicate(self.__val):
+            action(self.__val)
+        return self
 
     def stream(self) -> "Stream[T]":
         """
@@ -701,7 +738,7 @@ class Opt(Generic[T]):
         """
         if isinstance(self.__val, classType):
             return self
-        return Opt(None)
+        return self.__getNone()
 
     def cast(self, classType: type[V]) -> "Opt[V]":
         """
@@ -714,6 +751,50 @@ class Opt(Generic[T]):
             Opt[V]: An optional
         """
         return Opt(cast(V, self.__val))
+
+    def ifMatchesMap(
+        self,
+        predicate: Callable[[T], bool],
+        mapper: Callable[[T], Optional[V]],
+    ) -> "Opt[V]":
+        """
+        If the optional value is present and matches the given predicate, returns the value mapped
+        by mapper wrapped in an Opt.
+        If the optional value is not present, returns an empty Opt.
+
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+            mapper (Callable[[], Optional[V]]): The the mapper
+
+        Returns:
+            Opt[V]: An optional
+        """
+        if self.__val is not None and predicate(self.__val):
+            return Opt(mapper(self.__val))
+        return cast(Opt[V], self.__getNone())
+
+    def ifMatchesMapWith(
+        self,
+        withVal: K,
+        predicate: Callable[[T, K], bool],
+        mapper: Callable[[T, K], Optional[V]],
+    ) -> "Opt[V]":
+        """
+        If the optional value is present and matches the given predicate, returns the value mapped by mapper wrapped in an Opt.
+        If the optional value is not present, returns an empty Opt.
+        In addition to ifMatchesMap, this method also passes the withVal param to the mapper and supplier
+
+        Args:
+            withVal (K): The additional mapper value
+            predicate (Callable[[T, K], bool]): The predicate
+            mapper (Callable[[T, K], V]): The mapper
+
+        Returns:
+            Opt[V]: An optional
+        """
+        if self.__val is not None and predicate(self.__val, withVal):
+            return Opt(mapper(self.__val, withVal))
+        return cast(Opt[V], self.__getNone())
 
 class ClassOps:
     __slots__ = ("__classType",)
@@ -940,8 +1021,6 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: The result stream
         """
-        if isEmptyOrNone(self.__arg):
-            return Stream([])
         return Stream(_MapIterable(self.__arg, mapper))
 
     def flatMap(self, mapper: Callable[[T], Iterable[V]]) -> "Stream[V]":
@@ -954,9 +1033,6 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: the result stream
         """
-        if isEmptyOrNone(self.__arg):
-            return Stream([])
-
         return Stream(flatMap(self.__arg, mapper))
 
     def first(self) -> Opt[T]:
@@ -990,8 +1066,6 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The stream of filtered objects
         """
-        if isEmptyOrNone(self.__arg):
-            return Stream([])
 
         return Stream(_FilterIterable(self.__arg, predicate))
 
@@ -1006,8 +1080,6 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: The stream of casted objects
         """
-        if isEmptyOrNone(self.__arg):
-            return Stream([])
         return Stream(_CastIterable(self.__arg, castTo))
 
     def anyMatch(self, predicate: Callable[[T], bool]) -> bool:
@@ -1025,6 +1097,9 @@ class Stream(Generic[T]):
     def noneMatch(self, predicate: Callable[[T], bool]) -> bool:
         """
         Checks if none of the stream objects matches the given predicate. This is the inverse of 'anyMatch`
+        CAUTION: This method will actually iterate the entire stream, so if you're using
+        infinite generators, calling this method will block the execution of the program.
+        
         Args:
             predicate (Callable[[T], bool]): The predicate
 
@@ -1036,6 +1111,9 @@ class Stream(Generic[T]):
     def allMatch(self, predicate: Callable[[T], bool]) -> bool:
         """
         Checks if all of the stream objects matche the given predicate.
+        CAUTION: This method will actually iterate the entire stream, so if you're using
+        infinite generators, calling this method will block the execution of the program.
+        
         Args:
             predicate (Callable[[T], bool]): The predicate
 
@@ -1047,6 +1125,8 @@ class Stream(Generic[T]):
     def isEmpty(self) -> bool:
         """
         Checks if the stream is empty
+        CAUTION: This method will actually iterate the entire stream, so if you're using
+        infinite generators, calling this method will block the execution of the program.
 
         Returns:
             bool: True if the stream is empty, False otherwise
@@ -1056,6 +1136,8 @@ class Stream(Generic[T]):
     def isNotEmpty(self) -> bool:
         """
         Checks if the stream is not empty
+        CAUTION: This method will actually iterate the entire stream, so if you're using
+        infinite generators, calling this method will block the execution of the program.
 
         Returns:
             bool: True if the stream is not empty, False otherwise
@@ -1074,6 +1156,8 @@ class Stream(Generic[T]):
     def toList(self) -> list[T]:
         """
         Creates a list with the contents of the stream
+        CAUTION: This method will actually iterate the entire stream, so if you're using
+        infinite generators, calling this method will block the execution of the program.
 
         Returns:
             list[T]: The list
@@ -1083,16 +1167,36 @@ class Stream(Generic[T]):
     def toSet(self) -> set[T]:
         """
         Creates a set with the contents of the stream
+        CAUTION: This method will actually iterate the entire stream, so if you're using
+        infinite generators, calling this method will block the execution of the program.
 
         Returns:
             set[T]: The set
         """
         return set(self.__arg)
 
+    def toDict(self, keyMapper: Callable[[T], V], valueMapper: Callable[[T], K]) -> dict[V, K]:
+        """
+        Creates a dictionary with the contents of the stream creating keys using
+        the given key mapper and values using the value mapper
+        CAUTION: This method will actually iterate the entire stream, so if you're using
+        infinite generators, calling this method will block the execution of the program.
+
+        Args:
+            keyMapper (Callable[[T], V]): The key mapper
+            valueMapper (Callable[[T], K]): The value mapper
+
+        Returns:
+            dict[V, K]: The resulting dictionary
+        """
+        return { keyMapper(v): valueMapper(v) for v in self.__arg }
+
     def toDictAsValues(self, keyMapper: Callable[[T], V]) -> dict[V, T]:
         """
         Creates a dictionary with the contents of the stream creating keys using
         the given key mapper
+        CAUTION: This method will actually iterate the entire stream, so if you're using
+        infinite generators, calling this method will block the execution of the program.
 
         Args:
             keyMapper (Callable[[T], V]): The key mapper
@@ -1106,6 +1210,8 @@ class Stream(Generic[T]):
         """
         Creates a dictionary using the contents of the stream as keys and mapping
         the dictionary values using the given value mapper
+        CAUTION: This method will actually iterate the entire stream, so if you're using
+        infinite generators, calling this method will block the execution of the program.
 
         Args:
             keyMapper (Callable[[T], V]): The value mapper
@@ -1115,14 +1221,17 @@ class Stream(Generic[T]):
         """
         return { v: valueMapper(v) for v in self.__arg }
 
-    def each(self, action: Callable[[T], Any]) -> None:
+    def each(self, action: Callable[[T], Any]) -> "Stream[T]":
         """
-        Executes the action callable for each of the stream's elements
+        Executes the action callable for each of the stream's elements.
+        CAUTION: This method will actually iterate the entire stream, so if you're using
+        infinite generators, calling this method will block the execution of the program.
 
         Args:
             action (Callable[[T], Any]): The action
         """
         each(self.__arg, action)
+        return self
 
     def ofType(self, theType: type[V]) -> "Stream[V]":
         """
@@ -1188,6 +1297,8 @@ class Stream(Generic[T]):
         """
         Reduces a stream to a single value. The reducer function takes two values and
         returns only one. This function can be used to find min or max from a stream of ints.
+        CAUTION: This method will actually iterate the entire stream, so if you're using
+        infinite generators, calling this method will block the execution of the program.
 
         Args:
             reducer (Callable[[T, T], T]): The reducer function
@@ -1258,7 +1369,6 @@ class Stream(Generic[T]):
             Stream[T]: The resulting stream
         """
         return Stream(_ConcatIterable(self.__arg, newStream.__arg))
-    
 
 def stream(it: Iterable[T]) -> Stream[T]:
     """
