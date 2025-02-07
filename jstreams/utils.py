@@ -2,6 +2,7 @@ from typing import Any, Optional, TypeVar
 
 T = TypeVar("T")
 
+
 def requireNotNull(obj: Optional[T]) -> T:
     """
     Returns a non null value of the object provided. If the provided value is null,
@@ -19,7 +20,6 @@ def requireNotNull(obj: Optional[T]) -> T:
     if obj is None:
         raise ValueError("None object provided")
     return obj
-
 
 
 def isNumber(anyVal: Any) -> bool:
@@ -40,7 +40,7 @@ def isNumber(anyVal: Any) -> bool:
 
 def toInt(val: Any) -> int:
     """
-    Returns an int representation of the given value. 
+    Returns an int representation of the given value.
     Raises a ValueError if the value cannot be represented as an int.
 
     Args:
@@ -54,7 +54,7 @@ def toInt(val: Any) -> int:
 
 def toFloat(val: Any) -> float:
     """
-    Returns a float representation of the given value. 
+    Returns a float representation of the given value.
     Raises a ValueError if the value cannot be represented as a float.
 
     Args:
@@ -64,6 +64,7 @@ def toFloat(val: Any) -> float:
         float: The float representation
     """
     return float(str(val))
+
 
 def asList(dct: dict[Any, T]) -> list[T]:
     """
@@ -77,6 +78,7 @@ def asList(dct: dict[Any, T]) -> list[T]:
     """
     return [v for _, v in dct.items()]
 
+
 def keysAsList(dct: dict[T, Any]) -> list[T]:
     """
     Returns the keys in a dict as a list
@@ -88,6 +90,7 @@ def keysAsList(dct: dict[T, Any]) -> list[T]:
         list[T]: The list of keys
     """
     return [k for k, _ in dct.items()]
+
 
 __all__ = [
     "requireNotNull",
