@@ -43,21 +43,21 @@ class TestOpt(BaseTestCase):
         """
         Test opt getOrElse function
         """
-        self.assertIsNotNone(Opt(None).getOrElse("str"))
-        self.assertEqual(Opt(None).getOrElse("str"), "str")
+        self.assertIsNotNone(Opt(None).orElse("str"))
+        self.assertEqual(Opt(None).orElse("str"), "str")
 
-        self.assertIsNotNone(Opt("test").getOrElse("str"))
-        self.assertEqual(Opt("test").getOrElse("str"), "test")
+        self.assertIsNotNone(Opt("test").orElse("str"))
+        self.assertEqual(Opt("test").orElse("str"), "test")
 
     def test_opt_getOrElseGet(self) -> None:
         """
         Test opt getOrElseGet function
         """
-        self.assertIsNotNone(Opt(None).getOrElseGet(lambda: "str"))
-        self.assertEqual(Opt(None).getOrElseGet(lambda: "str"), "str")
+        self.assertIsNotNone(Opt(None).orElseGet(lambda: "str"))
+        self.assertEqual(Opt(None).orElseGet(lambda: "str"), "str")
 
-        self.assertIsNotNone(Opt("test").getOrElseGet(lambda: "str"))
-        self.assertEqual(Opt("test").getOrElseGet(lambda: "str"), "test")
+        self.assertIsNotNone(Opt("test").orElseGet(lambda: "str"))
+        self.assertEqual(Opt("test").orElseGet(lambda: "str"), "test")
 
     def test_opt_stream(self) -> None:
         """
