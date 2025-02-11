@@ -1,4 +1,5 @@
-from typing import Any, Optional, TypeVar
+import json
+from typing import Any, Callable, Optional, TypeVar, Union
 
 T = TypeVar("T")
 
@@ -91,6 +92,17 @@ def keysAsList(dct: dict[T, Any]) -> list[T]:
     """
     return [k for k, _ in dct.items()]
 
+def loadJson(s: Union[str, bytes, bytearray]) -> Optional[Union[list[Any], dict[Any, Any]]]:
+    return loadJsonEx(s, None)
+        
+
+def loadJsonEx(s: Union[str, bytes, bytearray], handler: Optional[Callable[[Exception], Any]]) -> Optional[Union[list[Any], dict[Any, Any]]]:
+    try:
+        return json.loads(s) # type: ignore[no-any-return]
+    except Exception as ex:
+        if handler is not None:
+            handler(ex)
+    return None
 
 __all__ = [
     "requireNotNull",
@@ -99,4 +111,6 @@ __all__ = [
     "toFloat",
     "asList",
     "keysAsList",
+    "loadJson",
+    "loadJsonEx",
 ]

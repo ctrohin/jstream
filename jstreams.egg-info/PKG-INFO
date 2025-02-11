@@ -1,6 +1,6 @@
 Metadata-Version: 2.2
 Name: jstreams
-Version: 3.0.14
+Version: 4.0.0
 Summary: A package providing streams and optional functionality similar to Java streams and optionals, a vavr.io Try minimal implementation, threading utilities such as JavaScript-like setTimer and setInterval,1 as well as a basic implementation of ReactiveX and a dependency injection framework.
 Author: Cristian Trohin
 Author-email: Cristian Trohin <cristi.trohin@gmail.com>
@@ -34,6 +34,54 @@ pip install jstreams
 ```
 
 ## Usage
+
+### v4.0.0 
+
+#### What's new?
+Version 4.0.0 introduces the *Predicate*, *Mapper* and *Reducer* classes that can replace the functions used so far for predicate matchig, mapping and reducing of streams. The added advantage for these classes is that they can be extended and can contain dynamic business logic.
+```python
+# Take the numbers from a stream until the third prime number is found.
+
+def isPrime(value: int) -> bool:
+    ...
+
+class TakeUntilThreePrimes(Predicate[int]):
+    def __init__(self) -> None:
+        self.numberOfPrimesFound = 0
+
+    def apply(self, value: int) -> bool:
+        if self.numberOfPrimesFound >= 3:
+            return False
+
+        if isPrime(value):
+            self.numberOfPrimesFound += 1
+        return True
+
+# Then we take a stream if ints
+Stream([3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15]).takeWhile(TakeUntilThreePrimes()).each(print)
+# This will print 3, 4, 5, 6, 8, 9, 10, 11, then stop the stream since three prime numbers were found.
+```
+
+#### BREAKING CHANGES
+
+In version 4.0.0, the Opt class has been refactored to fall in line with the Java implementation. The methods *getOrElse*, *getOrElseOpt*, *getOrElseGet* and *getOrElseGetOpt* have been removed, and the methods *orElse*, *orElseOpt*, *orElseGet* and *orElseGetOpt* will be replacing them. The older signatures for the *orElse* and *orElseOpt* have been changed to adapt to this change. In order to migrate you can follow this guide:
+
+```python
+# Old usage of orElse
+Opt(None).orElse(lambda: "test")
+# can be replaced with
+Opt(None).orElseGet(lambda: "test")
+
+# Old usage of getOrElse
+Opt(None).getOrElse("test")
+# can be replaced with
+Opt(None).orElse("test")
+
+# Old usage of getOrElseGet, which was the same as orElse
+Opt(None).getOrElseGet(lambda: "test")
+# can be replaced with
+Opt(None).orElseGet(lambda: "test")
+```
 
 ### Streams
 
@@ -126,14 +174,14 @@ Opt(None).getActual() # Returns None, does not raise value error
 Opt("test").ifPresent(lambda s: print(s)) # Will print "test"
 Opt(None).ifPresent(lambda s: print(s)) # Does nothing, since the object is None
 
-# The getOrElse method will return the value of the Opt if not None, otherwise the given parameter
-Opt("test").getOrElse("test1") # Will return "test", since the value is not None
-Opt(None).getOrElse("test1") # Will return "test1", since the value is  None
+# The orElse method will return the value of the Opt if not None, otherwise the given parameter
+Opt("test").orElse("test1") # Will return "test", since the value is not None
+Opt(None).orElse("test1") # Will return "test1", since the value is  None
 
-# The getOrElseGet method will return the value of the Opt if not None, otherwise it will execute 
+# The orElseGet method will return the value of the Opt if not None, otherwise it will execute 
 # the given function and return its value
-Opt("test").getOrElseGet(lambda: "test1") # Will return "test", since the value is not None
-Opt(None).getOrElseGet(lambda: "test1") # Will return "test1", since the value is  None
+Opt("test").orElseGet(lambda: "test1") # Will return "test", since the value is not None
+Opt(None).orElseGet(lambda: "test1") # Will return "test1", since the value is  None
 
 # stream will convert the object into a stream.
 Opt("test").stream() # Is equivalent with Stream(["test"])
