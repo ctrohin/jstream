@@ -137,6 +137,7 @@ from jstreams.predicate import (
     isLessThanOrEqual,
     anyOf,
     allOf,
+    noneOf,
 )
 
 from jstreams.match import (
@@ -258,6 +259,7 @@ __all__ = [
     "isLessThanOrEqual",
     "anyOf",
     "allOf",
+    "noneOf",
     "predicateOf",
     "predicateWithOf",
     "mapperOf",

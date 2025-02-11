@@ -510,6 +510,15 @@ def anyOf(
     return wrap
 
 
+def noneOf(
+    predicates: list[Union[Predicate[T], Callable[[T], bool]]],
+) -> Callable[[T], bool]:
+    def wrap(val: T) -> bool:
+        return Stream(predicates).map(predicateOf).noneMatch(lambda p: p.apply(val))
+
+    return wrap
+
+
 __all__ = [
     "isTrue",
     "isFalse",
@@ -554,4 +563,5 @@ __all__ = [
     "isLessThanOrEqual",
     "allOf",
     "anyOf",
+    "noneOf",
 ]
