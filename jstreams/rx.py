@@ -4,9 +4,7 @@ from typing import (
     Generic,
     Iterable,
     Optional,
-    TypeAlias,
     TypeVar,
-    Union,
     Any,
     overload,
 )
@@ -24,11 +22,11 @@ E = TypeVar("E")
 F = TypeVar("F")
 G = TypeVar("G")
 H = TypeVar("H")
-I = TypeVar("I")
 J = TypeVar("J")
 K = TypeVar("K")
 L = TypeVar("L")
 M = TypeVar("M")
+N = TypeVar("N")
 V = TypeVar("V")
 
 
@@ -373,8 +371,8 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
         op6: RxOperator[E, F],
         op7: RxOperator[F, G],
         op8: RxOperator[G, H],
-        op9: RxOperator[H, I],
-        op10: RxOperator[I, V],
+        op9: RxOperator[H, N],
+        op10: RxOperator[N, V],
     ) -> "_PipeObservable[T, V]": ...
 
     @overload
@@ -388,8 +386,8 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
         op6: RxOperator[E, F],
         op7: RxOperator[F, G],
         op8: RxOperator[G, H],
-        op9: RxOperator[H, I],
-        op10: RxOperator[I, J],
+        op9: RxOperator[H, N],
+        op10: RxOperator[N, J],
         op11: RxOperator[J, V],
     ) -> "_PipeObservable[T, V]": ...
 
@@ -404,8 +402,8 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
         op6: RxOperator[E, F],
         op7: RxOperator[F, G],
         op8: RxOperator[G, H],
-        op9: RxOperator[H, I],
-        op10: RxOperator[I, J],
+        op9: RxOperator[H, N],
+        op10: RxOperator[N, J],
         op11: RxOperator[J, K],
         op12: RxOperator[K, V],
     ) -> "_PipeObservable[T, V]": ...
@@ -421,8 +419,8 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
         op6: RxOperator[E, F],
         op7: RxOperator[F, G],
         op8: RxOperator[G, H],
-        op9: RxOperator[H, I],
-        op10: RxOperator[I, J],
+        op9: RxOperator[H, N],
+        op10: RxOperator[N, J],
         op11: RxOperator[J, K],
         op12: RxOperator[K, L],
         op13: RxOperator[L, V],
@@ -438,8 +436,8 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
         op6: Optional[RxOperator[E, F]] = None,
         op7: Optional[RxOperator[F, G]] = None,
         op8: Optional[RxOperator[G, H]] = None,
-        op9: Optional[RxOperator[H, I]] = None,
-        op10: Optional[RxOperator[I, J]] = None,
+        op9: Optional[RxOperator[H, N]] = None,
+        op10: Optional[RxOperator[N, J]] = None,
         op11: Optional[RxOperator[J, K]] = None,
         op12: Optional[RxOperator[K, L]] = None,
         op13: Optional[RxOperator[L, M]] = None,
@@ -584,8 +582,8 @@ class Observable(_Observable[T]):
         op6: RxOperator[E, F],
         op7: RxOperator[F, G],
         op8: RxOperator[G, H],
-        op9: RxOperator[H, I],
-        op10: RxOperator[I, V],
+        op9: RxOperator[H, N],
+        op10: RxOperator[N, V],
     ) -> _PipeObservable[T, V]: ...
 
     @overload
@@ -599,8 +597,8 @@ class Observable(_Observable[T]):
         op6: RxOperator[E, F],
         op7: RxOperator[F, G],
         op8: RxOperator[G, H],
-        op9: RxOperator[H, I],
-        op10: RxOperator[I, J],
+        op9: RxOperator[H, N],
+        op10: RxOperator[N, J],
         op11: RxOperator[J, V],
     ) -> _PipeObservable[T, V]: ...
 
@@ -615,8 +613,8 @@ class Observable(_Observable[T]):
         op6: RxOperator[E, F],
         op7: RxOperator[F, G],
         op8: RxOperator[G, H],
-        op9: RxOperator[H, I],
-        op10: RxOperator[I, J],
+        op9: RxOperator[H, N],
+        op10: RxOperator[N, J],
         op11: RxOperator[J, K],
         op12: RxOperator[K, V],
     ) -> _PipeObservable[T, V]: ...
@@ -632,8 +630,8 @@ class Observable(_Observable[T]):
         op6: RxOperator[E, F],
         op7: RxOperator[F, G],
         op8: RxOperator[G, H],
-        op9: RxOperator[H, I],
-        op10: RxOperator[I, J],
+        op9: RxOperator[H, N],
+        op10: RxOperator[N, J],
         op11: RxOperator[J, K],
         op12: RxOperator[K, L],
         op13: RxOperator[L, V],
@@ -649,8 +647,8 @@ class Observable(_Observable[T]):
         op6: Optional[RxOperator[E, F]] = None,
         op7: Optional[RxOperator[F, G]] = None,
         op8: Optional[RxOperator[G, H]] = None,
-        op9: Optional[RxOperator[H, I]] = None,
-        op10: Optional[RxOperator[I, J]] = None,
+        op9: Optional[RxOperator[H, N]] = None,
+        op10: Optional[RxOperator[N, J]] = None,
         op11: Optional[RxOperator[J, K]] = None,
         op12: Optional[RxOperator[K, L]] = None,
         op13: Optional[RxOperator[L, M]] = None,

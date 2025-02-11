@@ -4,6 +4,33 @@ from typing import Any, Callable, Optional, TypeVar, Union
 T = TypeVar("T")
 
 
+def _f() -> None:
+    pass
+
+
+class _F:
+    def mth(self) -> None:
+        pass
+
+
+FnType = type(_f)
+MthType = type(_F().mth)
+
+
+def isCallable(var: Any) -> bool:
+    """
+    Checks if the given argument is either a function or a method in a class.
+
+    Args:
+        var (Any): The argument to check
+
+    Returns:
+        bool: True if var is a function or method, False otherwise
+    """
+    varType = type(var)
+    return varType is FnType or varType is MthType
+
+
 def requireNotNull(obj: Optional[T]) -> T:
     """
     Returns a non null value of the object provided. If the provided value is null,
@@ -92,17 +119,23 @@ def keysAsList(dct: dict[T, Any]) -> list[T]:
     """
     return [k for k, _ in dct.items()]
 
-def loadJson(s: Union[str, bytes, bytearray]) -> Optional[Union[list[Any], dict[Any, Any]]]:
-    return loadJsonEx(s, None)
-        
 
-def loadJsonEx(s: Union[str, bytes, bytearray], handler: Optional[Callable[[Exception], Any]]) -> Optional[Union[list[Any], dict[Any, Any]]]:
+def loadJson(
+    s: Union[str, bytes, bytearray],
+) -> Optional[Union[list[Any], dict[Any, Any]]]:
+    return loadJsonEx(s, None)
+
+
+def loadJsonEx(
+    s: Union[str, bytes, bytearray], handler: Optional[Callable[[Exception], Any]]
+) -> Optional[Union[list[Any], dict[Any, Any]]]:
     try:
-        return json.loads(s) # type: ignore[no-any-return]
+        return json.loads(s)  # type: ignore[no-any-return]
     except Exception as ex:
         if handler is not None:
             handler(ex)
     return None
+
 
 __all__ = [
     "requireNotNull",
@@ -113,4 +146,5 @@ __all__ = [
     "keysAsList",
     "loadJson",
     "loadJsonEx",
+    "isCallable",
 ]

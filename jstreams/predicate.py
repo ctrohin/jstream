@@ -1,8 +1,7 @@
 import re
-import abc
-from typing import Any, Callable, Iterable, Optional, Sized, TypeVar
+from typing import Any, Callable, Iterable, Optional, Sized, TypeVar, Union
 
-from jstreams.stream import Stream
+from jstreams.stream import Predicate, Stream, predicateOf
 
 T = TypeVar("T")
 
@@ -422,7 +421,37 @@ def isBeweenClosedEnd(
     return wrap
 
 
-def not_(predicate: Callable[[Optional[T]], bool]) -> Callable[[Optional[T]], bool]:
+def isHigherThan(value: float) -> Callable[[Optional[float]], bool]:
+    def wrap(val: Optional[float]) -> bool:
+        return val is not None and val > value
+
+    return wrap
+
+
+def isHigherThanOrEqual(value: float) -> Callable[[Optional[float]], bool]:
+    def wrap(val: Optional[float]) -> bool:
+        return val is not None and val >= value
+
+    return wrap
+
+
+def isLessThan(value: float) -> Callable[[Optional[float]], bool]:
+    def wrap(val: Optional[float]) -> bool:
+        return val is not None and val < value
+
+    return wrap
+
+
+def isLessThanOrEqual(value: float) -> Callable[[Optional[float]], bool]:
+    def wrap(val: Optional[float]) -> bool:
+        return val is not None and val <= value
+
+    return wrap
+
+
+def not_(
+    predicate: Union[Predicate[Optional[T]], Callable[[Optional[T]], bool]],
+) -> Callable[[Optional[T]], bool]:
     """
     Negation predicate. Given a predicate, this predicate will map it to a negated value.
     Takes a predicate with optional as value, returning a negated predicate with an optional parameter as well.
@@ -430,33 +459,53 @@ def not_(predicate: Callable[[Optional[T]], bool]) -> Callable[[Optional[T]], bo
     Usage: not_(isBlank)("test") # Returns True
 
     Args:
-        predicate (Callable[[Optional[T]], bool]): The predicate
+        predicate (Union[Predicate[T], Callable[[Optional[T]], bool]]): The predicate
 
     Returns:
         Callable[[Optional[T]], bool]: The negation predicate
     """
 
     def wrap(val: Optional[T]) -> bool:
-        return not predicate(val)
+        return not predicateOf(predicate).apply(val)
 
     return wrap
 
 
-def notStrict(predicate: Callable[[T], bool]) -> Callable[[T], bool]:
+def notStrict(
+    predicate: Union[Predicate[T], Callable[[T], bool]],
+) -> Callable[[T], bool]:
     """
     Negation predicate. Given a predicate, this predicate will map it to a negated value.
     Takes a predicate with a strict value, returning a negated predicate with an strict parameter as well.
     Very similar with not_, but will not break strict type checking when applied to strict typing predicates.
 
     Args:
-        predicate (Callable[[Optional[T]], bool]): The predicate
+        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
 
     Returns:
         Callable[[Optional[T]], bool]: The negation predicate
     """
 
     def wrap(val: T) -> bool:
-        return not predicate(val)
+        return not predicateOf(predicate).apply(val)
+
+    return wrap
+
+
+def allOf(
+    predicates: list[Union[Predicate[T], Callable[[T], bool]]],
+) -> Callable[[T], bool]:
+    def wrap(val: T) -> bool:
+        return Stream(predicates).map(predicateOf).allMatch(lambda p: p.apply(val))
+
+    return wrap
+
+
+def anyOf(
+    predicates: list[Union[Predicate[T], Callable[[T], bool]]],
+) -> Callable[[T], bool]:
+    def wrap(val: T) -> bool:
+        return Stream(predicates).map(predicateOf).anyMatch(lambda p: p.apply(val))
 
     return wrap
 
@@ -499,4 +548,10 @@ __all__ = [
     "notStrict",
     "notEquals",
     "isNotBlank",
+    "isHigherThan",
+    "isHigherThanOrEqual",
+    "isLessThan",
+    "isLessThanOrEqual",
+    "allOf",
+    "anyOf",
 ]

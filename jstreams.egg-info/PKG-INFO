@@ -1,6 +1,6 @@
 Metadata-Version: 2.2
 Name: jstreams
-Version: 4.0.0
+Version: 4.1.0
 Summary: A package providing streams and optional functionality similar to Java streams and optionals, a vavr.io Try minimal implementation, threading utilities such as JavaScript-like setTimer and setInterval,1 as well as a basic implementation of ReactiveX and a dependency injection framework.
 Author: Cristian Trohin
 Author-email: Cristian Trohin <cristi.trohin@gmail.com>
@@ -35,9 +35,27 @@ pip install jstreams
 
 ## Usage
 
-### v4.0.0 
+### v4.1.0 
 
 #### What's new?
+Version 4.1.0 introduces the *Match* and *Case* classes that can implement switching based on predicate functions and predicate classes.
+
+```python
+# Returns the string "Hurray!"
+match("test").of(
+    case("test", "Hurray!"),
+    case("test1", "Not gonna happen")
+)
+
+# Default casing, as a fallback for when the value doesn't match any of the cases
+# IMPORTANT NOTE! The default case should ALWAYS be called last, as it will break the match if called before all cases are tested.
+match("not-present").of(
+    case("test", "Hurray!"),
+    case("test1", "Not gonna happen"),
+    defaultCase("Should never get here!")
+)
+```
+
 Version 4.0.0 introduces the *Predicate*, *Mapper* and *Reducer* classes that can replace the functions used so far for predicate matchig, mapping and reducing of streams. The added advantage for these classes is that they can be extended and can contain dynamic business logic.
 ```python
 # Take the numbers from a stream until the third prime number is found.

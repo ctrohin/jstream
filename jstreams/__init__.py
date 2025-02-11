@@ -15,6 +15,16 @@ from jstreams.stream import (
     ClassOps,
     stream,
     optional,
+    predicateOf,
+    predicateWithOf,
+    mapperOf,
+    mapperWithOf,
+    Predicate,
+    Mapper,
+    PredicateWith,
+    MapperWith,
+    Reducer,
+    reducerOf,
 )
 
 from jstreams.tryOpt import (
@@ -80,6 +90,7 @@ from jstreams.utils import (
     toFloat,
     asList,
     keysAsList,
+    isCallable,
 )
 
 from jstreams.predicate import (
@@ -120,6 +131,22 @@ from jstreams.predicate import (
     notStrict,
     notEquals,
     isNotBlank,
+    isHigherThan,
+    isHigherThanOrEqual,
+    isLessThan,
+    isLessThanOrEqual,
+    anyOf,
+    allOf,
+)
+
+from jstreams.match import (
+    Case,
+    Match,
+    DefaultCase,
+    case,
+    match,
+    matchOpt,
+    defaultCase,
 )
 
 __all__ = [
@@ -215,4 +242,30 @@ __all__ = [
     "notStrict",
     "notEquals",
     "isNotBlank",
+    "AutoStart",
+    "AutoInit",
+    "isCallable",
+    "Case",
+    "Match",
+    "DefaultCase",
+    "case",
+    "match",
+    "matchOpt",
+    "defaultCase",
+    "isHigherThan",
+    "isHigherThanOrEqual",
+    "isLessThan",
+    "isLessThanOrEqual",
+    "anyOf",
+    "allOf",
+    "predicateOf",
+    "predicateWithOf",
+    "mapperOf",
+    "mapperWithOf",
+    "Predicate",
+    "Mapper",
+    "PredicateWith",
+    "MapperWith",
+    "Reducer",
+    "reducerOf",
 ]
