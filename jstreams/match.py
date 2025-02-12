@@ -21,7 +21,7 @@ class Case(Generic[T, V]):
 
     def matches(self, value: T) -> bool:
         if isinstance(self.__matching, Predicate):
-            return cast(Predicate[T], self.__matching).apply(value)
+            return cast(Predicate[T], self.__matching).Apply(value)
         if isCallable(self.__matching):
             return cast(Callable[[T], bool], self.__matching)(value)
         return value == self.__matching

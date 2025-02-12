@@ -449,6 +449,21 @@ def isLessThanOrEqual(value: float) -> Callable[[Optional[float]], bool]:
     return wrap
 
 
+def Not(
+    predicate: Union[Predicate[Optional[T]], Callable[[Optional[T]], bool]],
+) -> Callable[[Optional[T]], bool]:
+    """
+    Alias for not_
+
+    Args:
+        predicate (Union[Predicate[Optional[T]], Callable[[Optional[T]], bool]]): The predicate
+
+    Returns:
+        Callable[[Optional[T]], bool]: The negated predicate
+    """
+    return not_(predicate)
+
+
 def not_(
     predicate: Union[Predicate[Optional[T]], Callable[[Optional[T]], bool]],
 ) -> Callable[[Optional[T]], bool]:
@@ -466,9 +481,24 @@ def not_(
     """
 
     def wrap(val: Optional[T]) -> bool:
-        return not predicateOf(predicate).apply(val)
+        return not predicateOf(predicate).Apply(val)
 
     return wrap
+
+
+def NotStrict(
+    predicate: Union[Predicate[T], Callable[[T], bool]],
+) -> Callable[[T], bool]:
+    """
+    Alias for notStrict
+
+    Args:
+        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+
+    Returns:
+        Callable[[T], bool]: The negated predicate
+    """
+    return notStrict(predicate)
 
 
 def notStrict(
@@ -487,7 +517,7 @@ def notStrict(
     """
 
     def wrap(val: T) -> bool:
-        return not predicateOf(predicate).apply(val)
+        return not predicateOf(predicate).Apply(val)
 
     return wrap
 
@@ -495,8 +525,18 @@ def notStrict(
 def allOf(
     predicates: list[Union[Predicate[T], Callable[[T], bool]]],
 ) -> Callable[[T], bool]:
+    """
+    Produces a predicate that checks the given value agains all predicates in the list
+
+    Args:
+        predicates (list[Union[Predicate[T], Callable[[T], bool]]]): The list of predicates
+
+    Returns:
+        Callable[[T], bool]: The resulting predicate
+    """
+
     def wrap(val: T) -> bool:
-        return Stream(predicates).map(predicateOf).allMatch(lambda p: p.apply(val))
+        return Stream(predicates).map(predicateOf).allMatch(lambda p: p.Apply(val))
 
     return wrap
 
@@ -504,8 +544,18 @@ def allOf(
 def anyOf(
     predicates: list[Union[Predicate[T], Callable[[T], bool]]],
 ) -> Callable[[T], bool]:
+    """
+    Produces a predicate that checks the given value agains any predicate in the list
+
+    Args:
+        predicates (list[Union[Predicate[T], Callable[[T], bool]]]): The list of predicates
+
+    Returns:
+        Callable[[T], bool]: The resulting predicate
+    """
+
     def wrap(val: T) -> bool:
-        return Stream(predicates).map(predicateOf).anyMatch(lambda p: p.apply(val))
+        return Stream(predicates).map(predicateOf).anyMatch(lambda p: p.Apply(val))
 
     return wrap
 
@@ -513,8 +563,19 @@ def anyOf(
 def noneOf(
     predicates: list[Union[Predicate[T], Callable[[T], bool]]],
 ) -> Callable[[T], bool]:
+    """
+    Produces a predicate that checks the given value agains all predicates in the list, resulting in a True
+    response if the given value doesn't match any of them
+
+    Args:
+        predicates (list[Union[Predicate[T], Callable[[T], bool]]]): The list of predicates
+
+    Returns:
+        Callable[[T], bool]: The resulting predicate
+    """
+
     def wrap(val: T) -> bool:
-        return Stream(predicates).map(predicateOf).noneMatch(lambda p: p.apply(val))
+        return Stream(predicates).map(predicateOf).noneMatch(lambda p: p.Apply(val))
 
     return wrap
 
@@ -564,4 +625,6 @@ __all__ = [
     "allOf",
     "anyOf",
     "noneOf",
+    "Not",
+    "NotStrict",
 ]

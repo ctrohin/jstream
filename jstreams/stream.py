@@ -20,7 +20,7 @@ C = TypeVar("C")
 
 class Predicate(ABC, Generic[T]):
     @abstractmethod
-    def apply(self, value: T) -> bool:
+    def Apply(self, value: T) -> bool:
         """
         Apply a condition to a given value.
 
@@ -31,10 +31,16 @@ class Predicate(ABC, Generic[T]):
             bool: True if the value matches, False otherwise
         """
 
+    def Or(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
+        return predicateOf(lambda v: self.Apply(v) or predicateOf(other).Apply(v))
+
+    def And(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
+        return predicateOf(lambda v: self.Apply(v) and predicateOf(other).Apply(v))
+
 
 class PredicateWith(ABC, Generic[T, K]):
     @abstractmethod
-    def apply(self, value: T, withValue: K) -> bool:
+    def Apply(self, value: T, withValue: K) -> bool:
         """
         Apply a condition to two given values.
 
@@ -46,6 +52,12 @@ class PredicateWith(ABC, Generic[T, K]):
             bool: True if the values matche the predicate, False otherwise
         """
 
+    def Or(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
+        return predicateWithOf(lambda v, k: self.Apply(v, k) or other.Apply(v, k))
+
+    def And(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
+        return predicateWithOf(lambda v, k: self.Apply(v, k) and other.Apply(v, k))
+
 
 class _WrapPredicate(Predicate[T]):
     __slots__ = ["__predicateFn"]
@@ -53,7 +65,7 @@ class _WrapPredicate(Predicate[T]):
     def __init__(self, fn: Callable[[T], bool]) -> None:
         self.__predicateFn = fn
 
-    def apply(self, value: T) -> bool:
+    def Apply(self, value: T) -> bool:
         return self.__predicateFn(value)
 
 
@@ -63,13 +75,13 @@ class _WrapPredicateWith(PredicateWith[T, K]):
     def __init__(self, fn: Callable[[T, K], bool]) -> None:
         self.__predicateFn = fn
 
-    def apply(self, value: T, withValue: K) -> bool:
+    def Apply(self, value: T, withValue: K) -> bool:
         return self.__predicateFn(value, withValue)
 
 
 class Mapper(ABC, Generic[T, V]):
     @abstractmethod
-    def map(self, value: T) -> V:
+    def Map(self, value: T) -> V:
         """
         Maps the given value, to a new value of maybe a different type.
 
@@ -83,7 +95,7 @@ class Mapper(ABC, Generic[T, V]):
 
 class MapperWith(ABC, Generic[T, K, V]):
     @abstractmethod
-    def map(self, value: T, withValue: K) -> V:
+    def Map(self, value: T, withValue: K) -> V:
         """
         Maps the given two values, to a new value.
 
@@ -102,7 +114,7 @@ class _WrapMapper(Mapper[T, V]):
     def __init__(self, mapper: Callable[[T], V]) -> None:
         self.__mapper = mapper
 
-    def map(self, value: T) -> V:
+    def Map(self, value: T) -> V:
         return self.__mapper(value)
 
 
@@ -112,13 +124,13 @@ class _WrapMapperWith(MapperWith[T, K, V]):
     def __init__(self, mapper: Callable[[T, K], V]) -> None:
         self.__mapper = mapper
 
-    def map(self, value: T, withValue: K) -> V:
+    def Map(self, value: T, withValue: K) -> V:
         return self.__mapper(value, withValue)
 
 
 class Reducer(ABC, Generic[T]):
     @abstractmethod
-    def reduce(self, a: T, b: T) -> T:
+    def Reduce(self, a: T, b: T) -> T:
         """
         Reduce two values to a single one.
 
@@ -137,7 +149,7 @@ class _WrapReducer(Reducer[T]):
     def __init__(self, reducer: Callable[[T, T], T]) -> None:
         self.__reducer = reducer
 
-    def reduce(self, a: T, b: T) -> T:
+    def Reduce(self, a: T, b: T) -> T:
         return self.__reducer(a, b)
 
 
@@ -304,7 +316,7 @@ def findFirst(
         return None
 
     for el in target:
-        if predicateOf(predicate).apply(el):
+        if predicateOf(predicate).Apply(el):
             return el
     return None
 
@@ -325,7 +337,7 @@ def mapIt(
     if target is None:
         return []
     mapperObj = mapperOf(mapper)
-    return [mapperObj.map(el) for el in target]
+    return [mapperObj.Map(el) for el in target]
 
 
 def flatMap(
@@ -351,7 +363,7 @@ def flatMap(
     mapperObj = mapperOf(mapper)
 
     for el in target:
-        mapped = mapperObj.map(el)
+        mapped = mapperObj.Map(el)
         each(mapped, ret.append)
     return ret
 
@@ -374,7 +386,7 @@ def matching(
         return ret
 
     for el in target:
-        if predicateOf(predicate).apply(el):
+        if predicateOf(predicate).Apply(el):
             ret.append(el)
     return ret
 
@@ -398,7 +410,7 @@ def takeWhile(
         return ret
 
     for el in target:
-        if predicateOf(predicate).apply(el):
+        if predicateOf(predicate).Apply(el):
             ret.append(el)
         else:
             break
@@ -427,7 +439,7 @@ def dropWhile(
     index = 0
 
     for el in target:
-        if predicateOf(predicate).apply(el):
+        if predicateOf(predicate).Apply(el):
             index += 1
         else:
             break
@@ -458,7 +470,7 @@ def reduce(
     result: T = elemList[0]
     reducerObj = reducerOf(reducer)
     for el in elemList:
-        result = reducerObj.reduce(el, result)
+        result = reducerObj.Reduce(el, result)
     return result
 
 
@@ -710,7 +722,7 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return self
-        if predicateOf(predicate).apply(self.__val):
+        if predicateOf(predicate).Apply(self.__val):
             return self
         return self.__getNone()
 
@@ -730,7 +742,7 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return self
-        if predicateWithOf(predicate).apply(self.__val, withVal):
+        if predicateWithOf(predicate).Apply(self.__val, withVal):
             return self
         return self.__getNone()
 
@@ -746,7 +758,7 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return cast(Opt[V], self.__getNone())
-        return Opt(mapperOf(mapper).map(self.__val))
+        return Opt(mapperOf(mapper).Map(self.__val))
 
     def mapWith(
         self, withVal: K, mapper: Union[MapperWith[T, K, V], Callable[[T, K], V]]
@@ -763,7 +775,7 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return cast(Opt[V], self.__getNone())
-        return Opt(mapperWithOf(mapper).map(self.__val, withVal))
+        return Opt(mapperWithOf(mapper).Map(self.__val, withVal))
 
     def orElseGetWith(self, withVal: K, supplier: Callable[[K], T]) -> "Opt[T]":
         """
@@ -813,7 +825,7 @@ class Opt(Generic[T]):
         Returns:
             Opt[T]: The same Opt
         """
-        if self.__val is not None and predicateOf(predicate).apply(self.__val):
+        if self.__val is not None and predicateOf(predicate).Apply(self.__val):
             action(self.__val)
         return self
 
@@ -833,7 +845,7 @@ class Opt(Generic[T]):
         Returns:
             Opt[T]: The same Opt
         """
-        if predicateOf(predicate).apply(self.__val):
+        if predicateOf(predicate).Apply(self.__val):
             action(self.__val)
         return self
 
@@ -912,7 +924,7 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return Opt(orElseSupplier())
-        return Opt(mapperOf(isPresentMapper).map(self.__val))
+        return Opt(mapperOf(isPresentMapper).Map(self.__val))
 
     def ifPresentMapWith(
         self,
@@ -935,7 +947,7 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return Opt(orElseSupplier(withVal))
-        return Opt(mapperWithOf(isPresentMapper).map(self.__val, withVal))
+        return Opt(mapperWithOf(isPresentMapper).Map(self.__val, withVal))
 
     def instanceOf(self, classType: type) -> "Opt[T]":
         """
@@ -980,8 +992,8 @@ class Opt(Generic[T]):
         Returns:
             Opt[V]: An optional
         """
-        if self.__val is not None and predicateOf(predicate).apply(self.__val):
-            return Opt(mapperOf(mapper).map(self.__val))
+        if self.__val is not None and predicateOf(predicate).Apply(self.__val):
+            return Opt(mapperOf(mapper).Map(self.__val))
         return cast(Opt[V], self.__getNone())
 
     def ifMatchesMapWith(
@@ -1003,10 +1015,10 @@ class Opt(Generic[T]):
         Returns:
             Opt[V]: An optional
         """
-        if self.__val is not None and predicateWithOf(predicate).apply(
+        if self.__val is not None and predicateWithOf(predicate).Apply(
             self.__val, withVal
         ):
-            return Opt(mapperWithOf(mapper).map(self.__val, withVal))
+            return Opt(mapperWithOf(mapper).Map(self.__val, withVal))
         return cast(Opt[V], self.__getNone())
 
 
@@ -1049,7 +1061,7 @@ class _FilterIterable(_GenericIterable[T]):
     def __next__(self) -> T:
         while True:
             nextObj = self._iterator.__next__()
-            if self.__predicate.apply(nextObj):
+            if self.__predicate.Apply(nextObj):
                 return nextObj
 
 
@@ -1126,7 +1138,7 @@ class _TakeWhileIterable(_GenericIterable[T]):
             raise StopIteration()
 
         obj = self._iterator.__next__()
-        if not self.__predicate.apply(obj):
+        if not self.__predicate.Apply(obj):
             self.__done = True
             raise StopIteration()
 
@@ -1149,7 +1161,7 @@ class _DropWhileIterable(_GenericIterable[T]):
             return self._iterator.__next__()
         while not self.__done:
             obj = self._iterator.__next__()
-            if not self.__predicate.apply(obj):
+            if not self.__predicate.Apply(obj):
                 self.__done = True
                 return obj
 
@@ -1213,7 +1225,7 @@ class _MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
         return self
 
     def __next__(self) -> V:
-        return self.__mapper.map(self._iterator.__next__())
+        return self.__mapper.Map(self._iterator.__next__())
 
 
 class Stream(Generic[T]):
@@ -1415,7 +1427,7 @@ class Stream(Generic[T]):
         """
         keyMapperObj = mapperOf(keyMapper)
         valueMapperObj = mapperOf(valueMapper)
-        return {keyMapperObj.map(v): valueMapperObj.map(v) for v in self.__arg}
+        return {keyMapperObj.Map(v): valueMapperObj.Map(v) for v in self.__arg}
 
     def toDictAsValues(
         self, keyMapper: Union[Mapper[T, V], Callable[[T], V]]
@@ -1433,7 +1445,7 @@ class Stream(Generic[T]):
             dict[V, T]: The resulting dictionary
         """
         keyMapperObj = mapperOf(keyMapper)
-        return {keyMapperObj.map(v): v for v in self.__arg}
+        return {keyMapperObj.Map(v): v for v in self.__arg}
 
     def toDictAsKeys(
         self, valueMapper: Union[Mapper[T, V], Callable[[T], V]]
@@ -1451,7 +1463,7 @@ class Stream(Generic[T]):
             dict[V, T]: The resulting dictionary
         """
         valueMapperObj = mapperOf(valueMapper)
-        return {v: valueMapperObj.map(v) for v in self.__arg}
+        return {v: valueMapperObj.Map(v) for v in self.__arg}
 
     def each(self, action: Callable[[T], Any]) -> "Stream[T]":
         """

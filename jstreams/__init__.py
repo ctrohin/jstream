@@ -138,6 +138,8 @@ from jstreams.predicate import (
     anyOf,
     allOf,
     noneOf,
+    Not,
+    NotStrict,
 )
 
 from jstreams.match import (
@@ -270,4 +272,6 @@ __all__ = [
     "MapperWith",
     "Reducer",
     "reducerOf",
+    "Not",
+    "NotStrict",
 ]
