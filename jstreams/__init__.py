@@ -140,6 +140,10 @@ from jstreams.predicate import (
     noneOf,
     Not,
     NotStrict,
+    hasKey,
+    hasValue,
+    isInInterval,
+    isInOpenInterval,
 )
 
 from jstreams.match import (
@@ -274,4 +278,9 @@ __all__ = [
     "reducerOf",
     "Not",
     "NotStrict",
+    "hasKey",
+    "hasValue",
+    "isInInterval",
+    "isInOpenInterval",
+    "contains",
 ]

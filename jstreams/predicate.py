@@ -1,5 +1,15 @@
 import re
-from typing import Any, Callable, Iterable, Optional, Sized, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    Mapping,
+    Optional,
+    Sized,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from jstreams.stream import Predicate, Stream, predicateOf
 
@@ -192,6 +202,31 @@ def allNotNone(it: Iterable[Optional[T]]) -> bool:
     return Stream(it).allMatch(lambda e: e is not None)
 
 
+def contains(value: Any) -> Callable[[Optional[Union[str, Iterable[Any]]]], bool]:
+    """
+    Checks if the given value is contained in the call parameter
+    Usage:
+    contains("test")("This is the test string") # Returns True
+    contains("other")("This is the test string") # Returns False
+    contains(1)([1, 2, 3]) # Returns True
+    contains(5)([1, 2, 3]) # Returns False
+    Usage with Opt and Stream:
+    Opt("This is a test string").map(contains("test")).get() # Returns True
+    Stream(["test string", "other string"]).filter(contains("test")).toList() # Results in ["test string"], filtering out the non matching elements
+
+    Args:
+        value (Any): The filter value
+
+    Returns:
+        Callable[[Optional[Union[str, Iterable[Any]]]], bool]: A predicate
+    """
+
+    def wrap(val: Optional[Union[str, Iterable[Any]]]) -> bool:
+        return val is not None and value in val
+
+    return wrap
+
+
 def strContains(value: str) -> Callable[[Optional[str]], bool]:
     """
     Checks if the given value is contained in the call parameter
@@ -209,10 +244,7 @@ def strContains(value: str) -> Callable[[Optional[str]], bool]:
         Callable[[Optional[str]], bool]: A predicate
     """
 
-    def wrap(val: Optional[str]) -> bool:
-        return val is not None and value in val
-
-    return wrap
+    return cast(Callable[[Optional[str]], bool], contains(value))
 
 
 def strContainsIgnoreCase(value: str) -> Callable[[Optional[str]], bool]:
@@ -403,6 +435,18 @@ def isBeweenClosed(
     return wrap
 
 
+def isInInterval(
+    intervalStart: float, intervalEnd: float
+) -> Callable[[Optional[float]], bool]:
+    return isBeweenClosed(intervalStart, intervalEnd)
+
+
+def isInOpenInterval(
+    intervalStart: float, intervalEnd: float
+) -> Callable[[Optional[float]], bool]:
+    return isBeween(intervalStart, intervalEnd)
+
+
 def isBeweenClosedStart(
     intervalStart: float, intervalEnd: float
 ) -> Callable[[Optional[float]], bool]:
@@ -580,6 +624,40 @@ def noneOf(
     return wrap
 
 
+def hasKey(key: Any) -> Callable[[Optional[Mapping[Any, Any]]], bool]:
+    """
+    Produces a predicate that checks that the given value is present in the argument mapping as a key.
+
+    Args:
+        key (Any): The key to be checked
+
+    Returns:
+        Callable[[Optional[Mapping[Any, Any]]], bool]: The resulting predicate
+    """
+
+    def wrap(dct: Optional[Mapping[Any, Any]]) -> bool:
+        return dct is not None and key in dct.keys()
+
+    return wrap
+
+
+def hasValue(value: Any) -> Callable[[Optional[Mapping[Any, Any]]], bool]:
+    """
+    Produces a predicate that checks that the given value is present in the argument mapping as a value.
+
+    Args:
+        value (Any): The value to be checked
+
+    Returns:
+        Callable[[Optional[Mapping[Any, Any]]], bool]: The resulting predicate
+    """
+
+    def wrap(dct: Optional[Mapping[Any, Any]]) -> bool:
+        return dct is not None and value in dct.values()
+
+    return wrap
+
+
 __all__ = [
     "isTrue",
     "isFalse",
@@ -627,4 +705,9 @@ __all__ = [
     "noneOf",
     "Not",
     "NotStrict",
+    "hasKey",
+    "hasValue",
+    "isInInterval",
+    "isInOpenInterval",
+    "contains",
 ]
