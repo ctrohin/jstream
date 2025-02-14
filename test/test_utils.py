@@ -1,10 +1,18 @@
 from baseTest import BaseTestCase
-from jstreams.predicate import allNotNone, default, equals, isBlank, isIn, isNotIn
-from jstreams.stream import Stream
-from jstreams.utils import isNumber, requireNotNull
+from jstreams import (
+    allNotNone,
+    default,
+    equals,
+    isBlank,
+    isIn,
+    isNotIn,
+    Stream,
+    isNumber,
+    requireNotNull,
+)
+
 
 class TestHelpers(BaseTestCase):
-
     def test_requireNotNull(self) -> None:
         """
         Test requireNotNull function
@@ -28,8 +36,14 @@ class TestHelpers(BaseTestCase):
         self.assertTrue(equals(["str"])(["str"]), "String array should be the same")
         self.assertFalse(equals([1])([2]), "Int array should not be the same")
         self.assertTrue(equals({"a": "b"})({"a": "b"}), "Dict should be the same")
-        self.assertTrue(equals({"a": "b", "c": "d"})({"a": "b", "c": "d"}), "Dict should be the same")
-        self.assertTrue(equals({"a": "b", "c": "d"})({"c": "d", "a": "b"}), "Dict should be the same")
+        self.assertTrue(
+            equals({"a": "b", "c": "d"})({"a": "b", "c": "d"}),
+            "Dict should be the same",
+        )
+        self.assertTrue(
+            equals({"a": "b", "c": "d"})({"c": "d", "a": "b"}),
+            "Dict should be the same",
+        )
         self.assertFalse(equals({"a": "b"})({"a": "b1"}), "Dict should not be the same")
 
     def test_allNotNone(self) -> None:
@@ -55,8 +69,9 @@ class TestHelpers(BaseTestCase):
 
     def test_defVal(self) -> None:
         self.assertEqual(default("str")(None), "str", "Default value should be applied")
-        self.assertEqual(default("str")("str1"), "str1", "Given value should be applied")
-
+        self.assertEqual(
+            default("str")("str1"), "str1", "Given value should be applied"
+        )
 
     def test_isNumber(self) -> None:
         self.assertTrue(isNumber(10), "10 should be a number")

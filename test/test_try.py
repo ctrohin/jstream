@@ -1,6 +1,6 @@
 from typing import Any
 from baseTest import BaseTestCase
-from jstreams.tryOpt import Try
+from jstreams import Try
 
 
 class CallRegister:
