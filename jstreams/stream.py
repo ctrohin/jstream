@@ -37,6 +37,9 @@ class Predicate(ABC, Generic[T]):
     def And(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
         return predicateOf(lambda v: self.Apply(v) and predicateOf(other).Apply(v))
 
+    def __call__(self, value: T) -> bool:
+        return self.Apply(value)
+
 
 class PredicateWith(ABC, Generic[T, K]):
     @abstractmethod
@@ -57,6 +60,9 @@ class PredicateWith(ABC, Generic[T, K]):
 
     def And(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
         return predicateWithOf(lambda v, k: self.Apply(v, k) and other.Apply(v, k))
+
+    def __call__(self, value: T, withValue: K) -> bool:
+        return self.Apply(value, withValue)
 
 
 class _WrapPredicate(Predicate[T]):
@@ -92,6 +98,9 @@ class Mapper(ABC, Generic[T, V]):
             V: The produced value
         """
 
+    def __call__(self, value: T) -> V:
+        return self.Map(value)
+
 
 class MapperWith(ABC, Generic[T, K, V]):
     @abstractmethod
@@ -106,6 +115,9 @@ class MapperWith(ABC, Generic[T, K, V]):
         Returns:
             V: The produced value
         """
+
+    def __call__(self, value: T, withValue: K) -> V:
+        return self.Map(value, withValue)
 
 
 class _WrapMapper(Mapper[T, V]):
@@ -141,6 +153,9 @@ class Reducer(ABC, Generic[T]):
         Returns:
             T: The reduced value
         """
+
+    def __call__(self, a: T, b: T) -> T:
+        return self.Reduce(a, b)
 
 
 class _WrapReducer(Reducer[T]):

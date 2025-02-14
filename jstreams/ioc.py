@@ -177,6 +177,3 @@ def inject(className: type[T], qualifier: Optional[str] = None) -> T:
 
 def var(className: type[T], qualifier: str) -> T:
     return injector().getVar(className, qualifier)
-
-
-__all__ = ["Injector", "AutoStart", "AutoInit", "injector", "inject", "var"]

@@ -1,7 +1,11 @@
 from typing import Any
 from baseTest import BaseTestCase
-from jstreams.rx import BehaviorSubject, Flowable, PublishSubject, ReplaySubject, Single
-from jstreams.rxops import (
+from jstreams import (
+    BehaviorSubject,
+    Flowable,
+    PublishSubject,
+    ReplaySubject,
+    Single,
     rxMap,
     rxFilter,
     rxReduce,

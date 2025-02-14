@@ -1,6 +1,5 @@
 from baseTest import BaseTestCase
-from jstreams import isNone, isNotNone, not_
-from jstreams.stream import predicateOf
+from jstreams import isNone, isNotNone, not_, predicateOf
 
 
 class TestNot(BaseTestCase):

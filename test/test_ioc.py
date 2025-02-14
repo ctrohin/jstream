@@ -1,5 +1,5 @@
 from baseTest import BaseTestCase
-from jstreams.ioc import Injector
+from jstreams import inject
 
 SUCCESS = "SUCCESS"
 
@@ -16,33 +16,37 @@ class TestInterfaceImplementation(TestInterface):
 
 class TestIOC(BaseTestCase):
     def setup_interface_nq(self) -> None:
-        Injector.provide(TestInterface, TestInterfaceImplementation())
+        inject().provide(TestInterface, TestInterfaceImplementation())
 
     def setup_interface_q(self) -> TestInterface:
-        Injector.provide(TestInterface, TestInterfaceImplementation(), "testName")
+        inject().provide(TestInterface, TestInterfaceImplementation(), "testName")
 
     def test_ioc_not_qualified(self) -> None:
         """Test dependency injection without qualifier"""
         self.assertThrowsExceptionOfType(
-            lambda: Injector.get(TestInterface),
+            lambda: inject().get(TestInterface),
             ValueError,
             "Retrieving a non existing object should throw a value error",
         )
         self.setup_interface_nq()
-        self.assertIsNotNone(Injector.find(TestInterface), "Autowired interface should not be null")
-        self.assertEqual(Injector.get(TestInterface).test_function(), SUCCESS)
+        self.assertIsNotNone(
+            inject().find(TestInterface), "Autowired interface should not be null"
+        )
+        self.assertEqual(inject().get(TestInterface).test_function(), SUCCESS)
 
     def test_ioc_qualified(self) -> None:
         """Test dependency injection with qualifier"""
         self.assertThrowsExceptionOfType(
-            lambda: Injector.get(TestInterface, "testName"),
+            lambda: inject().get(TestInterface, "testName"),
             ValueError,
             "Retrieving a non existing object should throw a value error",
         )
 
         self.setup_interface_q()
         self.assertIsNotNone(
-            Injector.find(TestInterface, "testName"),
+            inject().find(TestInterface, "testName"),
             "Autowired interface should not be null",
         )
-        self.assertEqual(Injector.get(TestInterface, "testName").test_function(), SUCCESS)
+        self.assertEqual(
+            inject().get(TestInterface, "testName").test_function(), SUCCESS
+        )

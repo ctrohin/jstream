@@ -25,6 +25,7 @@ from jstreams.stream import (
     MapperWith,
     Reducer,
     reducerOf,
+    isEmptyOrNone,
 )
 
 from jstreams.tryOpt import (
@@ -40,6 +41,10 @@ from jstreams.rx import (
     BehaviorSubject,
     PublishSubject,
     ReplaySubject,
+    CompletedHandler,
+    ErrorHandler,
+    DisposeHandler,
+    NextHandler,
 )
 
 from jstreams.rxops import (
@@ -53,12 +58,25 @@ from jstreams.rxops import (
     RxOperator,
     BaseFilteringOperator,
     BaseMappingOperator,
+    rxTake,
+    rxTakeWhile,
+    rxTakeUntil,
+    rxDropWhile,
+    rxDropUntil,
+    rxDrop,
+    TakeWhile,
+    TakeUntil,
+    Drop,
+    DropUntil,
+    DropWhile,
+    Take,
 )
 
 from jstreams.thread import (
     LoopingThread,
     CallbackLoopingThread,
     cancelThread,
+    Cancellable,
 )
 
 from jstreams.timer import (
@@ -283,4 +301,22 @@ __all__ = [
     "isInInterval",
     "isInOpenInterval",
     "contains",
+    "rxTake",
+    "rxTakeWhile",
+    "rxTakeUntil",
+    "rxDropWhile",
+    "rxDropUntil",
+    "rxDrop",
+    "Cancellable",
+    "isEmptyOrNone",
+    "CompletedHandler",
+    "ErrorHandler",
+    "DisposeHandler",
+    "NextHandler",
+    "TakeWhile",
+    "TakeUntil",
+    "Drop",
+    "DropUntil",
+    "DropWhile",
+    "Take",
 ]

@@ -1,7 +1,16 @@
 from baseTest import BaseTestCase
-from jstreams import stream
-from jstreams.predicate import Not, equalsIgnoreCase, strContains
-from jstreams.stream import isNotNone, optional, predicateOf
+from jstreams import (
+    stream,
+    Not,
+    equalsIgnoreCase,
+    strContains,
+    isNotNone,
+    mapperOf,
+    optional,
+    predicateOf,
+    reducerOf,
+    toFloat,
+)
 
 
 class TestPredicate(BaseTestCase):
@@ -41,4 +50,46 @@ class TestPredicate(BaseTestCase):
             .toList(),
             ["Test", "Fest", "other"],
             "Expected value should be correct",
+        )
+
+    def test_predicate_call(self) -> None:
+        predicate = predicateOf(strContains("es"))
+        self.assertTrue(
+            predicate("test"),
+            "Predicate should be callable and return the proper value",
+        )
+
+        self.assertTrue(
+            predicate.Apply("test"),
+            "Predicate should be callable via Apply and return the proper value",
+        )
+        self.assertFalse(
+            predicate("nomatch"),
+            "Predicate should be callable and return the proper value",
+        )
+        self.assertFalse(
+            predicate.Apply("nomatch"),
+            "Predicate should be callable via Apply and return the proper value",
+        )
+
+    def test_mapper_call(self) -> None:
+        mapper = mapperOf(toFloat)
+        self.assertEqual(
+            mapper("1.2"), 1.2, "Mapper should be callable and return the proper value"
+        )
+        self.assertEqual(
+            mapper.Map("1.2"),
+            1.2,
+            "Mapper should be callable via Map and return the proper value",
+        )
+
+    def test_reducer_call(self) -> None:
+        reducer = reducerOf(max)
+        self.assertEqual(
+            reducer(1, 2), 2, "Reducer should be callable and return the proper value"
+        )
+        self.assertEqual(
+            reducer.Reduce(1, 2),
+            2,
+            "Reducer should be callable via Reduce and return the proper value",
         )

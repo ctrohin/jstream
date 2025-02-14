@@ -1,8 +1,16 @@
 from typing import Optional
 from baseTest import BaseTestCase
-from jstreams import isNone, isNotNone
-from jstreams.match import case, defaultCase, match, matchOpt
-from jstreams.predicate import isBeweenClosed, isHigherThanOrEqual, isLessThan
+from jstreams import (
+    isNone,
+    isNotNone,
+    case,
+    defaultCase,
+    match,
+    matchOpt,
+    isBeweenClosed,
+    isHigherThanOrEqual,
+    isLessThan,
+)
 
 
 class TestMatch(BaseTestCase):

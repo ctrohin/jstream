@@ -292,14 +292,3 @@ def matchOpt(value: Optional[T]) -> Match[Optional[T]]:
 
 def defaultCase(resulting: Union[V, Callable[[], V]]) -> Case[T, V]:
     return DefaultCase(resulting)
-
-
-__all__ = [
-    "Case",
-    "Match",
-    "DefaultCase",
-    "case",
-    "match",
-    "matchOpt",
-    "defaultCase",
-]

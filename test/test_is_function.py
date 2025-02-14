@@ -1,5 +1,5 @@
 from baseTest import BaseTestCase
-from jstreams.utils import isCallable
+from jstreams import isCallable
 
 
 class _Class:

@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name="jstreams",
     author="Cristian Trohin",
-    version="4.2.0",
+    version="2025.2.9",
     package_data={"jstreams": ["py.typed"]},
     packages=["jstreams"],
 )
