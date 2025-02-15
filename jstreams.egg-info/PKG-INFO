@@ -1,6 +1,6 @@
 Metadata-Version: 2.2
 Name: jstreams
-Version: 4.2.0
+Version: 2025.2.9
 Summary: A package providing streams and optional functionality similar to Java streams and optionals, a vavr.io Try minimal implementation, threading utilities such as JavaScript-like setTimer and setInterval,1 as well as a basic implementation of ReactiveX and a dependency injection framework.
 Author: Cristian Trohin
 Author-email: Cristian Trohin <cristi.trohin@gmail.com>
@@ -34,6 +34,41 @@ pip install jstreams
 ```
 
 ## Usage
+### v2025.2.9
+From this version onwards, **jstreams** is switching the the following semantic versioning *YYYY.M.R*. YYYY means the release year, M means the month of the release within that year, and R means the number of release within that month. So, 2025.2.9 means the ninth release of February 2025.
+
+Version v2025.2.9 updates the *Predicate*, *PredicateWith*, *Mapper*, *MapperWith* and *Reducer* classes to be callable, so they can now be used without explicitly calling their underlying methods. This change allows predicates, mappers and reducers to be used as functions, not just in *Stream*, *Opt* and *Case* operations. v2025.2.9 also introduces a couple of new predicates:
+- hasKey - checks if a map contains a key
+- hasValue - checks if a map contains a value
+- isInInterval - checks if a value is in a closed interval, alias for *isBetweenClosed*
+- isInOpenInterval - checks if a value is in an open interval, aloas for *isBetween*
+- contains - checks if an Iterable contains an element (the symetrical function for *isIn*)
+- allOf - produces a new predicate that checks for a list of given predicates. Returns True if all predicates are satisfied
+- anyOf - produces a new predicate that checks for a list of given predicates. Returns True if any of the predicates are satisfied
+- noneOf - produces a new predicate that checks for a list of given predicates. Returns True if none of the predicates are satisfied
+- Not - alias of *not_*
+- NotStrict - alias of *notStrict*
+
+The *Predicate* and *PredicateWith* classes have been enriched with the *And* and *Or* methods in order to be chained with another predicate.
+
+```python
+# Define a predicate
+isNonePredicate = predicateOf(isNone)
+
+# Before v4.2.0
+isNonePredicate.Apply(None) # Returns True
+isNonePredicate.Apply("test") # Returns False
+
+# After v4.2.0
+isNonePredicate(None) # Returns True, internally calls the *Apply* method of the predicate
+isNonePredicate("test") # Returns False
+
+# Chain predicates
+chainedPredicate = predicateOf(isNotNone).And(equals("test"))
+chainedPredicate("test") # Returns True, since the parameter is not none and matches the equals predicate
+chainedPredicate(None) # Returns False, since the parameter fails the first predicate, isNotNone
+chainedPredicate("other") # Returns False, since the parameter passes the isNotNone
+```
 
 ### v4.1.0 
 
@@ -250,6 +285,14 @@ Predicates are functions and function wrappers that can be used to filter stream
 - isBeweenClosedEnd
 - not_
 - notStrict
+- hasKey
+- hasValue
+- isInInterval
+- isInOpenInterval
+- contains
+- anyOf
+- allOf
+- noneOf
 
 The predicates provided fall into one of two categories:
 - functions - can be applied directly to a value

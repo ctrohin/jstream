@@ -174,6 +174,16 @@ from jstreams.match import (
     defaultCase,
 )
 
+from jstreams.tuples import (
+    Pair,
+    pair,
+    Triplet,
+    triplet,
+    leftMatches,
+    rightMatches,
+    middleMatches,
+)
+
 __all__ = [
     "each",
     "dictUpdate",
@@ -319,4 +329,11 @@ __all__ = [
     "DropUntil",
     "DropWhile",
     "Take",
+    "Pair",
+    "pair",
+    "Triplet",
+    "triplet",
+    "leftMatches",
+    "rightMatches",
+    "middleMatches",
 ]

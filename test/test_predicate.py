@@ -11,6 +11,7 @@ from jstreams import (
     reducerOf,
     toFloat,
 )
+from jstreams.predicate import hasKey, hasValue, isKeyIn, isValueIn
 
 
 class TestPredicate(BaseTestCase):
@@ -93,3 +94,14 @@ class TestPredicate(BaseTestCase):
             2,
             "Reducer should be callable via Reduce and return the proper value",
         )
+
+    def test_dict_keys_values(self) -> None:
+        dct = {"test": "A"}
+        self.assertTrue(hasKey("test")(dct), "Dict should contain key")
+        self.assertTrue(hasValue("A")(dct), "Dict should contain value")
+        self.assertFalse(hasKey("other")(dct), "Dict should not contain key")
+        self.assertFalse(hasValue("B")(dct), "Dict should not contain value")
+        self.assertTrue(isKeyIn(dct)("test"), "Dict should contain key")
+        self.assertTrue(isValueIn(dct)("A"), "Dict should contain value")
+        self.assertFalse(isKeyIn(dct)("other"), "Dict should not contain key")
+        self.assertFalse(isValueIn(dct)("B"), "Dict should not contain value")
