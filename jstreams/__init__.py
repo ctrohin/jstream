@@ -162,6 +162,8 @@ from jstreams.predicate import (
     hasValue,
     isInInterval,
     isInOpenInterval,
+    isKeyIn,
+    isValueIn,
 )
 
 from jstreams.match import (
@@ -336,4 +338,6 @@ __all__ = [
     "leftMatches",
     "rightMatches",
     "middleMatches",
+    "isKeyIn",
+    "isValueIn",
 ]
