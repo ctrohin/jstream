@@ -45,9 +45,6 @@ from jstreams.rx import (
     ErrorHandler,
     DisposeHandler,
     NextHandler,
-)
-
-from jstreams.rxops import (
     Pipe,
     Reduce,
     Filter,
@@ -94,6 +91,9 @@ from jstreams.ioc import (
     AutoStart,
     inject,
     var,
+    InjectedDependency,
+    OptionalInjectedDependency,
+    resolveDependencies,
 )
 
 from jstreams.noop import (
@@ -164,6 +164,7 @@ from jstreams.predicate import (
     isInOpenInterval,
     isKeyIn,
     isValueIn,
+    contains,
 )
 
 from jstreams.match import (
@@ -340,4 +341,7 @@ __all__ = [
     "middleMatches",
     "isKeyIn",
     "isValueIn",
+    "InjectedDependency",
+    "OptionalInjectedDependency",
+    "resolveDependencies",
 ]

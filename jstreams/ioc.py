@@ -1,5 +1,5 @@
 from threading import Lock
-from typing import Any, Callable, Optional, TypeAlias, TypeVar, Union, cast
+from typing import Any, Callable, Generic, Optional, TypeAlias, TypeVar, Union, cast
 from jstreams.noop import NoOp, NoOpCls
 
 AnyDict: TypeAlias = dict[str, Any]
@@ -177,3 +177,36 @@ def inject(className: type[T], qualifier: Optional[str] = None) -> T:
 
 def var(className: type[T], qualifier: str) -> T:
     return injector().getVar(className, qualifier)
+
+
+def resolveDependencies(dependencies: dict[str, type]) -> Callable[[type[T]], type[T]]:
+    def wrap(cls: type[T]) -> type[T]:
+        for key, typ in dependencies.items():
+            if key.startswith("__"):
+                raise ValueError(
+                    "Cannot inject private attribute. Only public and protected attributes can use injection"
+                )
+            setattr(cls, key, injector().find(typ))
+        return cls
+
+    return wrap
+
+
+class InjectedDependency(Generic[T]):
+    __slots__ = ["__typ"]
+
+    def __init__(self, typ: type[T]) -> None:
+        self.__typ = typ
+
+    def get(self) -> T:
+        return injector().get(self.__typ)
+
+
+class OptionalInjectedDependency(Generic[T]):
+    __slots__ = ["__typ"]
+
+    def __init__(self, typ: type[T]) -> None:
+        self.__typ = typ
+
+    def get(self) -> Optional[T]:
+        return injector().find(self.__typ)

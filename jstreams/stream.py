@@ -1179,6 +1179,7 @@ class _DropWhileIterable(_GenericIterable[T]):
             if not self.__predicate.Apply(obj):
                 self.__done = True
                 return obj
+        raise StopIteration()
 
 
 class _ConcatIterable(_GenericIterable[T]):
@@ -1197,12 +1198,11 @@ class _ConcatIterable(_GenericIterable[T]):
     def __next__(self) -> T:
         if self.__done:
             return self.__iterator2.__next__()
-        else:
-            try:
-                return self._iterator.__next__()
-            except StopIteration:
-                self.__done = True
-                return self.__next__()
+        try:
+            return self._iterator.__next__()
+        except StopIteration:
+            self.__done = True
+            return self.__next__()
 
 
 class _DistinctIterable(_GenericIterable[T]):

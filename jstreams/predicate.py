@@ -419,7 +419,7 @@ def isInt(number: Optional[float]) -> bool:
 
 def isBeween(intervalStart: float, intervalEnd: float) -> Predicate[Optional[float]]:
     def wrap(val: Optional[float]) -> bool:
-        return val is not None and val > intervalStart and val < intervalEnd
+        return val is not None and intervalStart < val < intervalEnd
 
     return predicateOf(wrap)
 
@@ -428,7 +428,7 @@ def isBeweenClosed(
     intervalStart: float, intervalEnd: float
 ) -> Predicate[Optional[float]]:
     def wrap(val: Optional[float]) -> bool:
-        return val is not None and val >= intervalStart and val <= intervalEnd
+        return val is not None and intervalStart <= val <= intervalEnd
 
     return predicateOf(wrap)
 
@@ -449,7 +449,7 @@ def isBeweenClosedStart(
     intervalStart: float, intervalEnd: float
 ) -> Predicate[Optional[float]]:
     def wrap(val: Optional[float]) -> bool:
-        return val is not None and val >= intervalStart and val < intervalEnd
+        return val is not None and intervalStart <= val < intervalEnd
 
     return predicateOf(wrap)
 
@@ -458,7 +458,7 @@ def isBeweenClosedEnd(
     intervalStart: float, intervalEnd: float
 ) -> Predicate[Optional[float]]:
     def wrap(val: Optional[float]) -> bool:
-        return val is not None and val > intervalStart and val <= intervalEnd
+        return val is not None and intervalStart < val <= intervalEnd
 
     return predicateOf(wrap)
 
