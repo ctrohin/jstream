@@ -144,9 +144,12 @@ class _ObservableParent(Generic[T]):
 
 
 class _OnNext(Generic[T]):
+    __slots__ = ["__lock"]
+
+    def __init__(self) -> None:
+        self.__lock = Lock()
+
     def onNext(self, val: Optional[T]) -> None:
-        if not hasattr(self, "__lock"):
-            self.__lock = Lock()
         with self.__lock:
             self._onNext(val)
 

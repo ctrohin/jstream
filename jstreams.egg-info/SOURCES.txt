@@ -9,11 +9,11 @@ jstreams/noop.py
 jstreams/predicate.py
 jstreams/py.typed
 jstreams/rx.py
-jstreams/rxops.py
 jstreams/stream.py
 jstreams/thread.py
 jstreams/timer.py
 jstreams/tryOpt.py
+jstreams/tuples.py
 jstreams/utils.py
 jstreams.egg-info/PKG-INFO
 jstreams.egg-info/SOURCES.txt
@@ -29,4 +29,5 @@ test/test_rx.py
 test/test_stream.py
 test/test_timers.py
 test/test_try.py
+test/test_tuples.py
 test/test_utils.py

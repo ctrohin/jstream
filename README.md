@@ -18,6 +18,51 @@ pip install jstreams
 ```
 
 ## Usage
+### v2025.2.10
+Version 2025.2.10 adds the following enhancements:
+#### Pair and Triplet
+The **Pair** and **Triplet** classes are object oriented substitutions for Python tuples of 2 and 3 values. A such, they don't need to be unpacked and can be used by calling the **left**, **right** and **middle**(Triplets only) methods.
+For enhanced support with predicates and streams, **jstreams** also provides the following predicates dedicated to pairs and triplets:
+- *leftMatches* - A predicate that takes another predicate as a parameter, and applies it to the **left** of a Pair/Triplet
+- *rightMatches* - A predicate that takes another predicate as a parameter, and applies it to the **right** of a Pair/Triplet
+- *middleMatches* - A predicate that takes another predicate as a parameter, and applies it to the **middle** of a Triplet
+
+```python
+p = pair("string", 0)
+pred = rightMatches(isZero)
+pred(p) 
+# Returns True since the right value is, indeed, zero
+
+# Usage with optional
+optional(pair("string", 0)).filter(leftMatches(contains("tri"))).filter(rightMatches(isZero)).get() 
+# Returns the pair, since both fields match the given predicates
+
+# Usage with stream
+pairs = [pair("test", 1), pair("another", 11), pair("test1", 2)]
+stream(pairs).filter(leftMatches(contains("test"))).filter(rightMatches(isHigherThan(1))).toList() 
+# Produces [pair("test1", 2)], since this is the only item that can pass both filters
+
+```
+#### New predicates
+The following general purpose predicates have been added:
+- *isKeyIn* - checks if the predicate argument is present as a key in the predicate mapping
+- *isValueIn* - checks if the predicate argument is present as a value in the predicate mapping
+```python
+predIsKeyIn = isKeyIn({"test": "1"})
+predIsKeyIn("test") 
+# Returns True, since the given string is a key in the predicate dictionary
+
+predIsKeyIn("other") 
+# Returns False, since the givem string is not a key in the predicate dictionary
+
+predIsValueIn = isValueIn({"test": "1"})
+predIsValueIn("1")
+# Returns True, since the given string is a value in the predicate dictionary
+
+predIsValueIn("0")
+# Returns False, since the given string is not a value in the predicate dictionary
+
+```
 ### v2025.2.9
 From this version onwards, **jstreams** is switching the the following semantic versioning *YYYY.M.R*. YYYY means the release year, M means the month of the release within that year, and R means the number of release within that month. So, 2025.2.9 means the ninth release of February 2025.
 
@@ -39,11 +84,11 @@ The *Predicate* and *PredicateWith* classes have been enriched with the *And* an
 # Define a predicate
 isNonePredicate = predicateOf(isNone)
 
-# Before v4.2.0
+# Before 2025.2.9
 isNonePredicate.Apply(None) # Returns True
 isNonePredicate.Apply("test") # Returns False
 
-# After v4.2.0
+# After 2025.2.9
 isNonePredicate(None) # Returns True, internally calls the *Apply* method of the predicate
 isNonePredicate("test") # Returns False
 
@@ -86,7 +131,7 @@ class TakeUntilThreePrimes(Predicate[int]):
     def __init__(self) -> None:
         self.numberOfPrimesFound = 0
 
-    def apply(self, value: int) -> bool:
+    def Apply(self, value: int) -> bool:
         if self.numberOfPrimesFound >= 3:
             return False
 
