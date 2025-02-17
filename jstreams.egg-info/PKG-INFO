@@ -1,6 +1,6 @@
 Metadata-Version: 2.2
 Name: jstreams
-Version: 2025.2.10
+Version: 2025.2.11
 Summary: A package providing streams and optional functionality similar to Java streams and optionals, a vavr.io Try minimal implementation, threading utilities such as JavaScript-like setTimer and setInterval,1 as well as a basic implementation of ReactiveX and a dependency injection framework.
 Author: Cristian Trohin
 Author-email: Cristian Trohin <cristi.trohin@gmail.com>
@@ -34,8 +34,8 @@ pip install jstreams
 ```
 
 ## Usage
-### v2025.2.10
-Version 2025.2.10 adds the following enhancements:
+### v2025.2.11
+Version 2025.2.11 adds the following enhancements:
 #### Pair and Triplet
 The **Pair** and **Triplet** classes are object oriented substitutions for Python tuples of 2 and 3 values. A such, they don't need to be unpacked and can be used by calling the **left**, **right** and **middle**(Triplets only) methods.
 For enhanced support with predicates and streams, **jstreams** also provides the following predicates dedicated to pairs and triplets:

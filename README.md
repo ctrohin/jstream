@@ -18,8 +18,8 @@ pip install jstreams
 ```
 
 ## Usage
-### v2025.2.10
-Version 2025.2.10 adds the following enhancements:
+### v2025.2.11
+Version 2025.2.11 adds the following enhancements:
 #### Pair and Triplet
 The **Pair** and **Triplet** classes are object oriented substitutions for Python tuples of 2 and 3 values. A such, they don't need to be unpacked and can be used by calling the **left**, **right** and **middle**(Triplets only) methods.
 For enhanced support with predicates and streams, **jstreams** also provides the following predicates dedicated to pairs and triplets:
