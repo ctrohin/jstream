@@ -262,3 +262,18 @@ class TestStream(BaseTestCase):
             Stream(["a", "b", "c", "d"]).concat(Stream(["e", "f"])).toList(),
             ["a", "b", "c", "d", "e", "f"],
         )
+
+    def test_stream_flatten(self) -> None:
+        """
+        Test stream flattening
+        """
+
+        self.assertEqual(
+            Stream([["A", "B"], ["C", "D"], ["E", "F"]]).flatten(str).toList(),
+            ["A", "B", "C", "D", "E", "F"],
+        )
+
+        self.assertEqual(
+            Stream(["A", "B"]).flatten(str).toList(),
+            ["A", "B"],
+        )

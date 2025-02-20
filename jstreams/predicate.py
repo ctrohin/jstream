@@ -89,20 +89,20 @@ def isNotIn(it: Iterable[Any]) -> Predicate[Any]:
     return not_(isIn(it))
 
 
-def equals(obj: Any) -> Predicate[Any]:
+def equals(obj: T) -> Predicate[T]:
     """
     Predicate to check if a value equals another value.
     Usage: equals(objectToCompareTo)(myObject)
     Usage with Opt: Opt(myObject).filter(equals(objectToCompareTo))
 
     Args:
-        obj (Any): The object to compare to
+        obj (T): The object to compare to
 
     Returns:
-        Predicate[Any]: The predicate
+        Predicate[T]: The predicate
     """
 
-    def wrap(other: Any) -> bool:
+    def wrap(other: T) -> bool:
         return (obj is None and other is None) or (obj == other)
 
     return predicateOf(wrap)

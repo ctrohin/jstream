@@ -12,6 +12,7 @@ from typing import (
 )
 from abc import ABC, abstractmethod
 
+
 T = TypeVar("T")
 V = TypeVar("V")
 K = TypeVar("K")
@@ -1277,6 +1278,18 @@ class Stream(Generic[T]):
             Stream[V]: the result stream
         """
         return Stream(flatMap(self.__arg, mapperOf(mapper)))
+
+    def flatten(self, typ: type[V]) -> "Stream[V]":
+        """
+        Flattens a stream of iterables.
+        CAUTION: This method will actually iterate the entire iterable, so if you're using
+        infinite generators, calling this method will block the execution of the program.
+        Returns:
+            Stream[T]: A flattened stream
+        """
+        return self.flatMap(
+            lambda v: cast(Iterable[V], v) if isinstance(v, Iterable) else [cast(V, v)]
+        )
 
     def first(self) -> Opt[T]:
         """

@@ -12,6 +12,7 @@ from jstreams import (
     toFloat,
 )
 from jstreams.predicate import hasKey, hasValue, isKeyIn, isValueIn
+from jstreams.utils import identity
 
 
 class TestPredicate(BaseTestCase):
@@ -105,3 +106,11 @@ class TestPredicate(BaseTestCase):
         self.assertTrue(isValueIn(dct)("A"), "Dict should contain value")
         self.assertFalse(isKeyIn(dct)("other"), "Dict should not contain key")
         self.assertFalse(isValueIn(dct)("B"), "Dict should not contain value")
+
+    def test_identity(self) -> None:
+        initial = ["1", "2"]
+        self.assertListEqual(
+            stream(initial).map(identity).toList(),
+            initial,
+            "Lists should match after identity mapping",
+        )

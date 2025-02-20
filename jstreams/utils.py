@@ -135,3 +135,16 @@ def loadJsonEx(
         if handler is not None:
             handler(ex)
     return None
+
+
+def identity(value: T) -> T:
+    """
+    Returns the same value.
+
+    Args:
+        value (T): The given value
+
+    Returns:
+        T: The same value
+    """
+    return value

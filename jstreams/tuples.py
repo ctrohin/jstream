@@ -1,4 +1,4 @@
-from typing import Callable, Generic, TypeVar, Union
+from typing import Any, Callable, Generic, TypeVar, Union
 
 from jstreams.stream import Predicate, predicateOf
 
@@ -78,7 +78,7 @@ def triplet(left: T, middle: V, right: K) -> Triplet[T, V, K]:
 
 def leftMatches(
     predicateArg: Union[Predicate[T], Callable[[T], bool]],
-) -> Predicate[Pair[T, V]]:
+) -> Predicate[Pair[Any, Any]]:
     """
     Produces a predicate that checks if the left value of a Pair/Triplet matches the given predicate
 
@@ -97,7 +97,7 @@ def leftMatches(
 
 def rightMatches(
     predicateArg: Union[Predicate[V], Callable[[V], bool]],
-) -> Predicate[Pair[T, V]]:
+) -> Predicate[Pair[Any, Any]]:
     """
     Produces a predicate that checks if the right value of a Pair/Triplet matches the given predicate
 
@@ -116,7 +116,7 @@ def rightMatches(
 
 def middleMatches(
     predicateArg: Union[Predicate[V], Callable[[V], bool]],
-) -> Predicate[Triplet[T, V, K]]:
+) -> Predicate[Triplet[Any, Any, Any]]:
     """
     Produces a predicate that checks if the middle value of a Triplet matches the given predicate
 
