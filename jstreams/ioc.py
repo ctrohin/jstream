@@ -1,6 +1,7 @@
 from threading import Lock
 from typing import Any, Callable, Generic, Optional, TypeAlias, TypeVar, Union, cast
 from jstreams.noop import NoOp, NoOpCls
+from jstreams.utils import isCallable
 
 AnyDict: TypeAlias = dict[str, Any]
 
@@ -133,6 +134,11 @@ class _Injector:
         if qualifier is None:
             qualifier = ""
         containerDep.qualifiedDependencies[qualifier] = comp
+        if isinstance(comp, AutoInit):
+            comp.init()
+        if isinstance(comp, AutoStart):
+            comp.start()
+
         return self
 
     # Get a component from the container
@@ -141,7 +147,13 @@ class _Injector:
             return None
         if qualifier is None:
             qualifier = ""
-        return containerDep.qualifiedDependencies.get(qualifier, None)
+        foundComponent = containerDep.qualifiedDependencies.get(qualifier, None)
+        # We've got a lazy component
+        if isCallable(foundComponent):
+            # Initialize it
+            self.provide(className, foundComponent(), qualifier)
+            return self._get(className, qualifier)
+        return foundComponent
 
     def _getVar(self, className: type, qualifier: str) -> Any:
         if (varDep := self.__variables.get(className)) is None:
@@ -152,10 +164,6 @@ class _Injector:
         for componentClass in dependencies:
             service = dependencies[componentClass]
             self.provide(componentClass, service)
-            if isinstance(service, AutoInit):
-                service.init()
-            if isinstance(service, AutoStart):
-                service.start()
         return self
 
     def provideVariables(self, variables: list[tuple[type, str, Any]]) -> "_Injector":

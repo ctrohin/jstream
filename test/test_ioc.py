@@ -109,3 +109,26 @@ class TestIOC(BaseTestCase):
             ValueError,
             "Should throw error when dependency is forced and not present",
         )
+
+    def __produceHook(self) -> str:
+        setattr(self, "produceHookCalled", True)
+        return "Test"
+
+    def test_lazy_dependency(self) -> None:
+        injector().clear()
+        injector().provide(str, self.__produceHook)
+        self.assertFalse(
+            hasattr(self, "produceHookCalled"),
+            "Produce hook should not have been called",
+        )
+        self.assertEqual(injector().get(str), "Test", "Value should be present")
+        self.assertTrue(
+            hasattr(self, "produceHookCalled"),
+            "Produce hook should have been called",
+        )
+
+        self.assertTrue(
+            getattr(self, "produceHookCalled"),
+            "Produce hook should have been called",
+        )
+        injector().clear()
