@@ -192,6 +192,24 @@ def var(className: type[T], qualifier: str) -> T:
 
 
 def resolveDependencies(dependencies: dict[str, type]) -> Callable[[type[T]], type[T]]:
+    """
+    Resolve dependencies decorator.
+    Allows class decoration for parameter injection.
+    Example:
+
+    @resolveDependencies({"testField": ClassName})
+    class TestClass:
+        testField: Optional[ClassName]
+
+    Will inject the dependency associated with 'ClassName' into the 'testField' member
+
+    Args:
+        dependencies (dict[str, type]): A map of dependencies
+
+    Returns:
+        Callable[[type[T]], type[T]]: The decorated class constructor
+    """
+
     def wrap(cls: type[T]) -> type[T]:
         for key, typ in dependencies.items():
             if key.startswith("__"):
@@ -199,6 +217,40 @@ def resolveDependencies(dependencies: dict[str, type]) -> Callable[[type[T]], ty
                     "Cannot inject private attribute. Only public and protected attributes can use injection"
                 )
             setattr(cls, key, injector().find(typ))
+        return cls
+
+    return wrap
+
+
+def resolveVariables(
+    variables: dict[str, tuple[type, str]],
+) -> Callable[[type[T]], type[T]]:
+    """
+    Resolve varoables decorator.
+    Allows class decoration for variables injection.
+    Example:
+
+    @resolveVariables({"strValue": (str, "strQualifier"})
+    class TestClass:
+        strValue: Optional[str]
+
+    Will inject the value associated with 'strQualifier' of type 'str' into the 'strValue' member
+
+    Args:
+        variables: dict[str, tuple[type, str]]: A map of variable names to type and key tuple
+
+    Returns:
+        Callable[[type[T]], type[T]]: The decorated class constructor
+    """
+
+    def wrap(cls: type[T]) -> type[T]:
+        for key in variables:
+            typ, varKey = variables.get(key)
+            if key.startswith("__"):
+                raise ValueError(
+                    "Cannot inject private attribute. Only public and protected attributes can use injection"
+                )
+            setattr(cls, key, injector().findVar(typ, varKey))
         return cls
 
     return wrap

@@ -1,6 +1,7 @@
+from typing import Optional
 from baseTest import BaseTestCase
 from jstreams import injector
-from jstreams.ioc import InjectedDependency, resolveDependencies
+from jstreams.ioc import InjectedDependency, resolveDependencies, resolveVariables
 from jstreams.predicate import equals
 
 SUCCESS = "SUCCESS"
@@ -144,3 +145,21 @@ class TestIOC(BaseTestCase):
             injector().optional(str).filter(equals("Test")).isPresent(),
             "Dependency should be correct",
         )
+
+    def test_injected_variable_class_fail(self) -> None:
+        @resolveVariables({"val": (str, "valKey")})
+        class Test:
+            val: Optional[str]
+
+        test = Test()
+        self.assertIsNone(test.val, "Value should be none")
+
+    def test_injected_variable_class_success(self) -> None:
+        injector().provideVar(str, "valKey", "Test")
+
+        @resolveVariables({"val": (str, "valKey")})
+        class Test:
+            val: Optional[str]
+
+        test = Test()
+        self.assertEqual(test.val, "Test", "Value should be none")
