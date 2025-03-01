@@ -1,6 +1,7 @@
 from threading import Lock
 from typing import Any, Callable, Generic, Optional, TypeAlias, TypeVar, Union, cast
 from jstreams.noop import NoOp, NoOpCls
+from jstreams.stream import Opt
 from jstreams.utils import isCallable
 
 AnyDict: TypeAlias = dict[str, Any]
@@ -170,6 +171,9 @@ class _Injector:
         for varClass, qualifier, value in variables:
             self.provideVar(varClass, qualifier, value)
         return self
+
+    def optional(self, className: type[T], qualifier: Optional[str] = None) -> Opt[T]:
+        return Opt(self.find(className, qualifier))
 
 
 Injector = _Injector.getInstance()

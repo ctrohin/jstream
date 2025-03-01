@@ -1,6 +1,7 @@
 from baseTest import BaseTestCase
 from jstreams import injector
 from jstreams.ioc import InjectedDependency, resolveDependencies
+from jstreams.predicate import equals
 
 SUCCESS = "SUCCESS"
 
@@ -115,7 +116,6 @@ class TestIOC(BaseTestCase):
         return "Test"
 
     def test_lazy_dependency(self) -> None:
-        injector().clear()
         injector().provide(str, self.__produceHook)
         self.assertFalse(
             hasattr(self, "produceHookCalled"),
@@ -131,4 +131,16 @@ class TestIOC(BaseTestCase):
             getattr(self, "produceHookCalled"),
             "Produce hook should have been called",
         )
-        injector().clear()
+
+    def test_injector_optional(self) -> None:
+        self.assertFalse(
+            injector().optional(str).isPresent(), "Dependency should not be present"
+        )
+        injector().provide(str, "Test")
+        self.assertTrue(
+            injector().optional(str).isPresent(), "Dependency should be present"
+        )
+        self.assertTrue(
+            injector().optional(str).filter(equals("Test")).isPresent(),
+            "Dependency should be correct",
+        )
