@@ -19,6 +19,7 @@ jstreams.egg-info/PKG-INFO
 jstreams.egg-info/SOURCES.txt
 jstreams.egg-info/dependency_links.txt
 jstreams.egg-info/top_level.txt
+test/test_complex_ioc.py
 test/test_ioc.py
 test/test_is_function.py
 test/test_match.py

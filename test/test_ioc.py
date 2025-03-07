@@ -1,7 +1,12 @@
 from typing import Optional
 from baseTest import BaseTestCase
 from jstreams import injector
-from jstreams.ioc import InjectedDependency, resolveDependencies, resolveVariables
+from jstreams.ioc import (
+    InjectedDependency,
+    StrVariable,
+    resolveDependencies,
+    resolveVariables,
+)
 from jstreams.predicate import equals
 
 SUCCESS = "SUCCESS"
@@ -58,11 +63,11 @@ class TestIOC(BaseTestCase):
         )
 
     def test_autowire_public_attr(self) -> None:
-        injector().provide(TestInterface, TestInterfaceImplementation())
-
         @resolveDependencies({"testIf": TestInterface})
         class Test:
             testIf: TestInterface
+
+        injector().provide(TestInterface, TestInterfaceImplementation())
 
         test = Test()
         self.assertIsNotNone(test.testIf, "Attribute should have been injected")
@@ -71,8 +76,6 @@ class TestIOC(BaseTestCase):
         )
 
     def test_autowire_protected_attr(self) -> None:
-        injector().provide(TestInterface, TestInterfaceImplementation())
-
         @resolveDependencies({"_testIf": TestInterface})
         class Test:
             _testIf: TestInterface
@@ -80,6 +83,7 @@ class TestIOC(BaseTestCase):
             def getTestIf(self) -> TestInterface:
                 return self._testIf
 
+        injector().provide(TestInterface, TestInterfaceImplementation())
         test = Test()
         self.assertIsNotNone(test.getTestIf(), "Attribute should have been injected")
         self.assertEqual(
@@ -147,7 +151,7 @@ class TestIOC(BaseTestCase):
         )
 
     def test_injected_variable_class_fail(self) -> None:
-        @resolveVariables({"val": (str, "valKey")})
+        @resolveVariables({"val": StrVariable("valKey")})
         class Test:
             val: Optional[str]
 
@@ -155,11 +159,11 @@ class TestIOC(BaseTestCase):
         self.assertIsNone(test.val, "Value should be none")
 
     def test_injected_variable_class_success(self) -> None:
-        injector().provideVar(str, "valKey", "Test")
-
-        @resolveVariables({"val": (str, "valKey")})
+        @resolveVariables({"val": StrVariable("valKey")})
         class Test:
             val: Optional[str]
+
+        injector().provideVar(str, "valKey", "Test")
 
         test = Test()
         self.assertEqual(test.val, "Test", "Value should be none")

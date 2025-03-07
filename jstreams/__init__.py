@@ -94,6 +94,14 @@ from jstreams.ioc import (
     InjectedDependency,
     OptionalInjectedDependency,
     resolveDependencies,
+    resolveVariables,
+    component,
+    Variable,
+    StrVariable,
+    IntVariable,
+    FloatVariable,
+    Dependency,
+    InjectedVariable,
 )
 
 from jstreams.noop import (
@@ -344,4 +352,12 @@ __all__ = [
     "InjectedDependency",
     "OptionalInjectedDependency",
     "resolveDependencies",
+    "resolveVariables",
+    "Variable",
+    "StrVariable",
+    "IntVariable",
+    "FloatVariable",
+    "Dependency",
+    "InjectedVariable",
+    "component",
 ]

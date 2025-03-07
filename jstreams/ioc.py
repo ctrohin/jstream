@@ -1,3 +1,4 @@
+from enum import Enum
 from threading import Lock
 from typing import Any, Callable, Generic, Optional, TypeAlias, TypeVar, Union, cast
 from jstreams.noop import NoOp, NoOpCls
@@ -5,6 +6,64 @@ from jstreams.stream import Opt
 from jstreams.utils import isCallable
 
 AnyDict: TypeAlias = dict[str, Any]
+
+
+class Strategy(Enum):
+    EAGER = 0
+    LAZY = 1
+
+
+class Dependency:
+    __slots__ = ("__typ", "__qualifier")
+
+    def __init__(self, typ: type, qualifier: str) -> None:
+        self.__typ = typ
+        self.__qualifier = qualifier
+
+    def getType(self) -> type:
+        return self.__typ
+
+    def getQualifier(self) -> str:
+        return self.__qualifier
+
+
+class Variable:
+    __slots__ = ("__typ", "__key")
+
+    def __init__(self, typ: type, key: str) -> None:
+        self.__typ = typ
+        self.__key = key
+
+    def getType(self) -> type:
+        return self.__typ
+
+    def getKey(self) -> str:
+        return self.__key
+
+
+class StrVariable(Variable):
+    def __init__(self, key: str) -> None:
+        super().__init__(str, key)
+
+
+class IntVariable(Variable):
+    def __init__(self, key: str) -> None:
+        super().__init__(int, key)
+
+
+class FloatVariable(Variable):
+    def __init__(self, key: str) -> None:
+        super().__init__(float, key)
+
+
+class ListVariable(Variable):
+    def __init__(self, key: str) -> None:
+        super().__init__(list, key)
+
+
+class DictVariable(Variable):
+    def __init__(self, key: str) -> None:
+        super().__init__(dict, key)
 
 
 class AutoStart:
@@ -191,7 +250,28 @@ def var(className: type[T], qualifier: str) -> T:
     return injector().getVar(className, qualifier)
 
 
-def resolveDependencies(dependencies: dict[str, type]) -> Callable[[type[T]], type[T]]:
+def component(
+    strategy: Strategy = Strategy.EAGER,
+    className: Optional[type] = None,
+    qualifier: Optional[str] = None,
+) -> Callable[[type[T]], type[T]]:
+    def wrap(cls: type[T]) -> type[T]:
+        if strategy == Strategy.EAGER:
+            injector().provide(
+                className if className is not None else cls, cls(), qualifier
+            )
+        elif strategy == Strategy.LAZY:
+            injector().provide(
+                className if className is not None else cls, lambda: cls(), qualifier
+            )
+        return cls
+
+    return wrap
+
+
+def resolveDependencies(
+    dependencies: dict[str, Union[type, Dependency]],
+) -> Callable[[type[T]], type[T]]:
     """
     Resolve dependencies decorator.
     Allows class decoration for parameter injection.
@@ -204,29 +284,41 @@ def resolveDependencies(dependencies: dict[str, type]) -> Callable[[type[T]], ty
     Will inject the dependency associated with 'ClassName' into the 'testField' member
 
     Args:
-        dependencies (dict[str, type]): A map of dependencies
+        dependencies (Union[type, Dependency]]): A map of dependencies
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
 
     def wrap(cls: type[T]) -> type[T]:
-        for key, typ in dependencies.items():
-            if key.startswith("__"):
-                raise ValueError(
-                    "Cannot inject private attribute. Only public and protected attributes can use injection"
-                )
-            setattr(cls, key, injector().find(typ))
+        originalInit = cls.__init__
+
+        def __init__(self, *args: tuple[Any], **kws: dict[str, Any]) -> None:  # type: ignore[no-untyped-def]
+            for key, quali in dependencies.items():
+                if isinstance(quali, Dependency):
+                    typ = quali.getType()
+                    qualifier = quali.getQualifier()
+                else:
+                    typ = quali
+                    qualifier = None
+                if key.startswith("__"):
+                    raise ValueError(
+                        "Cannot inject private attribute. Only public and protected attributes can use injection"
+                    )
+                setattr(self, key, injector().find(typ, qualifier))
+            originalInit(self, *args, **kws)  # Call the original __init__
+
+        cls.__init__ = __init__  # type: ignore[method-assign]
         return cls
 
     return wrap
 
 
 def resolveVariables(
-    variables: dict[str, tuple[type, str]],
+    variables: dict[str, Variable],
 ) -> Callable[[type[T]], type[T]]:
     """
-    Resolve varoables decorator.
+    Resolve variables decorator.
     Allows class decoration for variables injection.
     Example:
 
@@ -237,40 +329,72 @@ def resolveVariables(
     Will inject the value associated with 'strQualifier' of type 'str' into the 'strValue' member
 
     Args:
-        variables: dict[str, tuple[type, str]]: A map of variable names to type and key tuple
+        variables: dict[str, dict[str, Variable]]: A map of variable names to type and key tuple
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
 
     def wrap(cls: type[T]) -> type[T]:
-        for key in variables:
-            typ, varKey = variables.get(key)
-            if key.startswith("__"):
-                raise ValueError(
-                    "Cannot inject private attribute. Only public and protected attributes can use injection"
+        originalInit = cls.__init__
+
+        def __init__(self, *args: tuple[Any], **kws: dict[str, Any]) -> None:  # type: ignore[no-untyped-def]
+            for key in variables:
+                variable = variables.get(key)
+                if variable is None:
+                    continue
+                if key.startswith("__"):
+                    raise ValueError(
+                        "Cannot inject private attribute. Only public and protected attributes can use injection"
+                    )
+                setattr(
+                    self, key, injector().findVar(variable.getType(), variable.getKey())
                 )
-            setattr(cls, key, injector().findVar(typ, varKey))
+            originalInit(self, *args, **kws)  # Call the original __init__
+
+        cls.__init__ = __init__  # type: ignore[method-assign]
         return cls
 
     return wrap
 
 
 class InjectedDependency(Generic[T]):
-    __slots__ = ["__typ"]
+    __slots__ = ["__typ", "__quali"]
 
-    def __init__(self, typ: type[T]) -> None:
+    def __init__(self, typ: type[T], qualifier: Optional[str] = None) -> None:
         self.__typ = typ
+        self.__quali = qualifier
 
     def get(self) -> T:
-        return injector().get(self.__typ)
+        return injector().get(self.__typ, self.__quali)
+
+    def __call__(self) -> T:
+        return self.get()
 
 
 class OptionalInjectedDependency(Generic[T]):
-    __slots__ = ["__typ"]
+    __slots__ = ["__typ", "__quali"]
 
-    def __init__(self, typ: type[T]) -> None:
+    def __init__(self, typ: type[T], qualifier: Optional[str] = None) -> None:
         self.__typ = typ
+        self.__quali = qualifier
 
     def get(self) -> Optional[T]:
-        return injector().find(self.__typ)
+        return injector().find(self.__typ, self.__quali)
+
+    def __call__(self) -> Optional[T]:
+        return self.get()
+
+
+class InjectedVariable(Generic[T]):
+    __slots__ = ["__typ", "__quali"]
+
+    def __init__(self, typ: type[T], qualifier: str) -> None:
+        self.__typ = typ
+        self.__quali = qualifier
+
+    def get(self) -> T:
+        return injector().getVar(self.__typ, self.__quali)
+
+    def __call__(self) -> T:
+        return self.get()

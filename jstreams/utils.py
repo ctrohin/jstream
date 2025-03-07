@@ -1,7 +1,11 @@
 import json
-from typing import Any, Callable, Optional, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar, Union, cast
+
+from jstreams import Stream
+from jstreams.stream import isNotNone
 
 T = TypeVar("T")
+K = TypeVar("K")
 
 
 def _f() -> None:
@@ -148,3 +152,51 @@ def identity(value: T) -> T:
         T: The same value
     """
     return value
+
+
+def extract(
+    typ: type[T], val: Any, keys: list[Any], defaultValue: Optional[T] = None
+) -> Optional[T]:
+    """
+    Extract a property from a complex object
+
+    Args:
+        typ (type[T]): The property type
+        val (Any): The object the property will be extracted from
+        keys (list[Any]): The list of keys to be applied. For each key, a value will be extracted recursively
+        defaultValue (Optional[T], optional): Default value if property is not found. Defaults to None.
+
+    Returns:
+        Optional[T]: The found property or the default value
+    """
+    if val is None:
+        return defaultValue
+
+    if len(keys) == 0:
+        return cast(typ, val) if val is not None else defaultValue  # type: ignore[valid-type]
+
+    if isinstance(val, list):
+        if len(val) < keys[0]:
+            return defaultValue
+        return extract(typ, val[keys[0]], keys[1:], defaultValue)
+
+    if isinstance(val, dict):
+        return extract(typ, val.get(keys[0], None), keys[1:], defaultValue)
+
+    if hasattr(val, keys[0]):
+        return extract(typ, getattr(val, keys[0]), keys[:1], defaultValue)
+    return defaultValue
+
+
+def extractList(val: dict[K, T], keys: list[K]) -> list[Optional[T]]:
+    return Stream(keys).map(val.get).toList()
+
+
+def extractNonNullList(val: dict[K, T], keys: list[K]) -> list[T]:
+    return (
+        Stream(keys)
+        .map(val.get)
+        .filter(isNotNone)
+        .map(lambda e: requireNotNull(e))
+        .toList()
+    )

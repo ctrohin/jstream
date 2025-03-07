@@ -1,6 +1,6 @@
 Metadata-Version: 2.2
 Name: jstreams
-Version: 2025.2.12
+Version: 2025.3.2
 Summary: A package providing streams and optional functionality similar to Java streams and optionals, a vavr.io Try minimal implementation, threading utilities such as JavaScript-like setTimer and setInterval,1 as well as a basic implementation of ReactiveX and a dependency injection framework.
 Author: Cristian Trohin
 Author-email: Cristian Trohin <cristi.trohin@gmail.com>
@@ -34,6 +34,13 @@ pip install jstreams
 ```
 
 ## Usage
+### v2025.3.2
+This version adds more dependency injection options (for usage, check the Dependency injection section below):
+- *resolveVariables* decorator - provides class level variable injection
+- *resolveDependencies* decorator - provides class level dependency injection
+- *component* decorator - provides decoration for classes. A decorated class will be injected once its module is imported
+- *InjectedVariable* class - a class providing access to a injected variable without the need for decoration or using the `injector` directly
+- added callable functionality to `InjectedDependency` and `OptionalInjectedDependency` classes. You can now call `dep()` instead of `dep.get()`
 ### v2025.2.11
 Version 2025.2.11 adds the following enhancements:
 #### Pair and Triplet
@@ -738,7 +745,7 @@ class ReduceOperator(BaseFilteringOperator[T]):
 The dependency injection container built into **jstreams** is a simple and straightforward implementation, providing two sets of methods for:
 - providing dependencies
 - retrieving dependencies
-The container does not support parameter injection or constructor injection.
+The container does not support parameter injection or constructor injection, but does (as of March 2025) support attributes injection.
 
 #### How can I use the dependency injection container
 The idea behind the DI container is to use interfaces in order to provide functionality in applications.
@@ -799,6 +806,53 @@ myClass = injector().get(MyClass)
 myOtherClass = injector().find(MyOtherClass)
 ```
 
+Dependencies can also be provided by using the `component` decorator:
+```python
+@component()
+class Service:
+    def doSomething(self) -> None:
+        print("Do something")
+
+injector().get(Service).doSomething() # Will print out "Do something"
+```
+
+Components can be defined using two different strategies:
+- Lazy
+- Eager
+
+A lazy component will only be instatianted when needed:
+
+```python
+@component(Strategy.LAZY)
+class Service:
+    def doSomething(self) -> None:
+        print("Do something")
+
+# The dependency is not yet instantiated
+injector().get(Service) # Now the dependency is created
+```
+
+An eager component will be instantiated once its module or the class itself is imported:
+```python
+@component(Strategy.EAGER)
+class Service:
+    def doSomething(self) -> None:
+        print("Do something")
+
+# The dependency is already instantiated
+injector().get(Service) # Now the dependency can be retrieved
+```
+
+You can also use the `component` decorator to specify the class/interface the service needs to substitute
+```python
+@component(Strategy.LAZY, ServiceInterface)
+class Service(ServiceInterface):
+    def serviceMethod(self) -> None:
+        pass
+
+# Inject the dependency using the interface
+injector().get(ServiceInterface)
+```
 
 #### Providing and retrieving qualified dependencies
 ```python
@@ -844,6 +898,62 @@ myString = injector().getVar(str, "myString")
 myInt = injector().findVar(int, "myInt")
 # retrieving a value with a default fallback if the value is not present
 myString = injector().findVarOr(str, "myStrint", "defaultValue")
+```
+Qualified dependencies can also be injected by using the `component` decorator:
+You can also use qualifiers with the `component` decorator:
+```python
+@component(Strategy.LAZY, ServiceInterface, "service")
+class Service(ServiceInterface):
+    def serviceMethod(self) -> None:
+        pass
+
+# Inject the dependency using the interface and a qualifier
+injector().get(ServiceInterface, "service")
+```
+
+#### Attribute injection
+Attributes can be injected by providing the dependency classes or variable definitions.
+```python
+@resoveDependencies({
+    "myAttribute": AttributeClassName
+})
+class MyDependentComponent:
+    myAttribute: AttributeClassName
+
+# Provide the dependency at some point before actually instantiating a MyDependentComponent object
+injector().provide(AttributeClassName, AttributeClassName())
+
+myDepComp = MyDependentComponent() # The dependency gets injected when the constructor is called
+myDepComp.myAttribute # Will have the value provided
+
+
+@resolveVariables({
+    "myVariable": StrVariable("myVar"), # Type agnostic syntax: Variable(str, "myVar")
+})
+class MyVariableNeededComponent:
+    myVariable: str
+
+injector().provideVar(str, "myVariable", "myVariableValue")
+
+myVarNeededComp = MyVariableNeededComponent() # Value gets injected when the constructor is called
+print(myVarNeededComp.myVariable) # Will print out 'myVariableValue'
+```
+
+#### Injected dependecies
+Injected dependecies can be used when the needed dependencies are not present in the container ahead of time. For example, you can create a class that requires a dependency even if the dependency is not yet present, provide the dependency later on, then use it in the class you've initialized.
+
+Injected dependencies are available through 3 classes:
+- InjectedDependency
+- OptionalInjectedDependency
+- InjectedVariable
+
+```python
+injector().provide(str, "Test")
+dep = InjectedDependency(str)
+# you can either use the get() method, or use the callable functionality of the class
+print(dep.get()) # will print out "Test"
+# or the equivalent
+print(dep()) # will also print out "Test"
 ```
 
 ### Threads
