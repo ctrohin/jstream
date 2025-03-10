@@ -255,6 +255,18 @@ def component(
     className: Optional[type] = None,
     qualifier: Optional[str] = None,
 ) -> Callable[[type[T]], type[T]]:
+    """
+    Decorates a component for container injection.
+
+    Args:
+        strategy (Strategy, optional): The strategy used for instantiation: EAGER means instantiate as soon as possible, LAZY means instantiate when needed. Defaults to Strategy.EAGER.
+        className (Optional[type], optional): Specify which class to use with the container. Defaults to declared class.
+        qualifier (Optional[str], optional): Specify the qualifer to be used for the dependency. Defaults to None.
+
+    Returns:
+        Callable[[type[T]], type[T]]: The decorated class
+    """
+
     def wrap(cls: type[T]) -> type[T]:
         if strategy == Strategy.EAGER:
             injector().provide(
