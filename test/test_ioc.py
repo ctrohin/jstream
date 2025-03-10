@@ -1,9 +1,10 @@
 from typing import Optional
 from baseTest import BaseTestCase
-from jstreams import injector
+from jstreams import Dependency, injector
 from jstreams.ioc import (
     InjectedDependency,
     StrVariable,
+    injectDependencies,
     resolveDependencies,
     resolveVariables,
 )
@@ -167,3 +168,27 @@ class TestIOC(BaseTestCase):
 
         test = Test()
         self.assertEqual(test.val, "Test", "Value should be none")
+
+    def test_inject_to_functions(self) -> None:
+        @injectDependencies({"a": int, "b": str})
+        def fn(a: int, b: str) -> str:
+            return str(a) + "_" + b
+
+        injector().provide(str, "test")
+        injector().provide(int, 1)
+        self.assertEqual(fn(), "1_test")
+        self.assertEqual(fn(a=10), "10_test")
+        self.assertEqual(fn(a=10, b="other"), "10_other")
+        self.assertEqual(fn(b="other"), "1_other")
+
+    def test_inject_to_functions_with_qualifiers(self) -> None:
+        @injectDependencies({"a": Dependency(int, "a"), "b": str})
+        def fn(a: int, b: str) -> str:
+            return str(a) + "_" + b
+
+        injector().provide(str, "test")
+        injector().provide(int, 1, "a")
+        self.assertEqual(fn(), "1_test")
+        self.assertEqual(fn(a=10), "10_test")
+        self.assertEqual(fn(a=10, b="other"), "10_other")
+        self.assertEqual(fn(b="other"), "1_other")

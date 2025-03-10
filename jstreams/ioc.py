@@ -358,6 +358,28 @@ def resolveVariables(
     return wrap
 
 
+def injectDependencies(
+    dependencies: dict[str, Union[type, Dependency]],
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    def wrapper(func: Callable[..., T]) -> Callable[..., T]:
+        def wrapped(*args: tuple[Any], **kwds: dict[str, Any]) -> T:
+            for key in dependencies:
+                if kwds.get(key) is None:
+                    dep = dependencies[key]
+                    quali: Optional[str] = None
+                    if isinstance(dep, Dependency):
+                        quali = dep.getQualifier()
+                        typ = dep.getType()
+                    else:
+                        typ = dep
+                    kwds[key] = inject(typ, quali)
+            return func(*args, **kwds)
+
+        return wrapped
+
+    return wrapper
+
+
 class InjectedDependency(Generic[T]):
     __slots__ = ["__typ", "__quali"]
 
