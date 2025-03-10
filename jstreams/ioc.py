@@ -361,18 +361,29 @@ def resolveVariables(
 def injectKwargsDependencies(
     dependencies: dict[str, Union[type, Dependency]],
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """
+    Injects dependencies to a function or method using kwargs
+
+    Args:
+        dependencies (dict[str, Union[type, Dependency]]): A dictionary of dependecies that specify the argument name and the dependency mapping.
+
+    Returns:
+        Callable[[Callable[..., T]], Callable[..., T]]: The decorated function or method
+    """
+
     def wrapper(func: Callable[..., T]) -> Callable[..., T]:
         def wrapped(*args: tuple[Any], **kwds: dict[str, Any]) -> T:
-            for key in dependencies:
-                if kwds.get(key) is None:
-                    dep = dependencies[key]
-                    quali: Optional[str] = None
-                    if isinstance(dep, Dependency):
-                        quali = dep.getQualifier()
-                        typ = dep.getType()
-                    else:
-                        typ = dep
-                    kwds[key] = inject(typ, quali)
+            if len(args) == 0:
+                for key in dependencies:
+                    if kwds.get(key) is None:
+                        dep = dependencies[key]
+                        quali: Optional[str] = None
+                        if isinstance(dep, Dependency):
+                            quali = dep.getQualifier()
+                            typ = dep.getType()
+                        else:
+                            typ = dep
+                        kwds[key] = inject(typ, quali)
             return func(*args, **kwds)
 
         return wrapped

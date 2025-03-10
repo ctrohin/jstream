@@ -180,6 +180,7 @@ class TestIOC(BaseTestCase):
         self.assertEqual(fn(a=10), "10_test")
         self.assertEqual(fn(a=10, b="other"), "10_other")
         self.assertEqual(fn(b="other"), "1_other")
+        self.assertEqual(fn(10, "other"), "10_other")
 
     def test_inject_to_functions_with_qualifiers(self) -> None:
         @injectKwargsDependencies({"a": Dependency(int, "a"), "b": str})
@@ -192,3 +193,4 @@ class TestIOC(BaseTestCase):
         self.assertEqual(fn(a=10), "10_test")
         self.assertEqual(fn(a=10, b="other"), "10_other")
         self.assertEqual(fn(b="other"), "1_other")
+        self.assertEqual(fn(10, "other"), "10_other")
