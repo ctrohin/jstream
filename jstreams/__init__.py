@@ -102,7 +102,7 @@ from jstreams.ioc import (
     FloatVariable,
     Dependency,
     InjectedVariable,
-    injectDependencies,
+    injectKwargsDependencies,
 )
 
 from jstreams.noop import (
@@ -361,5 +361,5 @@ __all__ = [
     "Dependency",
     "InjectedVariable",
     "component",
-    "injectDependencies",
+    "injectKwargsDependencies",
 ]

@@ -358,7 +358,7 @@ def resolveVariables(
     return wrap
 
 
-def injectDependencies(
+def injectKwargsDependencies(
     dependencies: dict[str, Union[type, Dependency]],
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     def wrapper(func: Callable[..., T]) -> Callable[..., T]:
