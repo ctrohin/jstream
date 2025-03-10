@@ -362,7 +362,26 @@ def injectKwargsDependencies(
     dependencies: dict[str, Union[type, Dependency]],
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
-    Injects dependencies to a function or method using kwargs
+    Injects dependencies to a function or method using kwargs.
+    Example:
+
+    # Example 1:
+    injector().provide(str, "test")
+    injector().provide(int, 10)
+
+    @injectKwargsDependencies({"param1": str, "param2": int})
+    def fn(param1: str, param2: int) -> None:
+        print(param1 + "_" + param2)
+
+    fn() # will print out "test_10"
+    fn(param1="test2") # will print out "test2_10" as param1 is overriden by the actual call
+    fn(param1="test2", param2=1) # will print out "test2_1" as both param1 and param2 are overriden by the actual call
+    fn(param2=1) # will print out "test_1" as only param2 is overriden by the actual call
+
+    CAUTION: It is possible to also call decorated functions with positional arguments, but int
+    this case, all parameters must be provided.
+    fn("test2", 1) # will print out "test2_1" as both param1 and param2 are provided by the actual call
+    fn("test2") # will result in an ERROR as not all params are provided by the positional arguments
 
     Args:
         dependencies (dict[str, Union[type, Dependency]]): A dictionary of dependecies that specify the argument name and the dependency mapping.
