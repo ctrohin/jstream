@@ -1,5 +1,5 @@
 from enum import Enum
-from threading import Lock
+from threading import Lock, RLock
 from typing import Any, Callable, Generic, Optional, TypeAlias, TypeVar, Union, cast
 
 from jstreams import Stream
@@ -91,13 +91,19 @@ class AutoInit:
 
 
 class ContainerDependency:
+    __slots__ = ("qualifiedDependencies", "lock")
+
     def __init__(self) -> None:
         self.qualifiedDependencies: AnyDict = {}
+        self.lock = RLock()
 
 
 class VariableDependency:
+    __slots__ = ("qualifiedVariables", "lock")
+
     def __init__(self) -> None:
         self.qualifiedVariables: AnyDict = {}
+        self.lock = RLock()
 
 
 T = TypeVar("T")
@@ -106,6 +112,7 @@ T = TypeVar("T")
 class _Injector:
     instance: Optional["_Injector"] = None
     instanceLock: Lock = Lock()
+    provideLock: Lock = Lock()
 
     def __init__(self) -> None:
         self.__components: dict[type, ContainerDependency] = {}
@@ -178,28 +185,30 @@ class _Injector:
         return self
 
     def provideVar(self, className: type, qualifier: str, value: Any) -> "_Injector":
-        if (varDep := self.__variables.get(className)) is None:
-            varDep = VariableDependency()
-            self.__variables[className] = varDep
-        if qualifier is None:
-            qualifier = ""
-        varDep.qualifiedVariables[qualifier] = value
+        with self.provideLock:
+            if (varDep := self.__variables.get(className)) is None:
+                varDep = VariableDependency()
+                self.__variables[className] = varDep
+            if qualifier is None:
+                qualifier = ""
+            varDep.qualifiedVariables[qualifier] = value
         return self
 
     # Register a component with the container
     def provide(
         self, className: type, comp: Any, qualifier: Optional[str] = None
     ) -> "_Injector":
-        if (containerDep := self.__components.get(className)) is None:
-            containerDep = ContainerDependency()
-            self.__components[className] = containerDep
-        if qualifier is None:
-            qualifier = ""
-        containerDep.qualifiedDependencies[qualifier] = comp
-        if isinstance(comp, AutoInit):
-            comp.init()
-        if isinstance(comp, AutoStart):
-            comp.start()
+        with self.provideLock:
+            if (containerDep := self.__components.get(className)) is None:
+                containerDep = ContainerDependency()
+                self.__components[className] = containerDep
+            if qualifier is None:
+                qualifier = ""
+            containerDep.qualifiedDependencies[qualifier] = comp
+            if isinstance(comp, AutoInit):
+                comp.init()
+            if isinstance(comp, AutoStart):
+                comp.start()
 
         return self
 
@@ -217,20 +226,22 @@ class _Injector:
     def _get(self, className: type, qualifier: Optional[str]) -> Any:
         if (containerDep := self.__components.get(className)) is None:
             return None
-        if qualifier is None:
-            qualifier = ""
-        foundComponent = containerDep.qualifiedDependencies.get(qualifier, None)
-        # We've got a lazy component
-        if isCallable(foundComponent):
-            # Initialize it
-            self.provide(className, foundComponent(), qualifier)
-            return self._get(className, qualifier)
-        return foundComponent
+        with containerDep.lock:
+            if qualifier is None:
+                qualifier = ""
+            foundComponent = containerDep.qualifiedDependencies.get(qualifier, None)
+            # We've got a lazy component
+            if isCallable(foundComponent):
+                # Initialize it
+                self.provide(className, foundComponent(), qualifier)
+                return self._get(className, qualifier)
+            return foundComponent
 
     def _getVar(self, className: type, qualifier: str) -> Any:
         if (varDep := self.__variables.get(className)) is None:
             return None
-        return varDep.qualifiedVariables.get(qualifier, None)
+        with varDep.lock:
+            return varDep.qualifiedVariables.get(qualifier, None)
 
     def provideDependencies(self, dependencies: dict[type, Any]) -> "_Injector":
         for componentClass in dependencies:
