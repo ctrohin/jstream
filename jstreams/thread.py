@@ -43,7 +43,7 @@ class CallbackLoopingThread(LoopingThread):
     Extension of LoopingThread. Provide your own callback instead of implementing the loop method.
     """
 
-    __slots__ = ("__running", "__target")
+    __slots__ = ("__target",)
 
     def __init__(self, callback: Callable[[], Any]) -> None:
         """
