@@ -557,9 +557,9 @@ subject.subscribe(
     lambda s: print(s)
 )
 
-# Will print out "C" as this is the next value added in the Subject,
-# any new subscription at this point will receive "A", then "B", then "C"
-subject.onNext("C")
+# Will print out "D" as this is the next value added in the Subject,
+# any new subscription at this point will receive "A", then "B", then "C", then "D"
+subject.onNext("D")
 
 # For long lived subjects and observables, it is wise to call the
 # dispose method so that all subscriptions can be cleared and no
