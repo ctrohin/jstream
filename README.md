@@ -18,8 +18,17 @@ pip install jstreams
 ```
 ## Changelog
 ### v2025.3.3
-This version adds argument injection via the *injectArgs* decorator. See usage below in the *Attribute and argument injection* section.
-This version also adds the ability to retrieve all dependencies of a certain type using the *allOfType* and *allOfTypeStream* methods. This method is useful when multiple dependecies that implement the same parent class are provided, for cases where you have multiple validators that can be dynamically provided.
+This versions adds the following features:
+- stream collectors
+    - the *Stream* class has been enriched with the *collectUsing* method to transform/reduce a stream
+    - the *Collectors* class has been added containing the following collectors:
+        - toList - produces a list of the elements of the stream
+        - toSet - produces a set of the elements of the stream
+        - groupingBy - produces a dictionary of the stream with the grouping value as key and a list of elements as values
+        - partitioningBy - produces a dictionary of the string with True/False as key (as returned by the given condition) and a list of elements as values
+        - joining - produces a string from all elements of the stream by joining them with the given separator
+- argument injection via the *injectArgs* decorator. See usage below in the *Attribute and argument injection* section.
+- the ability to retrieve all dependencies of a certain type using the *allOfType* and *allOfTypeStream* methods. This method is useful when multiple dependecies that implement the same parent class are provided, for cases where you have multiple validators that can be dynamically provided.
 ```python
 class ValidatorInterface(abc.ABC):
     @abc.abstractmethod
@@ -277,6 +286,31 @@ print(Stream([1, 2, 3, 4, 20, 5, 6]).reduce(max).getActual())
 print(Stream(["A", None, "B", None, None, "C", None, None]).nonNull().toList())
 # Will output ["A", "B", "C"]
 
+```
+
+#### Stream collectors
+```python
+def collector_group_by() -> None:
+    values = Stream(
+        [
+            {"key": 1, "prop": "prop", "value": "X1"},
+            {"key": 1, "prop": "prop", "value": "X2"},
+            {"key": 1, "prop": "prop1", "value": "X3"},
+            {"key": 1, "prop": "prop1", "value": "X4"},
+        ]
+    ).collectUsing(Collectors.groupingBy(lambda x: x["prop"]))
+    # values will be equal to:
+    # {
+    #     "prop": [
+    #         {"key": 1, "prop": "prop", "value": "X1"},
+    #         {"key": 1, "prop": "prop", "value": "X2"},
+    #     ],
+    #     "prop1": [
+    #         {"key": 1, "prop": "prop1", "value": "X3"},
+    #         {"key": 1, "prop": "prop1", "value": "X4"},
+    #     ],
+    # }
+    # The collector groups the values into a dictionary, for each provided grouping
 ```
 
 ### Opt
