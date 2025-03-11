@@ -4,7 +4,7 @@ from jstreams import Dependency, injector
 from jstreams.ioc import (
     InjectedDependency,
     StrVariable,
-    injectKwargsDependencies,
+    injectArgs,
     resolveDependencies,
     resolveVariables,
 )
@@ -170,7 +170,7 @@ class TestIOC(BaseTestCase):
         self.assertEqual(test.val, "Test", "Value should be none")
 
     def test_inject_to_functions(self) -> None:
-        @injectKwargsDependencies({"a": int, "b": str})
+        @injectArgs({"a": int, "b": str})
         def fn(a: int, b: str) -> str:
             return str(a) + "_" + b
 
@@ -183,7 +183,7 @@ class TestIOC(BaseTestCase):
         self.assertEqual(fn(10, "other"), "10_other")
 
     def test_inject_to_functions_with_qualifiers(self) -> None:
-        @injectKwargsDependencies({"a": Dependency(int, "a"), "b": str})
+        @injectArgs({"a": Dependency(int, "a"), "b": str})
         def fn(a: int, b: str) -> str:
             return str(a) + "_" + b
 

@@ -16,8 +16,9 @@ Use the package manager [pip](https://pip.pypa.io/en/stable/) to install jstream
 ```bash
 pip install jstreams
 ```
-
-## Usage
+## Changelog
+### v2025.3.3
+This version adds argument injection via the *injectArgs* decorator. See usage below in the *Attribute and argument injection* section.
 ### v2025.3.2
 This version adds more dependency injection options (for usage, check the Dependency injection section below):
 - *resolveVariables* decorator - provides class level variable injection
@@ -171,7 +172,7 @@ Opt(None).getOrElseGet(lambda: "test")
 # can be replaced with
 Opt(None).orElseGet(lambda: "test")
 ```
-
+## Usage
 ### Streams
 
 ```python
@@ -895,7 +896,8 @@ class Service(ServiceInterface):
 injector().get(ServiceInterface, "service")
 ```
 
-#### Attribute injection
+#### Attribute and argument injection
+##### Attribute injection
 Attributes can be injected by providing the dependency classes or variable definitions.
 ```python
 @resoveDependencies({
@@ -923,6 +925,39 @@ myVarNeededComp = MyVariableNeededComponent() # Value gets injected when the con
 print(myVarNeededComp.myVariable) # Will print out 'myVariableValue'
 ```
 
+##### Argument injection
+Arguments can be injected to functions, methods and class constructors.
+```python
+# Provide dependencies using argument injection
+# 1. To functions
+
+injector().provide(str, "test")
+injector().provide(int, 10)
+
+@injectArgs({"a": str, "b": int})
+def fn(a: str, b: int) -> None:
+    print(a + str(b))
+
+fn() # Will print out "test10" as the arguments will be injected
+
+# Arguments can be overriden by the caller by specifying the overriden argument as a kwarg
+fn(a="other") # Will print out "other10" as only the argument 'a' is overriden. Argument 'b' will be injected
+
+# 2. To constructors
+class TestArgInjection:
+    @injectArgs({"a": str, "b": int})
+    def __init__(self, a: str, b: int) -> None:
+        self.a = a
+        self.b = b
+
+    def print(self) -> None:
+        print(a + str(b))
+
+TestArgInjection().print() # Will print out "test10" as both arguments are injected into the constructor
+# IMPORTANT: For constructors, kw arg overriding is not available. When overriding arguments, all arguments must be specified
+TestArgInjection("other", 5).print() # Will print out "other5" as all args are overriden 
+
+```
 #### Injected dependecies
 Injected dependecies can be used when the needed dependencies are not present in the container ahead of time. For example, you can create a class that requires a dependency even if the dependency is not yet present, provide the dependency later on, then use it in the class you've initialized.
 

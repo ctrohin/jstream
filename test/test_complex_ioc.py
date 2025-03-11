@@ -4,6 +4,7 @@ from jstreams.ioc import (
     InjectedVariable,
     OptionalInjectedDependency,
     StrVariable,
+    injectArgs,
     injector,
     resolveDependencies,
     resolveVariables,
@@ -133,3 +134,14 @@ class TestComplexIoc(BaseTestCase):
         self.assertEqual(
             var(), "string", "Variable should have been injected and correct"
         )
+
+    def test_argument_injection(self) -> None:
+        injector().provideDependencies({str: "test", int: 10})
+        
+        class Test:
+            @injectArgs({"a": str, "b": int})
+            def __init__(self, a: str, b: int) -> None:
+                self.val = a + str(b)
+
+        
+        self.assertEqual(Test().val, "test10")

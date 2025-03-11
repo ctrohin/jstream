@@ -1,6 +1,8 @@
 from enum import Enum
 from threading import Lock
 from typing import Any, Callable, Generic, Optional, TypeAlias, TypeVar, Union, cast
+
+from jstreams import Stream
 from jstreams.noop import NoOp, NoOpCls
 from jstreams.stream import Opt
 from jstreams.utils import isCallable
@@ -201,6 +203,16 @@ class _Injector:
 
         return self
 
+    def _getAll(self, className: type[T]) -> list[T]:
+        elements: list[T] = []
+        for key in self.__components:
+            dep = self.__components[key]
+            for dependencyKey in dep.qualifiedDependencies:
+                component = self._get(key, dependencyKey)
+                if isinstance(component, className):
+                    elements.append(component)
+        return elements
+
     # Get a component from the container
     def _get(self, className: type, qualifier: Optional[str]) -> Any:
         if (containerDep := self.__components.get(className)) is None:
@@ -233,6 +245,12 @@ class _Injector:
 
     def optional(self, className: type[T], qualifier: Optional[str] = None) -> Opt[T]:
         return Opt(self.find(className, qualifier))
+    
+    def allOfType(self, className: type[T]) -> list[T]:
+        return self._getAll(className)
+    
+    def allOfTypeStream(self, className: type[T]) -> Stream[T]:
+        return Stream(self.allOfType(className))
 
 
 Injector = _Injector.getInstance()
@@ -370,18 +388,18 @@ def resolveVariables(
     return wrap
 
 
-def injectKwargsDependencies(
+def injectArgs(
     dependencies: dict[str, Union[type, Dependency]],
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
-    Injects dependencies to a function or method using kwargs.
+    Injects dependencies to a function, method or constructor using args and kwargs.
     Example:
 
     # Example 1:
     injector().provide(str, "test")
     injector().provide(int, 10)
 
-    @injectKwargsDependencies({"param1": str, "param2": int})
+    @injectArgs({"param1": str, "param2": int})
     def fn(param1: str, param2: int) -> None:
         print(param1 + "_" + param2)
 
@@ -390,12 +408,25 @@ def injectKwargsDependencies(
     fn(param1="test2", param2=1) # will print out "test2_1" as both param1 and param2 are overriden by the actual call
     fn(param2=1) # will print out "test_1" as only param2 is overriden by the actual call
 
-    CAUTION: It is possible to also call decorated functions with positional arguments, but int
+    CAUTION: It is possible to also call decorated functions with positional arguments, but in
     this case, all parameters must be provided.
     fn("test2", 1) # will print out "test2_1" as both param1 and param2 are provided by the actual call
     fn("test2") # will result in an ERROR as not all params are provided by the positional arguments
 
-    Args:
+    class TestArgInjection:
+    @injectArgs({"a": str, "b": int})
+    def __init__(self, a: str, b: int) -> None:
+        self.a = a
+        self.b = b
+
+    def print(self) -> None:
+        print(a + str(b))
+
+    TestArgInjection().print() # Will print out "test10" as both arguments are injected into the constructor
+    # IMPORTANT: For constructors, kw arg overriding is not available. When overriding arguments, all arguments must be specified
+    TestArgInjection("other", 5).print() # Will print out "other5" as all args are overriden 
+
+        Args:
         dependencies (dict[str, Union[type, Dependency]]): A dictionary of dependecies that specify the argument name and the dependency mapping.
 
     Returns:
@@ -404,7 +435,18 @@ def injectKwargsDependencies(
 
     def wrapper(func: Callable[..., T]) -> Callable[..., T]:
         def wrapped(*args: tuple[Any], **kwds: dict[str, Any]) -> T:
-            if len(args) == 0:
+            if func.__name__ == "__init__":
+                # We are dealing with a constructor, and must provide positional arguments
+                for key in dependencies:
+                    dep = dependencies[key]
+                    qualif: Optional[str] = None
+                    if isinstance(dep, Dependency):
+                        qualif = dep.getQualifier()
+                        typ = dep.getType()
+                    else:
+                        typ = dep
+                    args = args + (inject(typ, qualif),)
+            elif len(args) == 0:
                 for key in dependencies:
                     if kwds.get(key) is None:
                         dep = dependencies[key]
