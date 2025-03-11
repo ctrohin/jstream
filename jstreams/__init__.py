@@ -196,6 +196,12 @@ from jstreams.tuples import (
     middleMatches,
 )
 
+from jstreams.collectors import (
+    groupingBy,
+    joining,
+    Collectors,
+)
+
 __all__ = [
     "each",
     "dictUpdate",
@@ -362,4 +368,7 @@ __all__ = [
     "InjectedVariable",
     "component",
     "injectArgs",
+    "groupingBy",
+    "joining",
+    "Collectors",
 ]

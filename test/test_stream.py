@@ -1,5 +1,6 @@
 from baseTest import BaseTestCase
 from jstreams import Stream
+from jstreams.collectors import Collectors
 
 
 class TestStream(BaseTestCase):
@@ -276,4 +277,37 @@ class TestStream(BaseTestCase):
         self.assertEqual(
             Stream(["A", "B"]).flatten(str).toList(),
             ["A", "B"],
+        )
+
+    def test_collector_group_by(self) -> None:
+        values = Stream(
+            [
+                {"key": 1, "prop": "prop", "value": "X1"},
+                {"key": 1, "prop": "prop", "value": "X2"},
+                {"key": 1, "prop": "prop1", "value": "X3"},
+                {"key": 1, "prop": "prop1", "value": "X4"},
+            ]
+        ).collectUsing(Collectors.groupingBy(lambda x: x["prop"]))
+        expected = {
+            "prop": [
+                {"key": 1, "prop": "prop", "value": "X1"},
+                {"key": 1, "prop": "prop", "value": "X2"},
+            ],
+            "prop1": [
+                {"key": 1, "prop": "prop1", "value": "X3"},
+                {"key": 1, "prop": "prop1", "value": "X4"},
+            ],
+        }
+        self.assertDictEqual(values, expected, "Values should be properly grouped")
+
+    def test_collector_list(self) -> None:
+        expected = [
+            {"key": 1, "prop": "prop", "value": "X1"},
+            {"key": 1, "prop": "prop", "value": "X2"},
+            {"key": 1, "prop": "prop1", "value": "X3"},
+            {"key": 1, "prop": "prop1", "value": "X4"},
+        ]
+        values = Stream(expected).collectUsing(Collectors.toList())
+        self.assertListEqual(
+            values, expected, "Values should be collected in the same list"
         )

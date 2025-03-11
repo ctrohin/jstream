@@ -1413,6 +1413,21 @@ class Stream(Generic[T]):
         """
         return self.__arg
 
+    def collectUsing(self, collector: Callable[[Iterable[T]], K]) -> K:
+        """
+        Returns a transformed version of the stream. The transformation is provided by the collector
+
+        CAUTION: This method may actually iterate the entire stream, so if you're using
+        infinite generators, calling this method may block the execution of the program.
+
+        Args:
+            collector (Callable[[Iterable[T]], K]): The collector
+
+        Returns:
+            K: The tranformed type
+        """
+        return collector(self.__arg)
+
     def toList(self) -> list[T]:
         """
         Creates a list with the contents of the stream
