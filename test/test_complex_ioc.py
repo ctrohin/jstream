@@ -137,11 +137,31 @@ class TestComplexIoc(BaseTestCase):
 
     def test_argument_injection(self) -> None:
         injector().provideDependencies({str: "test", int: 10})
-        
+
         class Test:
             @injectArgs({"a": str, "b": int})
             def __init__(self, a: str, b: int) -> None:
                 self.val = a + str(b)
 
-        
         self.assertEqual(Test().val, "test10")
+
+    def test_all_of_type(self) -> None:
+        class ValidatorInterface:
+            def validate(self, value: str) -> bool:
+                pass
+
+        @component()
+        class ContainsAValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "A" in value
+
+        @component()
+        class ContainsBValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "B" in value
+
+        testString = "AB"
+        stream = injector().allOfTypeStream(ValidatorInterface)
+        self.assertEqual(len(stream.toList()), 2)
+        valid = stream.allMatch(lambda v: v.validate(testString))
+        self.assertTrue(valid)

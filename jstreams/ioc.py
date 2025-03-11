@@ -245,11 +245,37 @@ class _Injector:
 
     def optional(self, className: type[T], qualifier: Optional[str] = None) -> Opt[T]:
         return Opt(self.find(className, qualifier))
-    
+
     def allOfType(self, className: type[T]) -> list[T]:
+        """
+        Returns a list of all objects that have or subclass the given type,
+        regardless of their actual declared class or qualifiers.
+
+        This method is useful, for example, when retrieving a dynamic list
+        of validators that implement the same interface.
+
+        Args:
+            className (type[T]): The class or parent class
+
+        Returns:
+            list[T]: The list of dependencies available
+        """
         return self._getAll(className)
-    
+
     def allOfTypeStream(self, className: type[T]) -> Stream[T]:
+        """
+        Returns a stream of all objects that have or subclass the given type,
+        regardless of their actual declared class or qualifiers.
+
+        This method is useful, for example, when retrieving a dynamic list
+        of validators that implement the same interface.
+
+        Args:
+            className (type[T]): The class or parent class
+
+        Returns:
+            Stream[T]: A stream of the dependencies available
+        """
         return Stream(self.allOfType(className))
 
 
@@ -424,7 +450,7 @@ def injectArgs(
 
     TestArgInjection().print() # Will print out "test10" as both arguments are injected into the constructor
     # IMPORTANT: For constructors, kw arg overriding is not available. When overriding arguments, all arguments must be specified
-    TestArgInjection("other", 5).print() # Will print out "other5" as all args are overriden 
+    TestArgInjection("other", 5).print() # Will print out "other5" as all args are overriden
 
         Args:
         dependencies (dict[str, Union[type, Dependency]]): A dictionary of dependecies that specify the argument name and the dependency mapping.

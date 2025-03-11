@@ -19,6 +19,41 @@ pip install jstreams
 ## Changelog
 ### v2025.3.3
 This version adds argument injection via the *injectArgs* decorator. See usage below in the *Attribute and argument injection* section.
+This version also adds the ability to retrieve all dependencies of a certain type using the *allOfType* and *allOfTypeStream* methods. This method is useful when multiple dependecies that implement the same parent class are provided, for cases where you have multiple validators that can be dynamically provided.
+```python
+class ValidatorInterface(abc.ABC):
+    @abc.abstractmethod
+    def validate(self, value: str) -> bool:
+        pass
+
+class ContainsAValidator(ValidatorInterface):
+    def validate(self, value: str) -> bool:
+        return "A" in value
+
+class ContainsBValidator(ValidatorInterface):
+    def validate(self, value: str) -> bool:
+        return "B" in value
+
+# Provide both validators
+injector().provideDependencies({
+    ContainsAValidator: ContainsAValidator(),
+    ContainsBValidator: ContainsBValidator()
+})
+
+# Then validate a string against all provided validators implementing 'ValidatorInterface'
+validators = injector().allOfType(ValidatorInterface)
+isValid = True
+testString = "AB"
+for validator in validators:
+    if not validator.validate(testString):
+        isValid = False
+        break
+print(isValid) # Prints out "True" since the string passes both validations
+
+# Or use the stream functionality
+isValid = injector().allOfTypeStream(ValidatorInterface).allMatch(lambda v: v.validate(testString))
+print(isValid) # Prints out "True" since the string passes both validations
+```
 ### v2025.3.2
 This version adds more dependency injection options (for usage, check the Dependency injection section below):
 - *resolveVariables* decorator - provides class level variable injection
