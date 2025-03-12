@@ -1,13 +1,11 @@
 from enum import Enum
 from threading import Lock, RLock
-from typing import Any, Callable, Generic, Optional, TypeAlias, TypeVar, Union, cast
+from typing import Any, Callable, Generic, Optional, TypeVar, Union, cast
 
 from jstreams import Stream
 from jstreams.noop import NoOp, NoOpCls
 from jstreams.stream import Opt
 from jstreams.utils import isCallable
-
-AnyDict: TypeAlias = dict[str, Any]
 
 
 class Strategy(Enum):
@@ -104,19 +102,19 @@ class AutoInit:
         pass
 
 
-class ContainerDependency:
+class _ContainerDependency:
     __slots__ = ("qualifiedDependencies", "lock")
 
     def __init__(self) -> None:
-        self.qualifiedDependencies: AnyDict = {}
+        self.qualifiedDependencies: dict[str, Any] = {}
         self.lock = RLock()
 
 
-class VariableDependency:
+class _VariableDependency:
     __slots__ = ("qualifiedVariables", "lock")
 
     def __init__(self) -> None:
-        self.qualifiedVariables: AnyDict = {}
+        self.qualifiedVariables: dict[str, Any] = {}
         self.lock = RLock()
 
 
@@ -129,8 +127,8 @@ class _Injector:
     provideLock: Lock = Lock()
 
     def __init__(self) -> None:
-        self.__components: dict[type, ContainerDependency] = {}
-        self.__variables: dict[type, VariableDependency] = {}
+        self.__components: dict[type, _ContainerDependency] = {}
+        self.__variables: dict[type, _VariableDependency] = {}
 
     def clear(self) -> None:
         self.__components = {}
@@ -201,7 +199,7 @@ class _Injector:
     def provideVar(self, className: type, qualifier: str, value: Any) -> "_Injector":
         with self.provideLock:
             if (varDep := self.__variables.get(className)) is None:
-                varDep = VariableDependency()
+                varDep = _VariableDependency()
                 self.__variables[className] = varDep
             if qualifier is None:
                 qualifier = ""
@@ -214,7 +212,7 @@ class _Injector:
     ) -> "_Injector":
         with self.provideLock:
             if (containerDep := self.__components.get(className)) is None:
-                containerDep = ContainerDependency()
+                containerDep = _ContainerDependency()
                 self.__components[className] = containerDep
             if qualifier is None:
                 qualifier = ""
