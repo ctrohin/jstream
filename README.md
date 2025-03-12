@@ -4,7 +4,7 @@ jstreams is a Python library aiming to replicate the following:
 - Java Streams and Optional functionality
 - a basic ReactiveX implementation
 - a minimal replication of Java's vavr.io Try
-- a basic dependency injection container
+- a dependency injection container
 - some utility classes for threads as well as JavaScript-like timer and interval functionality
 
 The library is implemented with type safety in mind.
@@ -18,6 +18,9 @@ pip install jstreams
 ```
 ## Changelog
 ### v2025.3.3
+Improvements:
+- Classes using attribute injection using *resolveDependencies* and *resolveVariables* no longer need the dependencies declared ahead of time
+- *Dependency* and *Variable* classes used for injecting dependencies have now the *isOptional* flag, which will use the *find* injection mechanism instead of the *get* mechanism.
 This versions adds the following features:
 - stream collectors
     - the *Stream* class has been enriched with the *collectUsing* method to transform/reduce a stream
@@ -1028,7 +1031,7 @@ TestArgInjection("other", 5).print() # Will print out "other5" as all args are o
 
 ```
 #### Injected dependecies
-Injected dependecies can be used when the needed dependencies are not present in the container ahead of time. For example, you can create a class that requires a dependency even if the dependency is not yet present, provide the dependency later on, then use it in the class you've initialized.
+Injected dependecies can be used when the needed dependencies are not present in the container ahead of time (this is also possible now with *resovleDependencies* and *resolveVariables*). For example, you can create a class that requires a dependency even if the dependency is not yet present, provide the dependency later on, then use it in the class you've initialized.
 
 Injected dependencies are available through 3 classes:
 - InjectedDependency
