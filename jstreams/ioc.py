@@ -350,6 +350,15 @@ def component(
     return wrap
 
 
+def validateDependencies(dependencies: dict[str, Any]) -> None:
+    for key in dependencies:
+        if key.startswith("__"):
+            raise ValueError(
+                "Private attributes cannot be injected. Offending dependency "
+                + str(key)
+            )
+
+
 def resolveDependencies(
     dependencies: dict[str, Union[type, Dependency]],
 ) -> Callable[[type[T]], type[T]]:
@@ -370,6 +379,8 @@ def resolveDependencies(
     Returns:
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
+
+    validateDependencies(dependencies)
 
     def wrap(cls: type[T]) -> type[T]:
         originalGetAttribute = cls.__getattribute__
@@ -406,7 +417,7 @@ def resolveVariables(
     Allows class decoration for variables injection.
     Example:
 
-    @resolveVariables({"strValue": (str, "strQualifier"})
+    @resolveVariables({"strValue": Variable(str, "strQualifier", True)})
     class TestClass:
         strValue: Optional[str]
 
@@ -418,6 +429,8 @@ def resolveVariables(
     Returns:
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
+
+    validateDependencies(variables)
 
     def wrap(cls: type[T]) -> type[T]:
         originalGetAttribute = cls.__getattribute__
@@ -486,6 +499,7 @@ def injectArgs(
     Returns:
         Callable[[Callable[..., T]], Callable[..., T]]: The decorated function or method
     """
+    validateDependencies(dependencies)
 
     def wrapper(func: Callable[..., T]) -> Callable[..., T]:
         def wrapped(*args: tuple[Any], **kwds: dict[str, Any]) -> T:
