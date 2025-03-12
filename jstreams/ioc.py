@@ -16,25 +16,36 @@ class Strategy(Enum):
 
 
 class Dependency:
-    __slots__ = ("__typ", "__qualifier")
+    __slots__ = ("__typ", "__qualifier", "_isOptional")
 
-    def __init__(self, typ: type, qualifier: str) -> None:
+    def __init__(self, typ: type, qualifier: Optional[str] = None) -> None:
         self.__typ = typ
         self.__qualifier = qualifier
+        self._isOptional = False
 
     def getType(self) -> type:
         return self.__typ
 
-    def getQualifier(self) -> str:
+    def getQualifier(self) -> Optional[str]:
         return self.__qualifier
+
+    def isOptional(self) -> bool:
+        return self._isOptional
+
+
+class OptionalDependency(Dependency):
+    def __init__(self, typ: type, qualifier: Optional[str] = None) -> None:
+        super().__init__(typ, qualifier)
+        self._isOptional = True
 
 
 class Variable:
-    __slots__ = ("__typ", "__key")
+    __slots__ = ("__typ", "__key", "__isOptional")
 
-    def __init__(self, typ: type, key: str) -> None:
+    def __init__(self, typ: type, key: str, isOptional: bool = False) -> None:
         self.__typ = typ
         self.__key = key
+        self.__isOptional = isOptional
 
     def getType(self) -> type:
         return self.__typ
@@ -42,30 +53,33 @@ class Variable:
     def getKey(self) -> str:
         return self.__key
 
+    def isOptional(self) -> bool:
+        return self.__isOptional
+
 
 class StrVariable(Variable):
-    def __init__(self, key: str) -> None:
-        super().__init__(str, key)
+    def __init__(self, key: str, isOptional: bool = False) -> None:
+        super().__init__(str, key, isOptional)
 
 
 class IntVariable(Variable):
-    def __init__(self, key: str) -> None:
-        super().__init__(int, key)
+    def __init__(self, key: str, isOptional: bool = False) -> None:
+        super().__init__(int, key, isOptional)
 
 
 class FloatVariable(Variable):
-    def __init__(self, key: str) -> None:
-        super().__init__(float, key)
+    def __init__(self, key: str, isOptional: bool = False) -> None:
+        super().__init__(float, key, isOptional)
 
 
 class ListVariable(Variable):
-    def __init__(self, key: str) -> None:
-        super().__init__(list, key)
+    def __init__(self, key: str, isOptional: bool = False) -> None:
+        super().__init__(list, key, isOptional)
 
 
 class DictVariable(Variable):
-    def __init__(self, key: str) -> None:
-        super().__init__(dict, key)
+    def __init__(self, key: str, isOptional: bool = False) -> None:
+        super().__init__(dict, key, isOptional)
 
 
 class AutoStart:
@@ -358,24 +372,27 @@ def resolveDependencies(
     """
 
     def wrap(cls: type[T]) -> type[T]:
-        originalInit = cls.__init__
+        originalGetAttribute = cls.__getattribute__
 
-        def __init__(self, *args: tuple[Any], **kws: dict[str, Any]) -> None:  # type: ignore[no-untyped-def]
-            for key, quali in dependencies.items():
+        def __getattribute__(self, attrName: str) -> Any:  # type: ignore[no-untyped-def]
+            if attrName in dependencies:
+                quali = dependencies.get(attrName, NoOpCls)
+                isOptional = False
                 if isinstance(quali, Dependency):
                     typ = quali.getType()
                     qualifier = quali.getQualifier()
+                    isOptional = quali.isOptional()
                 else:
                     typ = quali
                     qualifier = None
-                if key.startswith("__"):
-                    raise ValueError(
-                        "Cannot inject private attribute. Only public and protected attributes can use injection"
-                    )
-                setattr(self, key, injector().find(typ, qualifier))
-            originalInit(self, *args, **kws)  # Call the original __init__
+                return (
+                    injector().find(typ, qualifier)
+                    if isOptional
+                    else inject(typ, qualifier)
+                )
+            return originalGetAttribute(self, attrName)
 
-        cls.__init__ = __init__  # type: ignore[method-assign]
+        cls.__getattribute__ = __getattribute__  # type: ignore[method-assign]
         return cls
 
     return wrap
@@ -403,23 +420,23 @@ def resolveVariables(
     """
 
     def wrap(cls: type[T]) -> type[T]:
-        originalInit = cls.__init__
+        originalGetAttribute = cls.__getattribute__
 
-        def __init__(self, *args: tuple[Any], **kws: dict[str, Any]) -> None:  # type: ignore[no-untyped-def]
-            for key in variables:
-                variable = variables.get(key)
+        def __getattribute__(self, attrName: str) -> Any:  # type: ignore[no-untyped-def]
+            if attrName in variables:
+                variable = variables.get(attrName)
                 if variable is None:
-                    continue
-                if key.startswith("__"):
-                    raise ValueError(
-                        "Cannot inject private attribute. Only public and protected attributes can use injection"
-                    )
-                setattr(
-                    self, key, injector().findVar(variable.getType(), variable.getKey())
+                    return originalGetAttribute(self, attrName)
+                return (
+                    injector().findVar(variable.getType(), variable.getKey())
+                    if variable.isOptional()
+                    else injector().getVar(variable.getType(), variable.getKey())
                 )
-            originalInit(self, *args, **kws)  # Call the original __init__
+            return originalGetAttribute(
+                self, attrName
+            )  # Call the original __getattribute__
 
-        cls.__init__ = __init__  # type: ignore[method-assign]
+        cls.__getattribute__ = __getattribute__  # type: ignore[method-assign]
         return cls
 
     return wrap
@@ -477,23 +494,37 @@ def injectArgs(
                 for key in dependencies:
                     dep = dependencies[key]
                     qualif: Optional[str] = None
+                    isOptional = False
                     if isinstance(dep, Dependency):
                         qualif = dep.getQualifier()
                         typ = dep.getType()
+                        isOptional = dep.isOptional()
                     else:
                         typ = dep
-                    args = args + (inject(typ, qualif),)
+                    args = args + (
+                        (
+                            injector.find(typ, qualif)
+                            if isOptional
+                            else inject(typ, qualif)
+                        ),
+                    )
             elif len(args) == 0:
                 for key in dependencies:
                     if kwds.get(key) is None:
                         dep = dependencies[key]
                         quali: Optional[str] = None
+                        isOptional = False
                         if isinstance(dep, Dependency):
                             quali = dep.getQualifier()
                             typ = dep.getType()
+                            isOptional = dep.isOptional()
                         else:
                             typ = dep
-                        kwds[key] = inject(typ, quali)
+                        kwds[key] = (
+                            injector().find(typ, quali)
+                            if isOptional
+                            else inject(typ, quali)
+                        )
             return func(*args, **kwds)
 
         return wrapped

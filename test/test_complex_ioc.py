@@ -74,9 +74,19 @@ class TestComplexIoc(BaseTestCase):
         mock = MockWithVariables(12)
         self.assertEqual(mock.printValues(), "labelValue12")
 
+    def test_resolve_variables_after_instantiation(self) -> None:
+        mock = MockWithVariables(12)
+        injector().provideVar(str, "label", "labelValue")
+        self.assertEqual(mock.printValues(), "labelValue12")
+
     def test_resolve_dependency(self) -> None:
         injector().provide(str, "labelValue")
         mock = MockWithDependencies(10)
+        self.assertEqual(mock.printValues(), "labelValue10")
+
+    def test_resolve_dependency_provision_after_instantiation(self) -> None:
+        mock = MockWithDependencies(10)
+        injector().provide(str, "labelValue")
         self.assertEqual(mock.printValues(), "labelValue10")
 
     def test_resolve_variables_and_dependencies(self) -> None:

@@ -152,7 +152,7 @@ class TestIOC(BaseTestCase):
         )
 
     def test_injected_variable_class_fail(self) -> None:
-        @resolveVariables({"val": StrVariable("valKey")})
+        @resolveVariables({"val": StrVariable("valKey", True)})
         class Test:
             val: Optional[str]
 
