@@ -1,4 +1,6 @@
 from enum import Enum
+from random import choice
+from string import ascii_letters, digits
 from threading import Lock, RLock
 from typing import Any, Callable, Generic, Optional, TypeVar, Union, cast
 
@@ -129,10 +131,32 @@ class _Injector:
     def __init__(self) -> None:
         self.__components: dict[type, _ContainerDependency] = {}
         self.__variables: dict[type, _VariableDependency] = {}
+        self.__defaultQualifier: str = "".join(
+            choice(digits + ascii_letters) for i in range(64)
+        )
+        self.__separator = "".join(choice(digits + ascii_letters) for i in range(16))
+        self.__defaultProfile = "".join(
+            choice(digits + ascii_letters) for i in range(16)
+        )
+        self.__profile: Optional[str] = None
+
+    def __getProfileStr(self) -> str:
+        if self.__profile is None:
+            return self.__defaultProfile
+        return self.__profile
+
+    def __computeProfile(self, profile: Optional[str]) -> str:
+        return profile if profile is not None else self.__defaultProfile
+
+    def activateProfile(self, profile: str) -> None:
+        if self.__profile is not None:
+            raise ValueError(f"Profile ${self.__profile} is already active")
+        self.__profile = profile
 
     def clear(self) -> None:
         self.__components = {}
         self.__variables = {}
+        self.__profile = None
 
     def get(self, className: type[T], qualifier: Optional[str] = None) -> T:
         if (foundObj := self.find(className, qualifier)) is None:
@@ -201,22 +225,28 @@ class _Injector:
             if (varDep := self.__variables.get(className)) is None:
                 varDep = _VariableDependency()
                 self.__variables[className] = varDep
-            if qualifier is None:
-                qualifier = ""
             varDep.qualifiedVariables[qualifier] = value
         return self
 
     # Register a component with the container
     def provide(
-        self, className: type, comp: Any, qualifier: Optional[str] = None
+        self,
+        className: type,
+        comp: Any,
+        qualifier: Optional[str] = None,
+        profile: Optional[str] = None,
     ) -> "_Injector":
         with self.provideLock:
             if (containerDep := self.__components.get(className)) is None:
                 containerDep = _ContainerDependency()
                 self.__components[className] = containerDep
             if qualifier is None:
-                qualifier = ""
-            containerDep.qualifiedDependencies[qualifier] = comp
+                qualifier = self.__defaultQualifier
+            containerDep.qualifiedDependencies[
+                self.__getComponentKeyWithProfile(
+                    qualifier, self.__computeProfile(profile)
+                )
+            ] = comp
             if isinstance(comp, AutoInit):
                 comp.init()
             if isinstance(comp, AutoStart):
@@ -229,23 +259,36 @@ class _Injector:
         for key in self.__components:
             dep = self.__components[key]
             for dependencyKey in dep.qualifiedDependencies:
-                component = self._get(key, dependencyKey)
+                component = self._get(key, dependencyKey, True)
                 if isinstance(component, className):
                     elements.append(component)
         return elements
 
+    def __getComponentKey(self, qualifier: str) -> str:
+        return self.__getProfileStr() + qualifier
+
+    def __getComponentKeyWithProfile(self, qualifier: str, profile: str) -> str:
+        return profile + qualifier
+
     # Get a component from the container
-    def _get(self, className: type, qualifier: Optional[str]) -> Any:
+    def _get(
+        self, className: type, qualifier: Optional[str], overrideQualifier: bool = False
+    ) -> Any:
         if (containerDep := self.__components.get(className)) is None:
             return None
         with containerDep.lock:
             if qualifier is None:
-                qualifier = ""
-            foundComponent = containerDep.qualifiedDependencies.get(qualifier, None)
+                qualifier = self.__defaultQualifier
+            foundComponent = containerDep.qualifiedDependencies.get(
+                qualifier if overrideQualifier else self.__getComponentKey(qualifier),
+                None,
+            )
             # We've got a lazy component
             if isCallable(foundComponent):
                 # Initialize it
-                self.provide(className, foundComponent(), qualifier)
+                self.provide(
+                    className, foundComponent(), qualifier, self.__getProfileStr()
+                )
                 return self._get(className, qualifier)
             return foundComponent
 
