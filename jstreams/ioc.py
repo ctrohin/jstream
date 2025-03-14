@@ -15,6 +15,20 @@ class Strategy(Enum):
     LAZY = 1
 
 
+class Provided:
+    __slots__ = ("__component", "__profiles")
+
+    def __init__(self, component: Any, profiles: list[str]) -> None:
+        self.__component = component
+        self.__profiles = profiles
+
+    def getComponent(self) -> Any:
+        return self.__component
+
+    def getProfiles(self) -> list[str]:
+        return self.__profiles
+
+
 class Dependency:
     __slots__ = ("__typ", "__qualifier", "_isOptional")
 
@@ -134,7 +148,6 @@ class _Injector:
         self.__defaultQualifier: str = "".join(
             choice(digits + ascii_letters) for i in range(64)
         )
-        self.__separator = "".join(choice(digits + ascii_letters) for i in range(16))
         self.__defaultProfile = "".join(
             choice(digits + ascii_letters) for i in range(16)
         )
@@ -182,7 +195,18 @@ class _Injector:
         return orVal if foundVar is None else cast(T, foundVar)
 
     def find(self, className: type[T], qualifier: Optional[str] = None) -> Optional[T]:
-        foundObj = self._get(className, qualifier)
+        foundObj = (
+            # Try to get the dependency using the active profile
+            self._get(className, qualifier)
+            # or get it for the default profile
+            or self._get(
+                className,
+                self.__getComponentKeyWithProfile(
+                    qualifier or self.__defaultQualifier, self.__defaultProfile
+                ),
+                True,
+            )
+        )
         return foundObj if foundObj is None else cast(T, foundObj)
 
     def findOr(
@@ -191,8 +215,8 @@ class _Injector:
         orCall: Callable[[], T],
         qualifier: Optional[str] = None,
     ) -> T:
-        foundObj = self._get(className, qualifier)
-        return orCall() if foundObj is None else cast(T, foundObj)
+        foundObj = self.find(className, qualifier)
+        return orCall() if foundObj is None else foundObj
 
     def findNoOp(
         self, className: type[T], qualifier: Optional[str] = None
@@ -543,7 +567,7 @@ def injectArgs(
     validateDependencies(dependencies)
 
     def wrapper(func: Callable[..., T]) -> Callable[..., T]:
-        def wrapped(*args: tuple[Any], **kwds: dict[str, Any]) -> T:
+        def wrapped(*args: Any, **kwds: Any) -> T:
             if func.__name__ == "__init__":
                 # We are dealing with a constructor, and must provide positional arguments
                 for key in dependencies:
@@ -558,7 +582,7 @@ def injectArgs(
                         typ = dep
                     args = args + (
                         (
-                            injector.find(typ, qualif)
+                            injector().find(typ, qualif)
                             if isOptional
                             else inject(typ, qualif)
                         ),
