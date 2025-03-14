@@ -6,7 +6,7 @@ from typing import Any, Callable, Generic, Optional, TypeVar, Union, cast
 
 from jstreams import Stream
 from jstreams.noop import NoOp, NoOpCls
-from jstreams.stream import Opt
+from jstreams.stream import Opt, each
 from jstreams.utils import isCallable
 
 
@@ -195,18 +195,17 @@ class _Injector:
         return orVal if foundVar is None else cast(T, foundVar)
 
     def find(self, className: type[T], qualifier: Optional[str] = None) -> Optional[T]:
-        foundObj = (
-            # Try to get the dependency using the active profile
-            self._get(className, qualifier)
+        # Try to get the dependency using the active profile
+        foundObj = self._get(className, qualifier)
+        if foundObj is None:
             # or get it for the default profile
-            or self._get(
+            foundObj = self._get(
                 className,
                 self.__getComponentKeyWithProfile(
                     qualifier or self.__defaultQualifier, self.__defaultProfile
                 ),
                 True,
             )
-        )
         return foundObj if foundObj is None else cast(T, foundObj)
 
     def findOr(
@@ -258,7 +257,7 @@ class _Injector:
         className: type,
         comp: Any,
         qualifier: Optional[str] = None,
-        profile: Optional[str] = None,
+        profiles: Optional[list[str]] = None,
     ) -> "_Injector":
         with self.provideLock:
             if (containerDep := self.__components.get(className)) is None:
@@ -266,11 +265,20 @@ class _Injector:
                 self.__components[className] = containerDep
             if qualifier is None:
                 qualifier = self.__defaultQualifier
-            containerDep.qualifiedDependencies[
-                self.__getComponentKeyWithProfile(
-                    qualifier, self.__computeProfile(profile)
-                )
-            ] = comp
+            if profiles is not None:
+                for profile in profiles:
+                    containerDep.qualifiedDependencies[
+                        self.__getComponentKeyWithProfile(
+                            qualifier, self.__computeProfile(profile)
+                        )
+                    ] = comp
+            else:
+                containerDep.qualifiedDependencies[
+                    self.__getComponentKeyWithProfile(
+                        qualifier, self.__computeProfile(None)
+                    )
+                ] = comp
+
             if isinstance(comp, AutoInit):
                 comp.init()
             if isinstance(comp, AutoStart):
@@ -310,10 +318,8 @@ class _Injector:
             # We've got a lazy component
             if isCallable(foundComponent):
                 # Initialize it
-                self.provide(
-                    className, foundComponent(), qualifier, self.__getProfileStr()
-                )
-                return self._get(className, qualifier)
+                self.provide(className, foundComponent(), qualifier)
+                return self._get(className, qualifier, overrideQualifier)
             return foundComponent
 
     def _getVar(self, className: type, qualifier: str) -> Any:
@@ -322,10 +328,12 @@ class _Injector:
         with varDep.lock:
             return varDep.qualifiedVariables.get(qualifier, None)
 
-    def provideDependencies(self, dependencies: dict[type, Any]) -> "_Injector":
+    def provideDependencies(
+        self, dependencies: dict[type, Any], profiles: Optional[list[str]] = None
+    ) -> "_Injector":
         for componentClass in dependencies:
             service = dependencies[componentClass]
-            self.provide(componentClass, service)
+            self.provide(componentClass, service, profiles)
         return self
 
     def provideVariables(self, variables: list[tuple[type, str, Any]]) -> "_Injector":
