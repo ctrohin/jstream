@@ -6,7 +6,7 @@ from typing import Any, Callable, Generic, Optional, TypeVar, Union, cast
 
 from jstreams import Stream
 from jstreams.noop import NoOp, NoOpCls
-from jstreams.stream import Opt, each
+from jstreams.stream import Opt
 from jstreams.utils import isCallable
 
 
@@ -354,7 +354,7 @@ class _Injector:
     ) -> "_Injector":
         for componentClass in dependencies:
             service = dependencies[componentClass]
-            self.provide(componentClass, service, profiles)
+            self.provide(componentClass, service, profiles=profiles)
         return self
 
     def provideVariables(
@@ -419,6 +419,7 @@ def component(
     strategy: Strategy = Strategy.EAGER,
     className: Optional[type] = None,
     qualifier: Optional[str] = None,
+    profiles: Optional[list[str]] = None,
 ) -> Callable[[type[T]], type[T]]:
     """
     Decorates a component for container injection.
@@ -427,6 +428,7 @@ def component(
         strategy (Strategy, optional): The strategy used for instantiation: EAGER means instantiate as soon as possible, LAZY means instantiate when needed. Defaults to Strategy.EAGER.
         className (Optional[type], optional): Specify which class to use with the container. Defaults to declared class.
         qualifier (Optional[str], optional): Specify the qualifer to be used for the dependency. Defaults to None.
+        profiles (Optional[list[str]], optional): Specify the profiles for which this dependency should be available. Defaults to None.
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class
@@ -435,11 +437,17 @@ def component(
     def wrap(cls: type[T]) -> type[T]:
         if strategy == Strategy.EAGER:
             injector().provide(
-                className if className is not None else cls, cls(), qualifier
+                className if className is not None else cls,
+                cls(),
+                qualifier,
+                profiles,
             )
         elif strategy == Strategy.LAZY:
             injector().provide(
-                className if className is not None else cls, lambda: cls(), qualifier
+                className if className is not None else cls,
+                lambda: cls(),
+                qualifier,
+                profiles,
             )
         return cls
 
