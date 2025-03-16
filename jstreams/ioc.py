@@ -243,12 +243,31 @@ class _Injector:
             self.provideVar(className, qualifier, value)
         return self
 
-    def provideVar(self, className: type, qualifier: str, value: Any) -> "_Injector":
+    def provideVar(
+        self,
+        className: type,
+        qualifier: str,
+        value: Any,
+        profiles: Optional[list[str]] = None,
+    ) -> "_Injector":
         with self.provideLock:
             if (varDep := self.__variables.get(className)) is None:
                 varDep = _VariableDependency()
                 self.__variables[className] = varDep
-            varDep.qualifiedVariables[qualifier] = value
+            if profiles is not None:
+                for profile in profiles:
+                    varDep.qualifiedVariables[
+                        self.__getComponentKeyWithProfile(
+                            qualifier, self.__computeProfile(profile)
+                        )
+                    ] = value
+            else:
+                varDep.qualifiedVariables[
+                    self.__getComponentKeyWithProfile(
+                        qualifier, self.__computeProfile(None)
+                    )
+                ] = value
+
         return self
 
     # Register a component with the container
@@ -326,7 +345,9 @@ class _Injector:
         if (varDep := self.__variables.get(className)) is None:
             return None
         with varDep.lock:
-            return varDep.qualifiedVariables.get(qualifier, None)
+            return varDep.qualifiedVariables.get(
+                self.__getComponentKey(qualifier), None
+            )
 
     def provideDependencies(
         self, dependencies: dict[type, Any], profiles: Optional[list[str]] = None
@@ -336,9 +357,11 @@ class _Injector:
             self.provide(componentClass, service, profiles)
         return self
 
-    def provideVariables(self, variables: list[tuple[type, str, Any]]) -> "_Injector":
+    def provideVariables(
+        self, variables: list[tuple[type, str, Any]], profiles: Optional[list[str]]
+    ) -> "_Injector":
         for varClass, qualifier, value in variables:
-            self.provideVar(varClass, qualifier, value)
+            self.provideVar(varClass, qualifier, value, profiles)
         return self
 
     def optional(self, className: type[T], qualifier: Optional[str] = None) -> Opt[T]:
