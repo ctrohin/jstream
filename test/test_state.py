@@ -9,8 +9,11 @@ class TestState(BaseTestCase):
         setValue("B")
         self.assertEqual(getValue(), "B", "State value should be B")
 
-    def __callback_test_use_state_with_on_change(self, value: str) -> None:
+    def __callback_test_use_state_with_on_change(
+        self, value: str, oldValue: str
+    ) -> None:
         self.callback_test_use_state_with_on_change = value
+        self.callback_test_use_state_with_on_change_old_value = oldValue
 
     def test_use_state_with_on_change(self) -> None:
         (getValue, setValue) = useState(
@@ -22,7 +25,12 @@ class TestState(BaseTestCase):
         self.assertEqual(
             self.callback_test_use_state_with_on_change,
             "B",
-            "Callback should have been called with the correct value",
+            "Callback should have been called with the correct new value",
+        )
+        self.assertEqual(
+            self.callback_test_use_state_with_on_change_old_value,
+            "A",
+            "Callback should have been called with the correct old value",
         )
 
     def test_use_state_multiple(self) -> None:
@@ -35,13 +43,13 @@ class TestState(BaseTestCase):
         self.assertEqual(getValue1(), "B", "State value should be B")
 
     def test_use_state_none_default(self) -> None:
-        (getValue, setValue) = useState("test3", defaultState(str))
+        (getValue, setValue) = useState("test4", defaultState(str))
         self.assertIsNone(getValue(), "State value should be None")
         setValue("Test")
         self.assertEqual(getValue(), "Test", "State value should be Test")
 
     def test_use_state_null_state(self) -> None:
-        (getValue, setValue) = useState("test3", nullState(str))
+        (getValue, setValue) = useState("test5", nullState(str))
         self.assertIsNone(getValue(), "State value should be None")
         setValue("Test")
         self.assertEqual(getValue(), "Test", "State value should be Test")

@@ -256,13 +256,23 @@ class _Injector:
 
         return self
 
-    # Register a component with the container
     def provide(
         self,
         className: type,
         comp: Union[Any, Callable[[], Any]],
         qualifier: Optional[str] = None,
         profiles: Optional[list[str]] = None,
+    ) -> "_Injector":
+        self.__provide(className, comp, qualifier, profiles, False)
+
+    # Register a component with the container
+    def __provide(
+        self,
+        className: type,
+        comp: Union[Any, Callable[[], Any]],
+        qualifier: Optional[str] = None,
+        profiles: Optional[list[str]] = None,
+        overrideQualifier: bool = False,
     ) -> "_Injector":
         with self.provideLock:
             if (containerDep := self.__components.get(className)) is None:
@@ -273,13 +283,17 @@ class _Injector:
             if profiles is not None:
                 for profile in profiles:
                     containerDep.qualifiedDependencies[
-                        self.__getComponentKeyWithProfile(
+                        qualifier
+                        if overrideQualifier
+                        else self.__getComponentKeyWithProfile(
                             qualifier, self.__computeProfile(profile)
                         )
                     ] = comp
             else:
                 containerDep.qualifiedDependencies[
-                    self.__getComponentKeyWithProfile(
+                    qualifier
+                    if overrideQualifier
+                    else self.__getComponentKeyWithProfile(
                         qualifier, self.__computeProfile(None)
                     )
                 ] = comp
@@ -296,10 +310,18 @@ class _Injector:
         for key in self.__components:
             dep = self.__components[key]
             for dependencyKey in dep.qualifiedDependencies:
-                component = self._get(key, dependencyKey, True)
-                if isinstance(component, className):
-                    elements.append(component)
+                if self.__isDependencyActive(dependencyKey):
+                    component = self._get(key, dependencyKey, True)
+                    if isinstance(component, className):
+                        elements.append(component)
         return elements
+
+    def __isDependencyActive(self, dependencyKey: str) -> bool:
+        return (
+            self.__profile is None
+            or dependencyKey.startswith(self.__defaultProfile)
+            or dependencyKey.startswith(self.__profile)
+        )
 
     def __getComponentKey(self, qualifier: str) -> str:
         return self.__getProfileStr() + qualifier
@@ -323,7 +345,12 @@ class _Injector:
             # We've got a lazy component
             if isCallable(foundComponent):
                 # Initialize it
-                self.provide(className, foundComponent(), qualifier)
+                self.__provide(
+                    className,
+                    foundComponent(),
+                    qualifier,
+                    overrideQualifier=overrideQualifier,
+                )
                 return self._get(className, qualifier, overrideQualifier)
             return foundComponent
 
@@ -405,7 +432,7 @@ def var(className: type[T], qualifier: str) -> T:
 
 
 def component(
-    strategy: Strategy = Strategy.EAGER,
+    strategy: Strategy = Strategy.LAZY,
     className: Optional[type] = None,
     qualifier: Optional[str] = None,
     profiles: Optional[list[str]] = None,
@@ -414,7 +441,7 @@ def component(
     Decorates a component for container injection.
 
     Args:
-        strategy (Strategy, optional): The strategy used for instantiation: EAGER means instantiate as soon as possible, LAZY means instantiate when needed. Defaults to Strategy.EAGER.
+        strategy (Strategy, optional): The strategy used for instantiation: EAGER means instantiate as soon as possible, LAZY means instantiate when needed. Defaults to Strategy.LAZY.
         className (Optional[type], optional): Specify which class to use with the container. Defaults to declared class.
         qualifier (Optional[str], optional): Specify the qualifer to be used for the dependency. Defaults to None.
         profiles (Optional[list[str]], optional): Specify the profiles for which this dependency should be available. Defaults to None.

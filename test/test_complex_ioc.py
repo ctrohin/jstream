@@ -138,6 +138,24 @@ class TestComplexIoc(BaseTestCase):
         dep = InjectedDependency(Test)
         self.assertEqual(dep().mock(), "test", "Dependency should be injected")
 
+    def test_injected_dependency_later(self) -> None:
+        class Test:
+            def mock(self) -> str:
+                return "test"
+
+        dep = InjectedDependency(Test)
+        injector().provide(Test, Test())
+        self.assertEqual(dep().mock(), "test", "Dependency should be injected")
+
+    def test_injected_dependency_builder_later(self) -> None:
+        class Test:
+            def mock(self) -> str:
+                return "test"
+
+        dep = InjectedDependency(Test)
+        injector().provide(Test, lambda: Test())
+        self.assertEqual(dep().mock(), "test", "Dependency should be injected")
+
     def test_injected_optional_dependency(self) -> None:
         class Test:
             def mock(self) -> str:
@@ -164,6 +182,24 @@ class TestComplexIoc(BaseTestCase):
 
         self.assertEqual(Test().val, "test10")
 
+    def test_argument_injection_lazy_inject(self) -> None:
+        class Test:
+            @injectArgs({"a": str, "b": int})
+            def __init__(self, a: str, b: int) -> None:
+                self.val = a + str(b)
+
+        injector().provideDependencies({str: "test", int: 10})
+        self.assertEqual(Test().val, "test10")
+
+    def test_argument_injection_lazy_declare(self) -> None:
+        class Test:
+            @injectArgs({"a": str, "b": int})
+            def __init__(self, a: str, b: int) -> None:
+                self.val = a + str(b)
+
+        injector().provideDependencies({str: lambda: "test", int: lambda: 10})
+        self.assertEqual(Test().val, "test10")
+
     def test_all_of_type(self) -> None:
         class ValidatorInterface:
             def validate(self, value: str) -> bool:
@@ -182,5 +218,27 @@ class TestComplexIoc(BaseTestCase):
         testString = "AB"
         stream = injector().allOfTypeStream(ValidatorInterface)
         self.assertEqual(len(stream.toList()), 2)
+        valid = stream.allMatch(lambda v: v.validate(testString))
+        self.assertTrue(valid)
+
+    def test_component_profile(self) -> None:
+        class ValidatorInterface:
+            def validate(self, value: str) -> bool:
+                pass
+
+        @component(profiles=["A"])
+        class ContainsAValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "A" in value
+
+        @component(profiles=["B"])
+        class ContainsBValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "B" in value
+
+        injector().activateProfile("A")
+        stream = injector().allOfTypeStream(ValidatorInterface)
+        self.assertEqual(len(stream.toList()), 1)
+        testString = "AAA"
         valid = stream.allMatch(lambda v: v.validate(testString))
         self.assertTrue(valid)
