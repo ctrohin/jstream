@@ -311,3 +311,48 @@ class TestStream(BaseTestCase):
         self.assertListEqual(
             values, expected, "Values should be collected in the same list"
         )
+
+    def test_collector_partitioning_by(self) -> None:
+        values = Stream(
+            [
+                {"key": 1, "prop": "prop", "value": "X1"},
+                {"key": 1, "prop": "prop", "value": "X2"},
+                {"key": 2, "prop": "prop1", "value": "X3"},
+                {"key": 2, "prop": "prop1", "value": "X4"},
+            ]
+        ).collectUsing(Collectors.partitioningBy(lambda x: x["key"] == 1))
+        expected = {
+            True: [
+                {"key": 1, "prop": "prop", "value": "X1"},
+                {"key": 1, "prop": "prop", "value": "X2"},
+            ],
+            False: [
+                {"key": 2, "prop": "prop1", "value": "X3"},
+                {"key": 2, "prop": "prop1", "value": "X4"},
+            ],
+        }
+        self.assertDictEqual(values, expected, "Values should be properly partitioned")
+
+    def test_collector_joining_default(self) -> None:
+        values = ["A", "B", "C"]
+        value = Stream(values).collectUsing(Collectors.joining())
+        expected = "ABC"
+        self.assertEqual(
+            value, expected, "Value should contain the concatenated string array"
+        )
+
+    def test_collector_joining_specific(self) -> None:
+        values = ["A", "B", "C"]
+        value = Stream(values).collectUsing(Collectors.joining(","))
+        expected = "A,B,C"
+        self.assertEqual(
+            value, expected, "Value should contain the concatenated string array"
+        )
+
+    def test_collector_set(self) -> None:
+        values = ["A", "B", "C"]
+        value = Stream(values).collectUsing(Collectors.toSet())
+        expected = {"A", "B", "C"}
+        self.assertSetEqual(
+            value, expected, "Collection should produce a set of the values"
+        )

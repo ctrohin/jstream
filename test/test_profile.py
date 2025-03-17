@@ -4,7 +4,9 @@ from jstreams.ioc import injector
 
 
 class TestProfile(BaseTestCase):
-    def test_profile(self) -> None:
+    def test_profile_two_provided_only_active_retrieved_first_profile_selected(
+        self,
+    ) -> None:
         injector().provide(str, "Test1", profiles=["1"])
         injector().provide(str, "Test2", profiles=["2"])
         injector().activateProfile("1")
@@ -12,7 +14,9 @@ class TestProfile(BaseTestCase):
             inject(str), "Test1", "Value for profile 1 should have been selected"
         )
 
-    def test_profile_2(self) -> None:
+    def test_profile_two_provided_only_active_retrieved_second_profile_selected(
+        self,
+    ) -> None:
         injector().provide(str, "Test1", profiles=["1"])
         injector().provide(str, "Test2", profiles=["2"])
         injector().activateProfile("2")
@@ -20,7 +24,9 @@ class TestProfile(BaseTestCase):
             inject(str), "Test2", "Value for profile 2 should have been selected"
         )
 
-    def test_profile_3(self) -> None:
+    def test_profile_two_classes_provided_only_one_available_first_profile_selected(
+        self,
+    ) -> None:
         injector().provide(str, "Test1", profiles=["1"])
         injector().provide(int, 0, profiles=["2"])
         injector().activateProfile("1")
@@ -31,7 +37,9 @@ class TestProfile(BaseTestCase):
         )
         self.assertIsNone(injector().find(int), "Value for int should not be injected")
 
-    def test_profile_4(self) -> None:
+    def test_profile_two_classes_provided_only_one_available_second_profile_selected(
+        self,
+    ) -> None:
         injector().provide(str, "Test1", profiles=["1"])
         injector().provide(int, 0, profiles=["2"])
         injector().activateProfile("2")

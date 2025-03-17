@@ -1,5 +1,5 @@
 from baseTest import BaseTestCase
-from jstreams.state import useState
+from jstreams.state import defaultState, nullState, useState
 
 
 class TestState(BaseTestCase):
@@ -33,3 +33,15 @@ class TestState(BaseTestCase):
         setValue("B")
         self.assertEqual(getValue(), "B", "State value should be B")
         self.assertEqual(getValue1(), "B", "State value should be B")
+
+    def test_use_state_none_default(self) -> None:
+        (getValue, setValue) = useState("test3", defaultState(str))
+        self.assertIsNone(getValue(), "State value should be None")
+        setValue("Test")
+        self.assertEqual(getValue(), "Test", "State value should be Test")
+
+    def test_use_state_null_state(self) -> None:
+        (getValue, setValue) = useState("test3", nullState(str))
+        self.assertIsNone(getValue(), "State value should be None")
+        setValue("Test")
+        self.assertEqual(getValue(), "Test", "State value should be Test")

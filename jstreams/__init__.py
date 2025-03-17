@@ -100,6 +100,7 @@ from jstreams.ioc import (
     StrVariable,
     IntVariable,
     FloatVariable,
+    DictVariable,
     Dependency,
     InjectedVariable,
     injectArgs,
@@ -200,6 +201,13 @@ from jstreams.collectors import (
     groupingBy,
     joining,
     Collectors,
+)
+
+from jstreams.state import (
+    defaultState,
+    useState,
+    useAsyncState,
+    nullState,
 )
 
 __all__ = [
@@ -371,4 +379,9 @@ __all__ = [
     "groupingBy",
     "joining",
     "Collectors",
+    "DictVariable",
+    "defaultState",
+    "useState",
+    "useAsyncState",
+    "nullState",
 ]

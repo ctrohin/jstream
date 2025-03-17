@@ -129,6 +129,15 @@ class TestComplexIoc(BaseTestCase):
         dep = InjectedDependency(Test)
         self.assertEqual(dep().mock(), "test", "Dependency should be injected")
 
+    def test_injected_dependency_builder(self) -> None:
+        class Test:
+            def mock(self) -> str:
+                return "test"
+
+        injector().provide(Test, lambda: Test())
+        dep = InjectedDependency(Test)
+        self.assertEqual(dep().mock(), "test", "Dependency should be injected")
+
     def test_injected_optional_dependency(self) -> None:
         class Test:
             def mock(self) -> str:

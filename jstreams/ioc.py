@@ -15,20 +15,6 @@ class Strategy(Enum):
     LAZY = 1
 
 
-class Provided:
-    __slots__ = ("__component", "__profiles")
-
-    def __init__(self, component: Any, profiles: list[str]) -> None:
-        self.__component = component
-        self.__profiles = profiles
-
-    def getComponent(self) -> Any:
-        return self.__component
-
-    def getProfiles(self) -> list[str]:
-        return self.__profiles
-
-
 class Dependency:
     __slots__ = ("__typ", "__qualifier", "_isOptional")
 
@@ -274,7 +260,7 @@ class _Injector:
     def provide(
         self,
         className: type,
-        comp: Any,
+        comp: Union[Any, Callable[[], Any]],
         qualifier: Optional[str] = None,
         profiles: Optional[list[str]] = None,
     ) -> "_Injector":
@@ -366,6 +352,9 @@ class _Injector:
 
     def optional(self, className: type[T], qualifier: Optional[str] = None) -> Opt[T]:
         return Opt(self.find(className, qualifier))
+
+    def varOptional(self, className: type[T], qualifier: str) -> Opt[T]:
+        return Opt(self.findVar(className, qualifier))
 
     def allOfType(self, className: type[T]) -> list[T]:
         """
