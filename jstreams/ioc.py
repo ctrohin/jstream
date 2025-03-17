@@ -1,4 +1,6 @@
 from enum import Enum
+from random import choice
+from string import ascii_letters, digits
 from threading import Lock, RLock
 from typing import Any, Callable, Generic, Optional, TypeVar, Union, cast
 
@@ -129,10 +131,31 @@ class _Injector:
     def __init__(self) -> None:
         self.__components: dict[type, _ContainerDependency] = {}
         self.__variables: dict[type, _VariableDependency] = {}
+        self.__defaultQualifier: str = "".join(
+            choice(digits + ascii_letters) for i in range(64)
+        )
+        self.__defaultProfile = "".join(
+            choice(digits + ascii_letters) for i in range(16)
+        )
+        self.__profile: Optional[str] = None
+
+    def __getProfileStr(self) -> str:
+        if self.__profile is None:
+            return self.__defaultProfile
+        return self.__profile
+
+    def __computeProfile(self, profile: Optional[str]) -> str:
+        return profile if profile is not None else self.__defaultProfile
+
+    def activateProfile(self, profile: str) -> None:
+        if self.__profile is not None:
+            raise ValueError(f"Profile ${self.__profile} is already active")
+        self.__profile = profile
 
     def clear(self) -> None:
         self.__components = {}
         self.__variables = {}
+        self.__profile = None
 
     def get(self, className: type[T], qualifier: Optional[str] = None) -> T:
         if (foundObj := self.find(className, qualifier)) is None:
@@ -158,7 +181,17 @@ class _Injector:
         return orVal if foundVar is None else cast(T, foundVar)
 
     def find(self, className: type[T], qualifier: Optional[str] = None) -> Optional[T]:
+        # Try to get the dependency using the active profile
         foundObj = self._get(className, qualifier)
+        if foundObj is None:
+            # or get it for the default profile
+            foundObj = self._get(
+                className,
+                self.__getComponentKeyWithProfile(
+                    qualifier or self.__defaultQualifier, self.__defaultProfile
+                ),
+                True,
+            )
         return foundObj if foundObj is None else cast(T, foundObj)
 
     def findOr(
@@ -167,8 +200,8 @@ class _Injector:
         orCall: Callable[[], T],
         qualifier: Optional[str] = None,
     ) -> T:
-        foundObj = self._get(className, qualifier)
-        return orCall() if foundObj is None else cast(T, foundObj)
+        foundObj = self.find(className, qualifier)
+        return orCall() if foundObj is None else foundObj
 
     def findNoOp(
         self, className: type[T], qualifier: Optional[str] = None
@@ -196,27 +229,61 @@ class _Injector:
             self.provideVar(className, qualifier, value)
         return self
 
-    def provideVar(self, className: type, qualifier: str, value: Any) -> "_Injector":
+    def provideVar(
+        self,
+        className: type,
+        qualifier: str,
+        value: Any,
+        profiles: Optional[list[str]] = None,
+    ) -> "_Injector":
         with self.provideLock:
             if (varDep := self.__variables.get(className)) is None:
                 varDep = _VariableDependency()
                 self.__variables[className] = varDep
-            if qualifier is None:
-                qualifier = ""
-            varDep.qualifiedVariables[qualifier] = value
+            if profiles is not None:
+                for profile in profiles:
+                    varDep.qualifiedVariables[
+                        self.__getComponentKeyWithProfile(
+                            qualifier, self.__computeProfile(profile)
+                        )
+                    ] = value
+            else:
+                varDep.qualifiedVariables[
+                    self.__getComponentKeyWithProfile(
+                        qualifier, self.__computeProfile(None)
+                    )
+                ] = value
+
         return self
 
     # Register a component with the container
     def provide(
-        self, className: type, comp: Any, qualifier: Optional[str] = None
+        self,
+        className: type,
+        comp: Union[Any, Callable[[], Any]],
+        qualifier: Optional[str] = None,
+        profiles: Optional[list[str]] = None,
     ) -> "_Injector":
         with self.provideLock:
             if (containerDep := self.__components.get(className)) is None:
                 containerDep = _ContainerDependency()
                 self.__components[className] = containerDep
             if qualifier is None:
-                qualifier = ""
-            containerDep.qualifiedDependencies[qualifier] = comp
+                qualifier = self.__defaultQualifier
+            if profiles is not None:
+                for profile in profiles:
+                    containerDep.qualifiedDependencies[
+                        self.__getComponentKeyWithProfile(
+                            qualifier, self.__computeProfile(profile)
+                        )
+                    ] = comp
+            else:
+                containerDep.qualifiedDependencies[
+                    self.__getComponentKeyWithProfile(
+                        qualifier, self.__computeProfile(None)
+                    )
+                ] = comp
+
             if isinstance(comp, AutoInit):
                 comp.init()
             if isinstance(comp, AutoStart):
@@ -229,45 +296,65 @@ class _Injector:
         for key in self.__components:
             dep = self.__components[key]
             for dependencyKey in dep.qualifiedDependencies:
-                component = self._get(key, dependencyKey)
+                component = self._get(key, dependencyKey, True)
                 if isinstance(component, className):
                     elements.append(component)
         return elements
 
+    def __getComponentKey(self, qualifier: str) -> str:
+        return self.__getProfileStr() + qualifier
+
+    def __getComponentKeyWithProfile(self, qualifier: str, profile: str) -> str:
+        return profile + qualifier
+
     # Get a component from the container
-    def _get(self, className: type, qualifier: Optional[str]) -> Any:
+    def _get(
+        self, className: type, qualifier: Optional[str], overrideQualifier: bool = False
+    ) -> Any:
         if (containerDep := self.__components.get(className)) is None:
             return None
         with containerDep.lock:
             if qualifier is None:
-                qualifier = ""
-            foundComponent = containerDep.qualifiedDependencies.get(qualifier, None)
+                qualifier = self.__defaultQualifier
+            foundComponent = containerDep.qualifiedDependencies.get(
+                qualifier if overrideQualifier else self.__getComponentKey(qualifier),
+                None,
+            )
             # We've got a lazy component
             if isCallable(foundComponent):
                 # Initialize it
                 self.provide(className, foundComponent(), qualifier)
-                return self._get(className, qualifier)
+                return self._get(className, qualifier, overrideQualifier)
             return foundComponent
 
     def _getVar(self, className: type, qualifier: str) -> Any:
         if (varDep := self.__variables.get(className)) is None:
             return None
         with varDep.lock:
-            return varDep.qualifiedVariables.get(qualifier, None)
+            return varDep.qualifiedVariables.get(
+                self.__getComponentKey(qualifier), None
+            )
 
-    def provideDependencies(self, dependencies: dict[type, Any]) -> "_Injector":
+    def provideDependencies(
+        self, dependencies: dict[type, Any], profiles: Optional[list[str]] = None
+    ) -> "_Injector":
         for componentClass in dependencies:
             service = dependencies[componentClass]
-            self.provide(componentClass, service)
+            self.provide(componentClass, service, profiles=profiles)
         return self
 
-    def provideVariables(self, variables: list[tuple[type, str, Any]]) -> "_Injector":
+    def provideVariables(
+        self, variables: list[tuple[type, str, Any]], profiles: Optional[list[str]]
+    ) -> "_Injector":
         for varClass, qualifier, value in variables:
-            self.provideVar(varClass, qualifier, value)
+            self.provideVar(varClass, qualifier, value, profiles)
         return self
 
     def optional(self, className: type[T], qualifier: Optional[str] = None) -> Opt[T]:
         return Opt(self.find(className, qualifier))
+
+    def varOptional(self, className: type[T], qualifier: str) -> Opt[T]:
+        return Opt(self.findVar(className, qualifier))
 
     def allOfType(self, className: type[T]) -> list[T]:
         """
@@ -321,6 +408,7 @@ def component(
     strategy: Strategy = Strategy.EAGER,
     className: Optional[type] = None,
     qualifier: Optional[str] = None,
+    profiles: Optional[list[str]] = None,
 ) -> Callable[[type[T]], type[T]]:
     """
     Decorates a component for container injection.
@@ -329,6 +417,7 @@ def component(
         strategy (Strategy, optional): The strategy used for instantiation: EAGER means instantiate as soon as possible, LAZY means instantiate when needed. Defaults to Strategy.EAGER.
         className (Optional[type], optional): Specify which class to use with the container. Defaults to declared class.
         qualifier (Optional[str], optional): Specify the qualifer to be used for the dependency. Defaults to None.
+        profiles (Optional[list[str]], optional): Specify the profiles for which this dependency should be available. Defaults to None.
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class
@@ -337,11 +426,17 @@ def component(
     def wrap(cls: type[T]) -> type[T]:
         if strategy == Strategy.EAGER:
             injector().provide(
-                className if className is not None else cls, cls(), qualifier
+                className if className is not None else cls,
+                cls(),
+                qualifier,
+                profiles,
             )
         elif strategy == Strategy.LAZY:
             injector().provide(
-                className if className is not None else cls, lambda: cls(), qualifier
+                className if className is not None else cls,
+                lambda: cls(),
+                qualifier,
+                profiles,
             )
         return cls
 
@@ -500,7 +595,7 @@ def injectArgs(
     validateDependencies(dependencies)
 
     def wrapper(func: Callable[..., T]) -> Callable[..., T]:
-        def wrapped(*args: tuple[Any], **kwds: dict[str, Any]) -> T:
+        def wrapped(*args: Any, **kwds: Any) -> T:
             if func.__name__ == "__init__":
                 # We are dealing with a constructor, and must provide positional arguments
                 for key in dependencies:
@@ -515,7 +610,7 @@ def injectArgs(
                         typ = dep
                     args = args + (
                         (
-                            injector.find(typ, qualif)
+                            injector().find(typ, qualif)
                             if isOptional
                             else inject(typ, qualif)
                         ),
