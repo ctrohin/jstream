@@ -21,6 +21,7 @@ pip install jstreams
 Improvements:
 - Classes using attribute injection using *resolveDependencies* and *resolveVariables* no longer need the dependencies declared ahead of time
 - *Dependency* and *Variable* classes used for injecting dependencies have now the *isOptional* flag, which will use the *find* injection mechanism instead of the *get* mechanism.
+- Dependency injection profiles: you can now specify profiles for each provided component. In order to activate a profile, you can use the `injector().activateProfile(profile)` call.
 This versions adds the following features:
 - stream collectors
     - the *Stream* class has been enriched with the *collectUsing* method to transform/reduce a stream
@@ -1047,6 +1048,63 @@ print(dep.get()) # will print out "Test"
 print(dep()) # will also print out "Test"
 ```
 
+#### Using profiles
+In order to activate only certain services or components, you can use profiles. Once a profile is activated, only components that have been defined without a specific list of profiles, or whose list of profiles contain the selected profiles will be injected. It is recommended that you use lazy initialization for profile specific components, so that the components are not created unless they are needed.
+**IMPORTANT** Please note that only one profile can be activated. Once a profile is active, any subsequent calls to the `activateProfile` method will raise an error.
+```python
+# The component decorator uses LAZY initialization strategy by default, unless the EAGER strategy is specified.
+@component(profiles=["profileA", "profileB"])
+class Test1:
+    pass
+
+@component(profiles=["profileA", "profileC"])
+class Test2:
+    pass
+
+# Both Test1 and Test2 components will be available when selecting "profileA"
+injector().activateProfile("profileA")
+
+# Only Test1 component will be available when selecting "profileB"
+injector().activateProfile("profileB")
+
+# Only Test2 component will be available when selecting "profileC"
+injector().activateProfile("profileC")
+
+# You can also provide the profiles to the "provide" and "provideDependencies" methods
+# this example uses a lambda to provide the component, so that the component is not created
+# ahead of time, since it is possible that the component will not be used with the active profile
+injector().provide(Test1, lambda: Test1(), profiles=["profileA", "profileB"])
+```
+Profiles can also be used to provided different implementations of an interface or abstract class depending on the selected profile.
+```python
+class LoggerInterface(abc.ABC):
+    @abc.abstractmethod
+    def log(operation: str) -> None:
+        pass
+
+@component(className=LoggerInterface, profiles=["console"])
+class ConsoleLogger(LoggerInterface):
+    def log(operation: str) -> None:
+        print(operation)
+
+@component(className=LoggerInterface, profiles=["file"])
+class FileLogger(LoggerInterface):
+    fileName = "logfile"
+    def log(operation: str) -> None:
+        with open(self.fileName, "w+") as file:
+            file.write(operation)
+
+# activate console profile
+injector().activateProfile("console")
+inject(LoggerInterface).log("test") # Will print out to console, as the console profile activation will inject the ConsoleLogger class
+
+# or
+
+# activate file profile
+injector().activateProfile("file")
+inject(LoggerInterface).log("test") # Will write the content to the "logfile" file, as the file profile activation will inject the FileLogger class
+
+```
 ### Threads
 
 #### LoopingThread
