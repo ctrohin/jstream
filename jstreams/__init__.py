@@ -122,7 +122,6 @@ from jstreams.utils import (
     each,
     dictUpdate,
     sort,
-    notNullElements,
 )
 
 from jstreams.predicate import (
