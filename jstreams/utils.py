@@ -1,11 +1,21 @@
 import json
-from typing import Any, Callable, Optional, TypeVar, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Generic,
+    Iterable,
+    Optional,
+    Sized,
+    TypeVar,
+    Union,
+    cast,
+)
 
-from jstreams import Stream
-from jstreams.stream import isNotNone
 
 T = TypeVar("T")
 K = TypeVar("K")
+C = TypeVar("C")
+V = TypeVar("V")
 
 
 def _f() -> None:
@@ -188,15 +198,106 @@ def extract(
     return defaultValue
 
 
-def extractList(val: dict[K, T], keys: list[K]) -> list[Optional[T]]:
-    return Stream(keys).map(val.get).toList()
+def isNotNone(element: Optional[T]) -> bool:
+    """
+    Checks if the given element is not None. This function is meant to be used
+    instead of lambdas for non null checks
+
+    Args:
+        element (Optional[T]): The given element
+
+    Returns:
+        bool: True if element is not None, False otherwise
+    """
+    return element is not None
 
 
-def extractNonNullList(val: dict[K, T], keys: list[K]) -> list[T]:
-    return (
-        Stream(keys)
-        .map(val.get)
-        .filter(isNotNone)
-        .map(lambda e: requireNotNull(e))
-        .toList()
-    )
+def isEmptyOrNone(
+    obj: Union[list[Any], dict[Any, Any], str, None, Any, Iterable[Any]],
+) -> bool:
+    """
+    Checkes whether the given object is either None, or is empty.
+    For str and Sized objects, besides the None check, the len(obj) == 0 is also applied
+
+    Args:
+        obj (Union[list[Any], dict[Any, Any], str, None, Any, Iterable[Any]]): The object
+
+    Returns:
+        bool: True if empty or None, False otherwise
+    """
+    if obj is None:
+        return True
+
+    if isinstance(obj, Iterable):
+        for _ in obj:
+            return False
+        return True
+
+    if isinstance(obj, Sized):
+        return len(obj) == 0
+
+    return False
+
+
+def cmpToKey(mycmp: Callable[[C, C], int]) -> type:
+    """Convert a cmp= function into a key= function"""
+
+    class Key(Generic[C]):  # type: ignore[misc]
+        __slots__ = ["obj"]
+
+        def __init__(self, obj: C) -> None:
+            self.obj = obj
+
+        def __lt__(self, other: "Key") -> bool:
+            return mycmp(self.obj, other.obj) < 0
+
+        def __gt__(self, other: "Key") -> bool:
+            return mycmp(self.obj, other.obj) > 0
+
+        def __eq__(self, other: object) -> bool:
+            if not isinstance(other, Key):
+                return NotImplemented
+            return mycmp(self.obj, other.obj) == 0
+
+        def __le__(self, other: "Key") -> bool:
+            return mycmp(self.obj, other.obj) <= 0
+
+        def __ge__(self, other: "Key") -> bool:
+            return mycmp(self.obj, other.obj) >= 0
+
+    return Key
+
+
+def each(target: Optional[Iterable[T]], action: Callable[[T], Any]) -> None:
+    """
+    Executes an action on each element of the given iterable
+
+    Args:
+        target (Optional[Iterable[T]]): The target iterable
+        action (Callable[[T], Any]): The action to be executed
+    """
+    if target is None:
+        return
+
+    for el in target:
+        action(el)
+
+
+def dictUpdate(target: dict[K, V], key: K, value: V) -> None:
+    target[key] = value
+
+
+def sort(target: list[T], comparator: Callable[[T, T], int]) -> list[T]:
+    """
+    Returns a list with the elements sorted according to the comparator function.
+    CAUTION: This method will actually iterate the entire iterable, so if you're using
+    infinite generators, calling this method will block the execution of the program.
+
+    Args:
+        comparator (Callable[[T, T], int]): The comparator function
+
+    Returns:
+        list[T]: The resulting list
+    """
+
+    return sorted(target, key=cmpToKey(comparator))

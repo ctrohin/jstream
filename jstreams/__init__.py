@@ -1,16 +1,13 @@
 from jstreams.stream import (
-    each,
-    dictUpdate,
     Stream,
     findFirst,
     mapIt,
     matching,
     flatMap,
+    notNullElements,
     reduce,
     takeWhile,
     dropWhile,
-    isNotNone,
-    sort,
     Opt,
     ClassOps,
     stream,
@@ -25,7 +22,8 @@ from jstreams.stream import (
     MapperWith,
     Reducer,
     reducerOf,
-    isEmptyOrNone,
+    extractList,
+    extractNonNullList,
 )
 
 from jstreams.tryOpt import (
@@ -119,6 +117,12 @@ from jstreams.utils import (
     asList,
     keysAsList,
     isCallable,
+    isNotNone,
+    isEmptyOrNone,
+    each,
+    dictUpdate,
+    sort,
+    notNullElements,
 )
 
 from jstreams.predicate import (
@@ -384,4 +388,7 @@ __all__ = [
     "useState",
     "useAsyncState",
     "nullState",
+    "extractList",
+    "extractNonNullList",
+    "notNullElements",
 ]

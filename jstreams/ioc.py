@@ -4,9 +4,8 @@ from string import ascii_letters, digits
 from threading import Lock, RLock
 from typing import Any, Callable, Generic, Optional, TypeVar, Union, cast
 
-from jstreams import Stream
 from jstreams.noop import NoOp, NoOpCls
-from jstreams.stream import Opt
+from jstreams.stream import Opt, Stream
 from jstreams.utils import isCallable
 
 
@@ -264,6 +263,7 @@ class _Injector:
         profiles: Optional[list[str]] = None,
     ) -> "_Injector":
         self.__provide(className, comp, qualifier, profiles, False)
+        return self
 
     # Register a component with the container
     def __provide(
@@ -309,9 +309,9 @@ class _Injector:
             dep = self.__components[key]
             for dependencyKey in dep.qualifiedDependencies:
                 if self.__isDependencyActive(dependencyKey):
-                    component = self._get(key, dependencyKey, True)
-                    if isinstance(component, className):
-                        elements.append(component)
+                    comp = self._get(key, dependencyKey, True)
+                    if isinstance(comp, className):
+                        elements.append(comp)
         return elements
 
     def __isDependencyActive(self, dependencyKey: str) -> bool:

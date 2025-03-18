@@ -1,7 +1,7 @@
 from threading import Lock, Thread
 from typing import Any, Callable, Generic, Optional, TypeVar
 
-from jstreams import each
+from jstreams.utils import each
 
 T = TypeVar("T")
 V = TypeVar("V")
