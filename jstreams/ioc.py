@@ -282,26 +282,24 @@ class _Injector:
                 qualifier = self.__defaultQualifier
             if profiles is not None:
                 for profile in profiles:
-                    containerDep.qualifiedDependencies[
+                    fullQualifier = (
                         qualifier
                         if overrideQualifier
                         else self.__getComponentKeyWithProfile(
                             qualifier, self.__computeProfile(profile)
                         )
-                    ] = comp
+                    )
+                    containerDep.qualifiedDependencies[fullQualifier] = comp
             else:
-                containerDep.qualifiedDependencies[
+                fullQualifier = (
                     qualifier
                     if overrideQualifier
                     else self.__getComponentKeyWithProfile(
                         qualifier, self.__computeProfile(None)
                     )
-                ] = comp
-
-            if isinstance(comp, AutoInit):
-                comp.init()
-            if isinstance(comp, AutoStart):
-                comp.start()
+                )
+                containerDep.qualifiedDependencies[fullQualifier] = comp
+            self.__initMeta(comp)
 
         return self
 
@@ -338,21 +336,30 @@ class _Injector:
         with containerDep.lock:
             if qualifier is None:
                 qualifier = self.__defaultQualifier
+            fullQualifier = (
+                qualifier if overrideQualifier else self.__getComponentKey(qualifier)
+            )
             foundComponent = containerDep.qualifiedDependencies.get(
-                qualifier if overrideQualifier else self.__getComponentKey(qualifier),
+                fullQualifier,
                 None,
             )
             # We've got a lazy component
             if isCallable(foundComponent):
-                # Initialize it
-                self.__provide(
-                    className,
-                    foundComponent(),
-                    qualifier,
-                    overrideQualifier=overrideQualifier,
+                comp = foundComponent()
+                # Remove the old dependency
+                containerDep.qualifiedDependencies[fullQualifier] = self.__initMeta(
+                    comp
                 )
-                return self._get(className, qualifier, overrideQualifier)
+
+                return comp
             return foundComponent
+
+    def __initMeta(self, comp: Any) -> Any:
+        if isinstance(comp, AutoInit):
+            comp.init()
+        if isinstance(comp, AutoStart):
+            comp.start()
+        return comp
 
     def _getVar(self, className: type, qualifier: str) -> Any:
         if (varDep := self.__variables.get(className)) is None:

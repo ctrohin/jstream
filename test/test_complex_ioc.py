@@ -1,3 +1,4 @@
+from jstreams import inject
 from baseTest import BaseTestCase
 from jstreams.ioc import (
     InjectedDependency,
@@ -242,3 +243,41 @@ class TestComplexIoc(BaseTestCase):
         testString = "AAA"
         valid = stream.allMatch(lambda v: v.validate(testString))
         self.assertTrue(valid)
+
+    def test_component_profile_alternate_A(self) -> None:
+        class ValidatorInterface:
+            def validate(self, value: str) -> bool:
+                pass
+
+        @component(className=ValidatorInterface, profiles=["PROFILE_A"])
+        class ContainsAValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "A" in value
+
+        @component(className=ValidatorInterface, profiles=["PROFILE_B"])
+        class ContainsBValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "B" in value
+
+        injector().activateProfile("PROFILE_A")
+        comp = inject(ValidatorInterface)
+        self.assertIsInstance(comp, ContainsAValidator)
+
+    def test_component_profile_alternate_B(self) -> None:
+        class ValidatorInterface:
+            def validate(self, value: str) -> bool:
+                pass
+
+        @component(className=ValidatorInterface, profiles=["A"])
+        class ContainsAValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "A" in value
+
+        @component(className=ValidatorInterface, profiles=["B"])
+        class ContainsBValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "B" in value
+
+        injector().activateProfile("B")
+        comp = inject(ValidatorInterface)
+        self.assertIsInstance(comp, ContainsBValidator)
