@@ -45,13 +45,14 @@ def isCallable(var: Any) -> bool:
     return varType is FnType or varType is MthType
 
 
-def requireNotNull(obj: Optional[T]) -> T:
+def requireNotNull(obj: Optional[T], message: Optional[str] = None) -> T:
     """
     Returns a non null value of the object provided. If the provided value is null,
     the function raises a ValueError.
 
     Args:
         obj (Optional[T]): The object
+        message (Optional[str]): Error message
 
     Raises:
         ValueError: Thrown when obj is None
@@ -60,7 +61,7 @@ def requireNotNull(obj: Optional[T]) -> T:
         T: The non null value
     """
     if obj is None:
-        raise ValueError("None object provided")
+        raise ValueError(message or "None object provided")
     return obj
 
 
