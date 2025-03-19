@@ -94,6 +94,7 @@ from jstreams.ioc import (
     resolveDependencies,
     resolveVariables,
     component,
+    service,
     Variable,
     StrVariable,
     IntVariable,
@@ -394,4 +395,5 @@ __all__ = [
     "notNullElements",
     "ListVariable",
     "SetVariable",
+    "service",
 ]

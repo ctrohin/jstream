@@ -1,4 +1,5 @@
 from enum import Enum
+import importlib
 from random import choice
 from string import ascii_letters, digits
 from threading import Lock, RLock
@@ -142,6 +143,16 @@ class _Injector:
             choice(digits + ascii_letters) for i in range(16)
         )
         self.__profile: Optional[str] = None
+        self.__modulesToScan: list[str] = []
+        self.__modulesScanned = False
+
+    def scanModules(self, modulesToScan: list[str]) -> "_Injector":
+        self.__modulesToScan = modulesToScan
+
+    def __retrieveComponents(self) -> None:
+        self.__modulesScanned = True
+        for module in self.__modulesToScan:
+            importlib.import_module(module)
 
     def __getProfileStr(self) -> str:
         if self.__profile is None:
@@ -160,6 +171,8 @@ class _Injector:
         self.__components = {}
         self.__variables = {}
         self.__profile = None
+        self.__modulesScanned = False
+        self.__modulesToScan = []
 
     def get(self, className: type[T], qualifier: Optional[str] = None) -> T:
         if (foundObj := self.find(className, qualifier)) is None:
@@ -336,6 +349,8 @@ class _Injector:
     def _get(
         self, className: type, qualifier: Optional[str], overrideQualifier: bool = False
     ) -> Any:
+        if not self.__modulesScanned:
+            self.__retrieveComponents()
         if (containerDep := self.__components.get(className)) is None:
             return None
         with containerDep.lock:
@@ -441,6 +456,14 @@ def inject(className: type[T], qualifier: Optional[str] = None) -> T:
 
 def var(className: type[T], qualifier: str) -> T:
     return injector().getVar(className, qualifier)
+
+
+def service(
+    className: Optional[type] = None,
+    qualifier: Optional[str] = None,
+    profiles: Optional[list[str]] = None,
+) -> Callable[[type[T]], type[T]]:
+    return component(Strategy.LAZY, className, qualifier, profiles)
 
 
 def component(

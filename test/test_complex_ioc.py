@@ -11,6 +11,7 @@ from jstreams.ioc import (
     resolveVariables,
     component,
     Strategy,
+    service,
 )
 
 
@@ -274,6 +275,66 @@ class TestComplexIoc(BaseTestCase):
                 return "A" in value
 
         @component(className=ValidatorInterface, profiles=["B"])
+        class ContainsBValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "B" in value
+
+        injector().activateProfile("B")
+        comp = inject(ValidatorInterface)
+        self.assertIsInstance(comp, ContainsBValidator)
+
+    def test_service_profile(self) -> None:
+        class ValidatorInterface:
+            def validate(self, value: str) -> bool:
+                pass
+
+        @service(profiles=["A"])
+        class ContainsAValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "A" in value
+
+        @service(profiles=["B"])
+        class ContainsBValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "B" in value
+
+        injector().activateProfile("A")
+        stream = injector().allOfTypeStream(ValidatorInterface)
+        self.assertEqual(len(stream.toList()), 1)
+        testString = "AAA"
+        valid = stream.allMatch(lambda v: v.validate(testString))
+        self.assertTrue(valid)
+
+    def test_service_profile_alternate_A(self) -> None:
+        class ValidatorInterface:
+            def validate(self, value: str) -> bool:
+                pass
+
+        @service(className=ValidatorInterface, profiles=["PROFILE_A"])
+        class ContainsAValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "A" in value
+
+        @service(className=ValidatorInterface, profiles=["PROFILE_B"])
+        class ContainsBValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "B" in value
+
+        injector().activateProfile("PROFILE_A")
+        comp = inject(ValidatorInterface)
+        self.assertIsInstance(comp, ContainsAValidator)
+
+    def test_service_profile_alternate_B(self) -> None:
+        class ValidatorInterface:
+            def validate(self, value: str) -> bool:
+                pass
+
+        @service(className=ValidatorInterface, profiles=["A"])
+        class ContainsAValidator(ValidatorInterface):
+            def validate(self, value: str) -> bool:
+                return "A" in value
+
+        @service(className=ValidatorInterface, profiles=["B"])
         class ContainsBValidator(ValidatorInterface):
             def validate(self, value: str) -> bool:
                 return "B" in value
