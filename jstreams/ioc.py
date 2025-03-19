@@ -81,6 +81,11 @@ class DictVariable(Variable):
         super().__init__(dict, key, isOptional)
 
 
+class SetVariable(Variable):
+    def __init__(self, key: str, isOptional: bool = False) -> None:
+        super().__init__(set, key, isOptional)
+
+
 class AutoStart:
     __slots__ = ()
     """

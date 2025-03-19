@@ -99,6 +99,8 @@ from jstreams.ioc import (
     IntVariable,
     FloatVariable,
     DictVariable,
+    SetVariable,
+    ListVariable,
     Dependency,
     InjectedVariable,
     injectArgs,
@@ -390,4 +392,6 @@ __all__ = [
     "extractList",
     "extractNonNullList",
     "notNullElements",
+    "ListVariable",
+    "SetVariable",
 ]
