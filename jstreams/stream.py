@@ -1148,6 +1148,10 @@ class Stream(Generic[T]):
     def of(arg: Iterable[T]) -> "Stream[T]":
         return Stream(arg)
 
+    @staticmethod
+    def ofNullable(arg: Iterable[Optional[T]]) -> "Stream[T]":
+        return Stream(arg).filter(isNotNone).map(lambda el: requireNotNull(el))
+
     def map(self, mapper: Union[Mapper[T, V], Callable[[T], V]]) -> "Stream[V]":
         """
         Produces a new stream by mapping the stream elements using the given mapper function.
