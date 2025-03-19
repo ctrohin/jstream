@@ -6,6 +6,7 @@ jstreams is a Python library aiming to replicate the following:
 - a minimal replication of Java's vavr.io Try
 - a dependency injection container
 - some utility classes for threads as well as JavaScript-like timer and interval functionality
+- a simple state management API
 
 The library is implemented with type safety in mind.
 
@@ -33,6 +34,7 @@ This versions adds the following features:
         - joining - produces a string from all elements of the stream by joining them with the given separator
 - argument injection via the *injectArgs* decorator. See usage below in the *Attribute and argument injection* section.
 - the ability to retrieve all dependencies of a certain type using the *allOfType* and *allOfTypeStream* methods. This method is useful when multiple dependecies that implement the same parent class are provided, for cases where you have multiple validators that can be dynamically provided.
+- a simple state management API
 ```python
 class ValidatorInterface(abc.ABC):
     @abc.abstractmethod
@@ -1221,6 +1223,46 @@ sleep(10)
 # Cancel the interval. This interval will stop executing the callback
 clear(interval)
 ```
+
+### State management API
+The State management API aims to provide sharing data between your application's components, in a way with React's state management.
+**jstreams** offers two ways to manage states shared within your application:
+- synchronous
+- asynchronous
+```python
+# Create a state
+STATE_KEY = "myState"
+
+# Simple synchronous usage, provide a state key, and the default value
+(getState, setState) = useState(STATE_KEY, "initial")
+
+print(getState()) # Prints out "initial", as there have been no changes to the state
+
+# we update the state
+setState("updated")
+print(getState()) # Prints out "updated"
+
+# Asynchronous usage
+(getAsyncState, setAsyncState) = useAsyncState(STATE_KEY, "initial")
+print(getAsyncState()) # Will print out "updated" since that is the state's current value
+
+# You can also provide an onChange callback to the state.
+# The difference between useState and useAsyncState is that the onChange callbacks
+# will be called in a synchronous manner (in order of subscription) for the useState
+# while the useAsyncState provided callbacks will be called from separate threads.
+# This behavior aims to avoid waiting to a callback that may do intensive processing
+# and unlock the other callbacks as soon as possible
+(getAsyncStateCB, setAsyncStateCB) = useAsyncState(
+    STATE_KEY, 
+    "initial", 
+    lambda newState, oldState: print("New state is '" + str(newState) + "' old state is '" + str(oldState) + "'")
+)
+
+setState("Update no 2")
+# At this point, the lambda callback will be called, and the output will read
+# "New state is 'Updated no 2' old state is 'updated'"
+```
+
 
 ## License
 
