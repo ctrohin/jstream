@@ -342,3 +342,22 @@ class TestComplexIoc(BaseTestCase):
         injector().activateProfile("B")
         comp = inject(ValidatorInterface)
         self.assertIsInstance(comp, ContainsBValidator)
+
+    def test_resove_deps_with_resolve_vars(self) -> None:
+        @component()
+        class Service:
+            pass
+
+        @resolveDependencies({"service": Service})
+        @resolveVariables({"variable": StrVariable("variable")})
+        class Test:
+            service: Service
+            variable: str
+
+            def mock(self) -> str:
+                return "test"
+
+        injector().provideVar(str, "variable", "value")
+        test = Test()
+        self.assertIsNotNone(test.service)
+        self.assertIsNotNone(test.variable)
