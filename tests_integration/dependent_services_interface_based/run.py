@@ -1,7 +1,7 @@
 import sys
 import unittest
 
-sys.path.append(".")
+sys.path.append("../../")
 
 from jstreams.ioc import injector
 from mockService3 import MockService3
