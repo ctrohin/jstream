@@ -284,6 +284,17 @@ class _Injector:
         self.__provide(className, comp, qualifier, profiles, False)
         return self
 
+    def __computeFullQualifier(
+        self, qualifier: str, overrideQualifier: bool, profile: Optional[str]
+    ) -> str:
+        return (
+            qualifier
+            if overrideQualifier
+            else self.__getComponentKeyWithProfile(
+                qualifier, self.__computeProfile(profile)
+            )
+        )
+
     # Register a component with the container
     def __provide(
         self,
@@ -301,21 +312,13 @@ class _Injector:
                 qualifier = self.__defaultQualifier
             if profiles is not None:
                 for profile in profiles:
-                    fullQualifier = (
-                        qualifier
-                        if overrideQualifier
-                        else self.__getComponentKeyWithProfile(
-                            qualifier, self.__computeProfile(profile)
-                        )
+                    fullQualifier = self.__computeFullQualifier(
+                        qualifier, overrideQualifier, profile
                     )
                     containerDep.qualifiedDependencies[fullQualifier] = comp
             else:
-                fullQualifier = (
-                    qualifier
-                    if overrideQualifier
-                    else self.__getComponentKeyWithProfile(
-                        qualifier, self.__computeProfile(None)
-                    )
+                fullQualifier = self.__computeFullQualifier(
+                    qualifier, overrideQualifier, None
                 )
                 containerDep.qualifiedDependencies[fullQualifier] = comp
             self.__initMeta(comp)
@@ -487,20 +490,12 @@ def component(
     """
 
     def wrap(cls: type[T]) -> type[T]:
-        if strategy == Strategy.EAGER:
-            injector().provide(
-                className if className is not None else cls,
-                cls(),
-                qualifier,
-                profiles,
-            )
-        elif strategy == Strategy.LAZY:
-            injector().provide(
-                className if className is not None else cls,
-                lambda: cls(),
-                qualifier,
-                profiles,
-            )
+        injector().provide(
+            className if className is not None else cls,
+            cls() if strategy == Strategy.EAGER else lambda: cls(),
+            qualifier,
+            profiles,
+        )
         return cls
 
     return wrap
@@ -544,19 +539,7 @@ def resolveDependencies(
         def __getattribute__(self, attrName: str) -> Any:  # type: ignore[no-untyped-def]
             if attrName in dependencies:
                 quali = dependencies.get(attrName, NoOpCls)
-                isOptional = False
-                if isinstance(quali, Dependency):
-                    typ = quali.getType()
-                    qualifier = quali.getQualifier()
-                    isOptional = quali.isOptional()
-                else:
-                    typ = quali
-                    qualifier = None
-                return (
-                    injector().find(typ, qualifier)
-                    if isOptional
-                    else inject(typ, qualifier)
-                )
+                return _getDep(quali)
             return originalGetAttribute(self, attrName)
 
         cls.__getattribute__ = __getattribute__  # type: ignore[method-assign]
@@ -596,11 +579,7 @@ def resolveVariables(
                 variable = variables.get(attrName)
                 if variable is None:
                     return originalGetAttribute(self, attrName)
-                return (
-                    injector().findVar(variable.getType(), variable.getKey())
-                    if variable.isOptional()
-                    else injector().getVar(variable.getType(), variable.getKey())
-                )
+                return _getDep(variable)
             return originalGetAttribute(
                 self, attrName
             )  # Call the original __getattribute__
