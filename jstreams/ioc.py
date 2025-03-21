@@ -611,6 +611,33 @@ def resolveVariables(
     return wrap
 
 
+def _getDep(dep: Union[type, Dependency, Variable]) -> Any:
+    qualif: Optional[str] = None
+    isOptional = False
+    isVariable = False
+    if isinstance(dep, Dependency):
+        qualif = dep.getQualifier()
+        typ = dep.getType()
+        isOptional = dep.isOptional()
+    elif isinstance(dep, Variable):
+        qualif = dep.getKey()
+        typ = dep.getType()
+        isVariable = True
+        isOptional = dep.isOptional()
+    else:
+        typ = dep
+
+    return (
+        (
+            injector().findVar(typ, requireNotNull(qualif))
+            if isOptional
+            else injector().getVar(typ, requireNotNull(qualif))
+        )
+        if isVariable
+        else (injector().find(typ, qualif) if isOptional else inject(typ, qualif))
+    )
+
+
 def injectArgs(
     dependencies: dict[str, Union[type, Dependency, Variable]],
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
@@ -666,65 +693,12 @@ def injectArgs(
                 # We are dealing with a constructor, and must provide positional arguments
                 for key in dependencies:
                     dep = dependencies[key]
-                    qualif: Optional[str] = None
-                    isOptional = False
-                    isVariable = False
-                    if isinstance(dep, Dependency):
-                        qualif = dep.getQualifier()
-                        typ = dep.getType()
-                        isOptional = dep.isOptional()
-                    elif isinstance(dep, Variable):
-                        qualif = dep.getKey()
-                        typ = dep.getType()
-                        isVariable = True
-                        isOptional = dep.isOptional()
-                    else:
-                        typ = dep
-                    args = args + (
-                        (
-                            (
-                                injector().findVar(typ, requireNotNull(qualif))
-                                if isOptional
-                                else injector().getVar(typ, requireNotNull(qualif))
-                            )
-                            if isVariable
-                            else (
-                                injector().find(typ, qualif)
-                                if isOptional
-                                else inject(typ, qualif)
-                            )
-                        ),
-                    )
+                    args = args + (_getDep(dep),)
             elif len(args) == 0:
                 for key in dependencies:
                     if kwds.get(key) is None:
                         dep = dependencies[key]
-                        quali: Optional[str] = None
-                        isOptional = False
-                        isVar = False
-                        if isinstance(dep, Dependency):
-                            quali = dep.getQualifier()
-                            typ = dep.getType()
-                            isOptional = dep.isOptional()
-                        elif isinstance(dep, Variable):
-                            quali = dep.getKey()
-                            typ = dep.getType()
-                            isVar = True
-                        else:
-                            typ = dep
-                        kwds[key] = (
-                            (
-                                injector().findVar(typ, requireNotNull(quali))
-                                if isOptional
-                                else injector().getVar(typ, requireNotNull(quali))
-                            )
-                            if isVar
-                            else (
-                                injector().find(typ, quali)
-                                if isOptional
-                                else inject(typ, quali)
-                            )
-                        )
+                        kwds[key] = _getDep(dep)
             return func(*args, **kwds)
 
         return wrapped
