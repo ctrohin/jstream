@@ -7,7 +7,7 @@ from typing import Any, Callable, Generic, Optional, TypeVar, Union, cast
 
 from jstreams.noop import NoOp, NoOpCls
 from jstreams.stream import Opt, Stream
-from jstreams.utils import isCallable
+from jstreams.utils import isCallable, requireNotNull
 
 
 class Strategy(Enum):
@@ -148,6 +148,7 @@ class _Injector:
 
     def scanModules(self, modulesToScan: list[str]) -> "_Injector":
         self.__modulesToScan = modulesToScan
+        return self
 
     def __retrieveComponents(self) -> None:
         self.__modulesScanned = True
@@ -611,15 +612,18 @@ def resolveVariables(
 
 
 def injectArgs(
-    dependencies: dict[str, Union[type, Dependency]],
+    dependencies: dict[str, Union[type, Dependency, Variable]],
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
     Injects dependencies to a function, method or constructor using args and kwargs.
     Example:
 
+    IMPORTANT: For constructors, kw arg overriding is not available. When overriding arguments, all arguments must be specified, and their order must be exact (see below TestArgInjection)
+
     # Example 1:
     injector().provide(str, "test")
     injector().provide(int, 10)
+    injector().provideVar(str, "var1", "var1Value")
 
     @injectArgs({"param1": str, "param2": int})
     def fn(param1: str, param2: int) -> None:
@@ -630,26 +634,26 @@ def injectArgs(
     fn(param1="test2", param2=1) # will print out "test2_1" as both param1 and param2 are overriden by the actual call
     fn(param2=1) # will print out "test_1" as only param2 is overriden by the actual call
 
-    CAUTION: It is possible to also call decorated functions with positional arguments, but in
-    this case, all parameters must be provided.
+    # CAUTION: It is possible to also call decorated functions with positional arguments, but in
+    # this case, all parameters must be provided.
     fn("test2", 1) # will print out "test2_1" as both param1 and param2 are provided by the actual call
     fn("test2") # will result in an ERROR as not all params are provided by the positional arguments
 
     class TestArgInjection:
-    @injectArgs({"a": str, "b": int})
-    def __init__(self, a: str, b: int) -> None:
-        self.a = a
-        self.b = b
+        @injectArgs({"a": str, "b": int, "c": StrVariable("var1)})
+        def __init__(self, a: str, b: int, c: str) -> None:
+            self.a = a
+            self.b = b
+            self.c = c
 
-    def print(self) -> None:
-        print(a + str(b))
+        def print(self) -> None:
+            print(a + str(b) + c)
 
-    TestArgInjection().print() # Will print out "test10" as both arguments are injected into the constructor
-    # IMPORTANT: For constructors, kw arg overriding is not available. When overriding arguments, all arguments must be specified
+    TestArgInjection().print() # Will print out "test10var1Value" as all three arguments are injected into the constructor
     TestArgInjection("other", 5).print() # Will print out "other5" as all args are overriden
 
         Args:
-        dependencies (dict[str, Union[type, Dependency]]): A dictionary of dependecies that specify the argument name and the dependency mapping.
+        dependencies (dict[str, Union[type, Dependency, Variable]]): A dictionary of dependecies that specify the argument name and the dependency or variable mapping.
 
     Returns:
         Callable[[Callable[..., T]], Callable[..., T]]: The decorated function or method
@@ -664,17 +668,31 @@ def injectArgs(
                     dep = dependencies[key]
                     qualif: Optional[str] = None
                     isOptional = False
+                    isVariable = False
                     if isinstance(dep, Dependency):
                         qualif = dep.getQualifier()
                         typ = dep.getType()
+                        isOptional = dep.isOptional()
+                    elif isinstance(dep, Variable):
+                        qualif = dep.getKey()
+                        typ = dep.getType()
+                        isVariable = True
                         isOptional = dep.isOptional()
                     else:
                         typ = dep
                     args = args + (
                         (
-                            injector().find(typ, qualif)
-                            if isOptional
-                            else inject(typ, qualif)
+                            (
+                                injector().findVar(typ, requireNotNull(qualif))
+                                if isOptional
+                                else injector().getVar(typ, requireNotNull(qualif))
+                            )
+                            if isVariable
+                            else (
+                                injector().find(typ, qualif)
+                                if isOptional
+                                else inject(typ, qualif)
+                            )
                         ),
                     )
             elif len(args) == 0:
@@ -683,16 +701,29 @@ def injectArgs(
                         dep = dependencies[key]
                         quali: Optional[str] = None
                         isOptional = False
+                        isVar = False
                         if isinstance(dep, Dependency):
                             quali = dep.getQualifier()
                             typ = dep.getType()
                             isOptional = dep.isOptional()
+                        elif isinstance(dep, Variable):
+                            quali = dep.getKey()
+                            typ = dep.getType()
+                            isVar = True
                         else:
                             typ = dep
                         kwds[key] = (
-                            injector().find(typ, quali)
-                            if isOptional
-                            else inject(typ, quali)
+                            (
+                                injector().findVar(typ, requireNotNull(quali))
+                                if isOptional
+                                else injector().getVar(typ, requireNotNull(quali))
+                            )
+                            if isVar
+                            else (
+                                injector().find(typ, quali)
+                                if isOptional
+                                else inject(typ, quali)
+                            )
                         )
             return func(*args, **kwds)
 
