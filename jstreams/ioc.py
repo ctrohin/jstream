@@ -547,7 +547,7 @@ def configuration(profiles: Optional[list[str]] = None) -> Callable[[type[T]], t
     def runBean(obj: Any, attr: str) -> None:
         try:
             getattr(obj, attr)(profiles=profiles)
-        except TypeError as e:
+        except TypeError as _:
             message = (
                 "Bean "
                 + str(attr)
@@ -777,6 +777,30 @@ def injectArgs(
                         dep = dependencies[key]
                         kwds[key] = _getDep(dep)
             return func(*args, **kwds)
+
+        return wrapped
+
+    return wrapper
+
+
+def getInjected(
+    className: type[T], qualifier: Optional[str] = None
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    def wrapper(func: Callable[..., T]) -> Callable[..., T]:
+        def wrapped(*args: Any, **kwds: Any) -> T:
+            return injector().get(className, qualifier)
+
+        return wrapped
+
+    return wrapper
+
+
+def findInjected(
+    className: type[T], qualifier: Optional[str] = None
+) -> Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]:
+    def wrapper(func: Callable[..., Optional[T]]) -> Callable[..., Optional[T]]:
+        def wrapped(*args: Any, **kwds: Any) -> Optional[T]:
+            return injector().find(className, qualifier)
 
         return wrapped
 
