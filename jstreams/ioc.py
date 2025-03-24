@@ -145,6 +145,7 @@ class _Injector:
         self.__profile: Optional[str] = None
         self.__modulesToScan: list[str] = []
         self.__modulesScanned = False
+        self.__raiseBeansError = False
 
     def scanModules(self, modulesToScan: list[str]) -> "_Injector":
         self.__modulesToScan = modulesToScan
@@ -167,6 +168,15 @@ class _Injector:
         if self.__profile is not None:
             raise ValueError(f"Profile ${self.__profile} is already active")
         self.__profile = profile
+
+    def raiseBeanErrors(self, raiseBeanErrors: bool) -> "_Injector":
+        self.__raiseBeansError = raiseBeanErrors
+        return self
+
+    def handleBeanError(self, message: str) -> None:
+        if self.__raiseBeansError:
+            raise TypeError(message)
+        print(message)
 
     def clear(self) -> None:
         self.__components = {}
@@ -499,6 +509,49 @@ def component(
         return cls
 
     return wrap
+
+
+def configuration(profiles: Optional[list[str]] = None) -> Callable[[type[T]], type[T]]:
+    def runBean(obj: Any, attr: str) -> None:
+        try:
+            getattr(obj, attr)(profiles=profiles)
+        except TypeError as e:
+            message = (
+                "Bean "
+                + str(attr)
+                + " of class "
+                + str(type(obj))
+                + " is not properly decorated. In a configuration class, each public method must produce a bean decorated with the @bean decorator. For internal logic, please use protected _method or private __method."
+            )
+            injector().handleBeanError(message)
+
+    def wrap(cls: type[T]) -> type[T]:
+        obj = cls()
+        (
+            Stream(dir(obj))
+            .filter(lambda s: not s.startswith("_"))
+            .filter(lambda s: isCallable(getattr(obj, s)))
+            .each(lambda s: runBean(obj, s))
+        )
+        return cls
+
+    return wrap
+
+
+def bean(
+    className: type[T], qualifier: Optional[str] = None
+) -> Callable[[Callable[..., T]], Callable[..., None]]:
+    def wrapper(func: Callable[..., T]) -> Callable[..., None]:
+        def wrapped(*args: Any, **kwds: Any) -> None:
+            profiles: Optional[list[str]] = None
+            if "profiles" in kwds:
+                profiles = kwds.pop("profiles")
+
+            injector().provide(className, lambda: func(*args), qualifier, profiles)
+
+        return wrapped
+
+    return wrapper
 
 
 def validateDependencies(dependencies: dict[str, Any]) -> None:
