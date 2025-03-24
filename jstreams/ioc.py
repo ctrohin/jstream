@@ -165,6 +165,16 @@ class _Injector:
         return profile if profile is not None else self.__defaultProfile
 
     def activateProfile(self, profile: str) -> None:
+        """
+        Activates the given injection profile.
+        Only components that use the given profile or no profile will be available once a profile is activated.
+
+        Args:
+            profile (str): The profile
+
+        Raises:
+            ValueError: When a profile is already active.
+        """
         if self.__profile is not None:
             raise ValueError(f"Profile ${self.__profile} is already active")
         self.__profile = profile
@@ -477,6 +487,9 @@ def service(
     qualifier: Optional[str] = None,
     profiles: Optional[list[str]] = None,
 ) -> Callable[[type[T]], type[T]]:
+    """
+    Proxy for @component with the strategy always set to Strategy.LAZY
+    """
     return component(Strategy.LAZY, className, qualifier, profiles)
 
 
@@ -512,6 +525,25 @@ def component(
 
 
 def configuration(profiles: Optional[list[str]] = None) -> Callable[[type[T]], type[T]]:
+    """
+    Configuration decorator.
+    A class can be decorated as a configuration if that class provides one or multiple injection beans.
+    Each public method from a decorated class should return a bean decorated with the @bean decoration.
+    Example:
+
+    @configuration()
+    class Config:
+        @bean(str)
+        def strBean(self) -> str: # Produces a str bean that can be accessed by inject(str)
+            return "test"
+
+    Args:
+        profiles (Optional[list[str]], optional): The profiles for which the defined beans will be available for. Defaults to None.
+
+    Returns:
+        Callable[[type[T]], type[T]]: The decorated class
+    """
+
     def runBean(obj: Any, attr: str) -> None:
         try:
             getattr(obj, attr)(profiles=profiles)
@@ -541,6 +573,19 @@ def configuration(profiles: Optional[list[str]] = None) -> Callable[[type[T]], t
 def bean(
     className: type[T], qualifier: Optional[str] = None
 ) -> Callable[[Callable[..., T]], Callable[..., None]]:
+    """
+    Bean decorator. Used for methods inside @configuration classes.
+    This decorator is meant to be used in @configuration classes, in order to mark the methods that
+    define injected dependencies.
+
+    Args:
+        className (type[T]): The dependency class
+        qualifier (Optional[str], optional): Optional bean qualifier. Defaults to None.
+
+    Returns:
+        Callable[[Callable[..., T]], Callable[..., None]]: The decorated method
+    """
+
     def wrapper(func: Callable[..., T]) -> Callable[..., None]:
         def wrapped(*args: Any, **kwds: Any) -> None:
             profiles: Optional[list[str]] = None
