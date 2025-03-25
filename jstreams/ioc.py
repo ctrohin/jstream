@@ -783,7 +783,7 @@ def injectArgs(
     return wrapper
 
 
-def getInjected(
+def autowired(
     className: type[T], qualifier: Optional[str] = None
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     def wrapper(func: Callable[..., T]) -> Callable[..., T]:
@@ -795,7 +795,7 @@ def getInjected(
     return wrapper
 
 
-def findInjected(
+def autowiredOptional(
     className: type[T], qualifier: Optional[str] = None
 ) -> Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]:
     def wrapper(func: Callable[..., Optional[T]]) -> Callable[..., Optional[T]]:
