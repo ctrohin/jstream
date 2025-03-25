@@ -795,6 +795,14 @@ def autowired(
     return wrapper
 
 
+def returnWired(className: type[T]) -> T:
+    return cast(T, NoOp)
+
+
+def returnWiredOptional(className: type[T]) -> Optional[T]:
+    return None
+
+
 def autowiredOptional(
     className: type[T], qualifier: Optional[str] = None
 ) -> Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]:
