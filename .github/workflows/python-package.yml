@@ -33,7 +33,7 @@ jobs:
         ./lint.sh
     - name: Unit tests with coverage
       run: |
-        ./test-coverage.sh
+        ./test-coverage-gh.sh
     - name: Integration tests
       run: |
-        ./test-integration.sh
+        ./test-integration-gh.sh
