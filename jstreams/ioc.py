@@ -550,12 +550,12 @@ def configuration(profiles: Optional[list[str]] = None) -> Callable[[type[T]], t
 
     @configuration()
     class Config:
-        @bean(str)
-        def strBean(self) -> str: # Produces a str bean that can be accessed by inject(str)
+        @provide(str)
+        def strBean(self) -> str: # Produces a str dependency that can be accessed by inject(str)
             return "test"
 
     Args:
-        profiles (Optional[list[str]], optional): The profiles for which the defined beans will be available for. Defaults to None.
+        profiles (Optional[list[str]], optional): The profiles for which the defined dependencies will be available for. Defaults to None.
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class
@@ -566,11 +566,11 @@ def configuration(profiles: Optional[list[str]] = None) -> Callable[[type[T]], t
             getattr(obj, attr)(profiles=profiles)
         except TypeError as _:
             message = (
-                "Bean "
+                "Dependency "
                 + str(attr)
                 + " of class "
                 + str(type(obj))
-                + " is not properly decorated. In a configuration class, each public method must produce a bean decorated with the @bean decorator. For internal logic, please use protected _method or private __method."
+                + " is not properly decorated. In a configuration class, each public method must produce a dependency decorated with the @provide decorator. For internal logic, please use protected _method or private __method."
             )
             injector().handleBeanError(message)
 

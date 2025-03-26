@@ -849,7 +849,7 @@ assertTrue(mock.methodCalled)
 **jstreams** implements various ways to provide/declare an injected dependency, such as:
 - direct injector provisioning
 - component/service declaration
-- configuration class bean creation
+- configuration class dependencies creation
 
 **jstreams** provides a various strategies for retrieving injected dependencies, such as:
 - direct injector retrieval
