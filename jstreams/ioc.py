@@ -122,7 +122,6 @@ class _VariableDependency:
 
     def __init__(self) -> None:
         self.qualifiedVariables: dict[str, Any] = {}
-        self.lock = RLock()
 
 
 T = TypeVar("T")
@@ -132,7 +131,7 @@ class _Injector:
     instance: Optional["_Injector"] = None
     instanceLock: Lock = Lock()
     provideLock: Lock = Lock()
-    loadModulesLock: RLock = RLock()
+    loadModulesLock: Lock = Lock()
 
     def __init__(self) -> None:
         self.__components: dict[type, _ContainerDependency] = {}
@@ -153,9 +152,14 @@ class _Injector:
         return self
 
     def __retrieveComponents(self) -> None:
-        self.__modulesScanned = True
-        for module in self.__modulesToScan:
-            importlib.import_module(module)
+        if self.__modulesScanned:
+            return
+        with self.loadModulesLock:
+            if self.__modulesScanned:
+                return
+            self.__modulesScanned = True
+            for module in self.__modulesToScan:
+                importlib.import_module(module)
 
     def __getProfileStr(self) -> str:
         if self.__profile is None:
@@ -179,6 +183,9 @@ class _Injector:
         if self.__profile is not None:
             raise ValueError(f"Profile ${self.__profile} is already active")
         self.__profile = profile
+
+    def getActiveProfile(self) -> Optional[str]:
+        return self.__profile
 
     def raiseBeanErrors(self, raiseBeanErrors: bool) -> "_Injector":
         self.__raiseBeansError = raiseBeanErrors
@@ -383,45 +390,56 @@ class _Injector:
     def _get(
         self, className: type, qualifier: Optional[str], overrideQualifier: bool = False
     ) -> Any:
-        if not self.__modulesScanned:
-            self.__retrieveComponents()
+        self.__retrieveComponents()
         if (containerDep := self.__components.get(className)) is None:
             return None
-        with containerDep.lock:
-            if qualifier is None:
-                qualifier = self.__defaultQualifier
-            fullQualifier = (
-                qualifier if overrideQualifier else self.__getComponentKey(qualifier)
-            )
-            foundComponent = containerDep.qualifiedDependencies.get(
-                fullQualifier,
-                None,
-            )
-            # We've got a lazy component
-            if isCallable(foundComponent):
-                comp = foundComponent()
-                # Remove the old dependency
-                containerDep.qualifiedDependencies[fullQualifier] = self.__initMeta(
-                    comp
+        if qualifier is None:
+            qualifier = self.__defaultQualifier
+        fullQualifier = (
+            qualifier if overrideQualifier else self.__getComponentKey(qualifier)
+        )
+        foundComponent = containerDep.qualifiedDependencies.get(
+            fullQualifier,
+            None,
+        )
+
+        if foundComponent is None:
+            return None
+
+        # We've got a lazy component
+        if isCallable(foundComponent):
+            # We need to lock in the instantiation, so it will only happen once.
+            with containerDep.lock:
+                # Once we've got the lock, get the component again, and make sure no other thread has already instatiated it
+                foundComponent = containerDep.qualifiedDependencies.get(
+                    fullQualifier,
+                    None,
                 )
 
-                return comp
-            return foundComponent
+                if isCallable(foundComponent):
+                    comp = foundComponent()
+                    # Remove the old dependency
+                    containerDep.qualifiedDependencies[fullQualifier] = self.__initMeta(
+                        comp
+                    )
+
+                    return comp
+
+        return foundComponent
 
     def _getVar(
         self, className: type, qualifier: str, overrideQualifier: bool = False
     ) -> Any:
-        if not self.__modulesScanned:
-            self.__retrieveComponents()
+        self.__retrieveComponents()
 
         if (varDep := self.__variables.get(className)) is None:
             return None
-        with varDep.lock:
-            fullQualifier = (
-                qualifier if overrideQualifier else self.__getComponentKey(qualifier)
-            )
 
-            return varDep.qualifiedVariables.get(fullQualifier, None)
+        fullQualifier = (
+            qualifier if overrideQualifier else self.__getComponentKey(qualifier)
+        )
+
+        return varDep.qualifiedVariables.get(fullQualifier, None)
 
     def __initMeta(self, comp: Any) -> Any:
         if isinstance(comp, AutoInit):
