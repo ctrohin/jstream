@@ -105,6 +105,13 @@ from jstreams.ioc import (
     Dependency,
     InjectedVariable,
     injectArgs,
+    autowired,
+    autowiredOptional,
+    provide,
+    provideVariable,
+    configuration,
+    returnWired,
+    returnWiredOptional,
 )
 
 from jstreams.noop import (
@@ -396,4 +403,11 @@ __all__ = [
     "ListVariable",
     "SetVariable",
     "service",
+    "autowired",
+    "autowiredOptional",
+    "provide",
+    "provideVariable",
+    "configuration",
+    "returnWired",
+    "returnWiredOptional",
 ]

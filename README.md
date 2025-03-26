@@ -845,7 +845,19 @@ injector().provide(MyInterface, mock)
 assertTrue(mock.methodCalled)
 ```
 
-#### Providing and retrieving non qualified dependencies
+#### Providing and retrieving dependencies
+**jstreams** implements various ways to provide/declare an injected dependency, such as:
+- direct injector provisioning
+- component/service declaration
+- configuration class bean creation
+
+**jstreams** provides a various strategies for retrieving injected dependencies, such as:
+- direct injector retrieval
+- method/function arguments injection
+- dependency classes
+- dependency resolving
+
+##### Direct injection/retrieving
 ```python
 from jstreams import injector
 from mypackage import MyClass, MyOtherClass
@@ -865,7 +877,7 @@ myClass = injector().get(MyClass)
 # Retrieve using find. This method returns an Optional and does not raise a ValueError. The missing dependency needs to be handled by the caller
 myOtherClass = injector().find(MyOtherClass)
 ```
-
+##### Component/service declaration and module scanning
 Dependencies can also be provided by using the `component` decorator:
 ```python
 @component()
@@ -914,6 +926,80 @@ class Service(ServiceInterface):
 injector().get(ServiceInterface)
 ```
 
+However, if your interface is defined in a different class, then you need to use the module scanning functionality in order to retrieve a decorated component that implements an interface from another module.
+This mechanism is necessary since python does not load any classes from non imported modules. By providing the modules to be scanned, **jstreams** will attempt to load the provided modules and automatically provide the decorated classes from those modules during injection.
+
+**interface.py**
+```python
+class Interface(abc.ABC):
+    @abc.abstractmethod
+    def doSomething(self) -> None:
+        pass
+```
+
+**service.py**
+```python
+@component(className=Interface)
+class Service(Interface):
+    def doSomething(self) -> None:
+        print("Something got done")
+```
+
+**main.py**
+```python
+injector().scanModules(["service"]) # Provide fully qualified name for the module
+injector().get(Interface).doSomething() # Wil print out 'Something got done'
+```
+
+### Providing dependencies using configuration classes using @configuration and @provide/@provideVariable
+In order to abstract the creation of dependencies from the code that are using those dependencies, you can use configuration classes. In the following example, we will use configuration classes to define two different sets of declared dependencies that will be injected.
+
+**api_config.py**
+```python
+class APIConfiguration:
+    def __init__(self, apiHost: str, apiPort: int) -> None:
+        self.apiHost = apiHost
+        self.apiPort = apiPort
+```
+
+**configuration_dev.py**
+```python
+# First we define a configuration for a development environment
+@configuration(profiles=["dev"])
+class DevConfiguration:
+    @provide(APIConfiguration)
+    def provideDevConfiguration(self) -> APIConfiguration:
+        return APIConfiguration("dev.host.api", 8080)
+```
+
+**configuration_prod.py**
+```python
+# Then we define a configuration for a production environment
+@configuration(profiles=["prod"])
+class ProdConfiguration:
+    @provide(APIConfiguration)
+    def provideDevConfiguration(self) -> APIConfiguration:
+        return APIConfiguration("prod.host.api", 8080)
+```
+
+**dev.py**
+```python
+# This would be the development launcher of your application
+injector().scanModules(["configuration_dev"]) # Inform the container where to load the configuration from
+injector().activateProfile("dev")
+apiConfiguration = inject(APIConfiguration)
+print(apiConfiguration.apiHost) # Will print out 'dev.host.api'
+```
+
+**main.py**
+```python
+# This would be the production launcher of your application
+injector().scanModules(["configuration_prod"]) # Inform the container where to load the configuration from
+injector().activateProfile("prod")
+apiConfiguration = inject(APIConfiguration)
+print(apiConfiguration.apiHost) # Will print out 'prod.host.api'
+```
+
 #### Providing and retrieving qualified dependencies
 ```python
 from jstreams import injector
@@ -934,6 +1020,27 @@ myClassDifferentInstance = injector().find(MyClass, "differentName")
 
 # Using defaults. This method will try to resolve the object for MyNotCalledClass, and if no object is found, the builder function provider will be called and its return value returned and used by the container for the given class.
 myNotCalledObject = injector().findOr(MyNotCalledClass, lambda: MyNotCalledClass())
+```
+
+# Retrieving dependencies using @autowired and @autowiredOptional decorators
+```python
+from jstreams import autowired, autowiredOptional, returnAutowired, returnAutowiredOptional
+
+injector().provide(MyClass, MyClass())
+
+@autowired(MyClass)
+def getMyClass() -> MyClass:
+    # This method does not have to return anything, but for
+    # strict typechecking, we need to use this masking method
+    return returnAutowired(MyClass)
+
+@autowiredOptional(MyClass)
+def getMyClass() -> Optional[MyClass]:
+    # This method does not have to return anything, but for
+    # strict typechecking, we need to use this masking method
+    return returnAutowiredOptional(MyClass)
+
+print(getMyClass()) # Will print out the injected class string representation
 ```
 
 #### Providing and retrieving variables

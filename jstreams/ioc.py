@@ -132,6 +132,7 @@ class _Injector:
     instance: Optional["_Injector"] = None
     instanceLock: Lock = Lock()
     provideLock: Lock = Lock()
+    loadModulesLock: RLock = RLock()
 
     def __init__(self) -> None:
         self.__components: dict[type, _ContainerDependency] = {}
@@ -212,11 +213,20 @@ class _Injector:
 
     def findVar(self, className: type[T], qualifier: str) -> Optional[T]:
         foundVar = self._getVar(className, qualifier)
+        if foundVar is None:
+            foundVar = self._getVar(
+                className,
+                self.__getComponentKeyWithProfile(
+                    qualifier or self.__defaultQualifier, self.__defaultProfile
+                ),
+                True,
+            )
+
         return foundVar if foundVar is None else cast(T, foundVar)
 
     def findVarOr(self, className: type[T], qualifier: str, orVal: T) -> Optional[T]:
-        foundVar = self._getVar(className, qualifier)
-        return orVal if foundVar is None else cast(T, foundVar)
+        foundVar = self.findVar(className, qualifier)
+        return orVal if foundVar is None else foundVar
 
     def find(self, className: type[T], qualifier: Optional[str] = None) -> Optional[T]:
         # Try to get the dependency using the active profile
@@ -398,20 +408,27 @@ class _Injector:
                 return comp
             return foundComponent
 
+    def _getVar(
+        self, className: type, qualifier: str, overrideQualifier: bool = False
+    ) -> Any:
+        if not self.__modulesScanned:
+            self.__retrieveComponents()
+
+        if (varDep := self.__variables.get(className)) is None:
+            return None
+        with varDep.lock:
+            fullQualifier = (
+                qualifier if overrideQualifier else self.__getComponentKey(qualifier)
+            )
+
+            return varDep.qualifiedVariables.get(fullQualifier, None)
+
     def __initMeta(self, comp: Any) -> Any:
         if isinstance(comp, AutoInit):
             comp.init()
         if isinstance(comp, AutoStart):
             comp.start()
         return comp
-
-    def _getVar(self, className: type, qualifier: str) -> Any:
-        if (varDep := self.__variables.get(className)) is None:
-            return None
-        with varDep.lock:
-            return varDep.qualifiedVariables.get(
-                self.__getComponentKey(qualifier), None
-            )
 
     def provideDependencies(
         self, dependencies: dict[type, Any], profiles: Optional[list[str]] = None
@@ -570,17 +587,17 @@ def configuration(profiles: Optional[list[str]] = None) -> Callable[[type[T]], t
     return wrap
 
 
-def bean(
+def provide(
     className: type[T], qualifier: Optional[str] = None
 ) -> Callable[[Callable[..., T]], Callable[..., None]]:
     """
-    Bean decorator. Used for methods inside @configuration classes.
+    Provide decorator. Used for methods inside @configuration classes.
     This decorator is meant to be used in @configuration classes, in order to mark the methods that
     define injected dependencies.
 
     Args:
         className (type[T]): The dependency class
-        qualifier (Optional[str], optional): Optional bean qualifier. Defaults to None.
+        qualifier (Optional[str], optional): Optional dependency qualifier. Defaults to None.
 
     Returns:
         Callable[[Callable[..., T]], Callable[..., None]]: The decorated method
@@ -593,6 +610,35 @@ def bean(
                 profiles = kwds.pop("profiles")
 
             injector().provide(className, lambda: func(*args), qualifier, profiles)
+
+        return wrapped
+
+    return wrapper
+
+
+def provideVariable(
+    className: type[T], qualifier: str
+) -> Callable[[Callable[..., T]], Callable[..., None]]:
+    """
+    Provide variable decorator. Used for methods inside @configuration classes.
+    This decorator is meant to be used in @configuration classes, in order to mark the methods that
+    define injected variables.
+
+    Args:
+        className (type[T]): The dependency class
+        qualifier (str): Mandatory variable qualifier. Defaults to None.
+
+    Returns:
+        Callable[[Callable[..., T]], Callable[..., None]]: The decorated method
+    """
+
+    def wrapper(func: Callable[..., T]) -> Callable[..., None]:
+        def wrapped(*args: Any, **kwds: Any) -> None:
+            profiles: Optional[list[str]] = None
+            if "profiles" in kwds:
+                profiles = kwds.pop("profiles")
+
+            injector().provideVar(className, qualifier, func(*args), profiles)
 
         return wrapped
 
