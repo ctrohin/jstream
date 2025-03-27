@@ -386,6 +386,28 @@ class _Injector:
     def __getComponentKeyWithProfile(self, qualifier: str, profile: str) -> str:
         return profile + qualifier
 
+    def __getFullQualifier(
+        self, qualifier: Optional[str], overrideQualifier: bool
+    ) -> str:
+        if qualifier is None:
+            qualifier = self.__defaultQualifier
+        return qualifier if overrideQualifier else self.__getComponentKey(qualifier)
+
+    def __initializeAndGet(
+        self, containerDep: _ContainerDependency, fullQualifier: str
+    ) -> Any:
+        foundComponent = containerDep.qualifiedDependencies.get(
+            fullQualifier,
+            None,
+        )
+
+        if isCallable(foundComponent):
+            comp = foundComponent()
+            # Remove the old dependency
+            containerDep.qualifiedDependencies[fullQualifier] = self.__initMeta(comp)
+            return comp
+        return foundComponent
+
     # Get a component from the container
     def _get(
         self, className: type, qualifier: Optional[str], overrideQualifier: bool = False
@@ -393,11 +415,7 @@ class _Injector:
         self.__retrieveComponents()
         if (containerDep := self.__components.get(className)) is None:
             return None
-        if qualifier is None:
-            qualifier = self.__defaultQualifier
-        fullQualifier = (
-            qualifier if overrideQualifier else self.__getComponentKey(qualifier)
-        )
+        fullQualifier = self.__getFullQualifier(qualifier, overrideQualifier)
         foundComponent = containerDep.qualifiedDependencies.get(
             fullQualifier,
             None,
@@ -411,19 +429,7 @@ class _Injector:
             # We need to lock in the instantiation, so it will only happen once.
             with containerDep.lock:
                 # Once we've got the lock, get the component again, and make sure no other thread has already instatiated it
-                foundComponent = containerDep.qualifiedDependencies.get(
-                    fullQualifier,
-                    None,
-                )
-
-                if isCallable(foundComponent):
-                    comp = foundComponent()
-                    # Remove the old dependency
-                    containerDep.qualifiedDependencies[fullQualifier] = self.__initMeta(
-                        comp
-                    )
-
-                    return comp
+                return self.__initializeAndGet(containerDep, fullQualifier)
 
         return foundComponent
 
