@@ -1,4 +1,4 @@
-from jstreams.ioc import provide, configuration, provideVariable
+from jstreams.ioc import provide, configuration, provide_variable
 
 
 @configuration(["profile1", "profile2"])
@@ -10,7 +10,7 @@ class Config:
     def test1(self) -> str:
         return "test1"
 
-    @provideVariable(str, "test1")
+    @provide_variable(str, "test1")
     def test2(self) -> str:
         return "test1"
 
@@ -30,7 +30,7 @@ class Config2:
     def test1(self) -> int:
         return 3
 
-    @provideVariable(str, "test2")
+    @provide_variable(str, "test2")
     def test2(self) -> str:
         return "test2"
 

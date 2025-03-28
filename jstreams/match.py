@@ -1,7 +1,7 @@
 from typing import Callable, Generic, Optional, TypeVar, Union, cast, overload
 
 from jstreams.stream import stream, Predicate
-from jstreams.utils import isCallable, requireNotNull
+from jstreams.utils import is_callable, require_non_null
 
 
 T = TypeVar("T")
@@ -21,13 +21,13 @@ class Case(Generic[T, V]):
 
     def matches(self, value: T) -> bool:
         if isinstance(self.__matching, Predicate):
-            return cast(Predicate[T], self.__matching).Apply(value)
-        if isCallable(self.__matching):
+            return cast(Predicate[T], self.__matching).apply(value)
+        if is_callable(self.__matching):
             return cast(Callable[[T], bool], self.__matching)(value)
         return value == self.__matching
 
     def result(self) -> V:
-        if isCallable(self.__resulting):
+        if is_callable(self.__resulting):
             return cast(Callable[[], V], self.__resulting)()
         return cast(V, self.__resulting)
 
@@ -267,11 +267,11 @@ class Match(Generic[T]):
                     case16,
                 ]
             )
-            .nonNull()
-            .map(requireNotNull)
-            .findFirst(lambda c: c.matches(self.__value))
+            .non_null()
+            .map(require_non_null)
+            .find_first(lambda c: c.matches(self.__value))
             .map(lambda c: c.result())
-            .getActual()
+            .get_actual()
         )
 
 
@@ -286,9 +286,9 @@ def match(value: T) -> Match[T]:
     return Match(value)
 
 
-def matchOpt(value: Optional[T]) -> Match[Optional[T]]:
+def match_opt(value: Optional[T]) -> Match[Optional[T]]:
     return Match(value)
 
 
-def defaultCase(resulting: Union[V, Callable[[], V]]) -> Case[T, V]:
+def default_case(resulting: Union[V, Callable[[], V]]) -> Case[T, V]:
     return DefaultCase(resulting)

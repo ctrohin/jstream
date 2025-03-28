@@ -1,4 +1,40 @@
-from jstreams.stream import ClassOps as ClassOps, Opt as Opt, Stream as Stream, dictUpdate as dictUpdate, dropWhile as dropWhile, each as each, findFirst as findFirst, flatMap as flatMap, isNotNone as isNotNone, mapIt as mapIt, matching as matching, optional as optional, reduce as reduce, sort as sort, stream as stream, takeWhile as takeWhile
+from jstreams.stream import (
+    ClassOps as ClassOps,
+    Opt as Opt,
+    Stream as Stream,
+    dictUpdate as dictUpdate,
+    drop_while as drop_while,
+    each as each,
+    find_first as find_first,
+    flat_map as flat_map,
+    is_not_none as is_not_none,
+    map_it as map_it,
+    matching as matching,
+    optional as optional,
+    reduce as reduce,
+    sort as sort,
+    stream as stream,
+    take_while as take_while,
+)
 from jstreams.tryOpt import ErrorLog as ErrorLog, Try as Try
 
-__all__ = ['each', 'dictUpdate', 'Stream', 'findFirst', 'mapIt', 'matching', 'flatMap', 'reduce', 'takeWhile', 'dropWhile', 'isNotNone', 'sort', 'Opt', 'ClassOps', 'stream', 'optional', 'Try', 'ErrorLog']
+__all__ = [
+    "each",
+    "dictUpdate",
+    "Stream",
+    "find_first",
+    "map_it",
+    "matching",
+    "flat_map",
+    "reduce",
+    "take_while",
+    "drop_while",
+    "is_not_none",
+    "sort",
+    "Opt",
+    "ClassOps",
+    "stream",
+    "optional",
+    "Try",
+    "ErrorLog",
+]

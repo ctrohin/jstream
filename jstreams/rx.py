@@ -49,7 +49,7 @@ class Pipe(Generic[T, V]):
     __slots__ = ("__operators",)
 
     def __init__(
-        self, inputType: type[T], outputType: type[V], ops: list[RxOperator[Any, Any]]
+        self, input_type: type[T], output_type: type[V], ops: list[RxOperator[Any, Any]]
     ) -> None:
         super().__init__()
         self.__operators: list[RxOperator[Any, Any]] = ops
@@ -79,45 +79,45 @@ class MultipleSubscriptionsException(Exception):
 class ObservableSubscription(Generic[T]):
     __slots__ = (
         "__parent",
-        "__onNext",
-        "__onError",
-        "__onCompleted",
-        "__onDispose",
-        "__subscriptionId",
+        "__on_next",
+        "__on_error",
+        "__on_completed",
+        "__on_dispose",
+        "__subscription_id",
         "__paused",
     )
 
     def __init__(
         self,
         parent: Any,
-        onNext: NextHandler[T],
-        onError: ErrorHandler = None,
-        onCompleted: CompletedHandler[T] = None,
-        onDispose: DisposeHandler = None,
+        on_next: NextHandler[T],
+        on_error: ErrorHandler = None,
+        on_completed: CompletedHandler[T] = None,
+        on_dispose: DisposeHandler = None,
     ) -> None:
         self.__parent = parent
-        self.__onNext = onNext
-        self.__onError = onError
-        self.__onCompleted = onCompleted
-        self.__onDispose = onDispose
-        self.__subscriptionId = str(uuid.uuid4())
+        self.__on_next = on_next
+        self.__on_error = on_error
+        self.__on_completed = on_completed
+        self.__on_dispose = on_dispose
+        self.__subscription_id = str(uuid.uuid4())
         self.__paused = False
 
-    def getSubscriptionId(self) -> str:
-        return self.__subscriptionId
+    def get_subscription_id(self) -> str:
+        return self.__subscription_id
 
-    def onNext(self, obj: T) -> None:
-        self.__onNext(obj)
+    def on_next(self, obj: T) -> None:
+        self.__on_next(obj)
 
-    def onError(self, ex: Exception) -> None:
-        if self.__onError:
-            self.__onError(ex)
+    def on_error(self, ex: Exception) -> None:
+        if self.__on_error:
+            self.__on_error(ex)
 
-    def onCompleted(self, obj: Optional[T]) -> None:
-        if self.__onCompleted:
-            self.__onCompleted(obj)
+    def on_completed(self, obj: Optional[T]) -> None:
+        if self.__on_completed:
+            self.__on_completed(obj)
 
-    def isPaused(self) -> bool:
+    def is_paused(self) -> bool:
         return self.__paused
 
     def pause(self) -> None:
@@ -127,8 +127,8 @@ class ObservableSubscription(Generic[T]):
         self.__paused = False
 
     def dispose(self) -> None:
-        if self.__onDispose:
-            self.__onDispose()
+        if self.__on_dispose:
+            self.__on_dispose()
 
     def cancel(self) -> None:
         if hasattr(self.__parent, "cancel"):
@@ -139,61 +139,61 @@ class _ObservableParent(Generic[T]):
     def push(self) -> None:
         pass
 
-    def pushToSubOnSubscribe(self, sub: ObservableSubscription[T]) -> None:
+    def push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
         pass
 
 
 class _OnNext(Generic[T]):
-    def onNext(self, val: Optional[T]) -> None:
+    def on_next(self, val: Optional[T]) -> None:
         if not hasattr(self, "__lock"):
             self.__lock = Lock()
         with self.__lock:
-            self._onNext(val)
+            self._on_next(val)
 
-    def _onNext(self, val: Optional[T]) -> None:
+    def _on_next(self, val: Optional[T]) -> None:
         pass
 
 
 class _ObservableBase(Generic[T]):
-    __slots__ = ("__subscriptions", "_parent", "_lastVal")
+    __slots__ = ("__subscriptions", "_parent", "_last_val")
 
     def __init__(self) -> None:
         self.__subscriptions: list[ObservableSubscription[Any]] = []
         self._parent: Optional[_ObservableParent[T]] = None
-        self._lastVal: Optional[T] = None
+        self._last_val: Optional[T] = None
 
-    def _notifyAllSubs(self, val: T) -> None:
-        self._lastVal = val
+    def _notify_all_subs(self, val: T) -> None:
+        self._last_val = val
 
         if self.__subscriptions is not None:
             for sub in self.__subscriptions:
-                self.pushToSubscription(sub, val)
+                self.push_to_subscription(sub, val)
 
-    def pushToSubscription(self, sub: ObservableSubscription[Any], val: T) -> None:
-        if not sub.isPaused():
+    def push_to_subscription(self, sub: ObservableSubscription[Any], val: T) -> None:
+        if not sub.is_paused():
             try:
-                sub.onNext(val)
+                sub.on_next(val)
             except Exception as e:
-                if sub.onError is not None:
-                    sub.onError(e)
+                if sub.on_error is not None:
+                    sub.on_error(e)
 
     def subscribe(
         self,
-        onNext: NextHandler[T],
-        onError: ErrorHandler = None,
-        onCompleted: CompletedHandler[T] = None,
-        onDispose: DisposeHandler = None,
+        on_next: NextHandler[T],
+        on_error: ErrorHandler = None,
+        on_completed: CompletedHandler[T] = None,
+        on_dispose: DisposeHandler = None,
     ) -> ObservableSubscription[Any]:
-        sub = ObservableSubscription(self, onNext, onError, onCompleted, onDispose)
+        sub = ObservableSubscription(self, on_next, on_error, on_completed, on_dispose)
         self.__subscriptions.append(sub)
         if self._parent is not None:
-            self._parent.pushToSubOnSubscribe(sub)
+            self._parent.push_to_sub_on_subscribe(sub)
         return sub
 
     def cancel(self, sub: ObservableSubscription[Any]) -> None:
         (
             Stream(self.__subscriptions)
-            .filter(lambda e: e.getSubscriptionId() == sub.getSubscriptionId())
+            .filter(lambda e: e.get_subscription_id() == sub.get_subscription_id())
             .each(self.__subscriptions.remove)
         )
 
@@ -204,34 +204,34 @@ class _ObservableBase(Generic[T]):
     def pause(self, sub: ObservableSubscription[Any]) -> None:
         (
             Stream(self.__subscriptions)
-            .filter(lambda e: e.getSubscriptionId() == sub.getSubscriptionId())
+            .filter(lambda e: e.get_subscription_id() == sub.get_subscription_id())
             .each(lambda s: s.pause())
         )
 
     def resume(self, sub: ObservableSubscription[Any]) -> None:
         (
             Stream(self.__subscriptions)
-            .filter(lambda e: e.getSubscriptionId() == sub.getSubscriptionId())
+            .filter(lambda e: e.get_subscription_id() == sub.get_subscription_id())
             .each(lambda s: s.resume())
         )
 
-    def pauseAll(self) -> None:
+    def pause_all(self) -> None:
         (Stream(self.__subscriptions).each(lambda s: s.pause()))
 
-    def resumePaused(self) -> None:
+    def resume_paused(self) -> None:
         (
             Stream(self.__subscriptions)
-            .filter(ObservableSubscription.isPaused)
+            .filter(ObservableSubscription.is_paused)
             .each(lambda s: s.resume())
         )
 
-    def onCompleted(self, val: Optional[T]) -> None:
-        (Stream(self.__subscriptions).each(lambda s: s.onCompleted(val)))
+    def on_completed(self, val: Optional[T]) -> None:
+        (Stream(self.__subscriptions).each(lambda s: s.on_completed(val)))
         # Clear all subscriptions. This subject is out of business
         self.dispose()
 
-    def onError(self, ex: Exception) -> None:
-        (Stream(self.__subscriptions).each(lambda s: s.onError(ex)))
+    def on_error(self, ex: Exception) -> None:
+        (Stream(self.__subscriptions).each(lambda s: s.on_error(ex)))
 
 
 class _Observable(_ObservableBase[T], _ObservableParent[T]):
@@ -249,46 +249,46 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
 
     def subscribe(
         self,
-        onNext: NextHandler[V],
-        onError: ErrorHandler = None,
-        onCompleted: CompletedHandler[V] = None,
-        onDispose: DisposeHandler = None,
+        on_next: NextHandler[V],
+        on_error: ErrorHandler = None,
+        on_completed: CompletedHandler[V] = None,
+        on_dispose: DisposeHandler = None,
     ) -> ObservableSubscription[Any]:
         """
         Subscribe to this pipe
 
         Args:
-            onNext (NextHandler[V]): On next handler for incoming values
-            onError (ErrorHandler, optional): Error handler. Defaults to None.
-            onCompleted (CompletedHandler[V], optional): Competed handler. Defaults to None.
-            onDispose (DisposeHandler, optional): Dispose handler. Defaults to None.
+            on_next (NextHandler[V]): On next handler for incoming values
+            on_error (ErrorHandler, optional): Error handler. Defaults to None.
+            on_completed (CompletedHandler[V], optional): Competed handler. Defaults to None.
+            on_dispose (DisposeHandler, optional): Dispose handler. Defaults to None.
 
         Returns:
             ObservableSubscription[V]: The subscription
         """
-        wrappedOnNext, wrappedOnCompleted = self.__wrap(onNext, onCompleted)
+        wrapped_on_next, wrapped_on_completed = self.__wrap(on_next, on_completed)
         return self.__parent.subscribe(
-            wrappedOnNext, onError, wrappedOnCompleted, onDispose
+            wrapped_on_next, on_error, wrapped_on_completed, on_dispose
         )
 
     def __wrap(
-        self, onNext: Callable[[V], Any], onCompleted: CompletedHandler[V]
+        self, on_next: Callable[[V], Any], on_completed: CompletedHandler[V]
     ) -> tuple[Callable[[T], Any], CompletedHandler[T]]:
-        clonePipe = self.__pipe.clone()
+        clone_pipe = self.__pipe.clone()
 
-        def onNextWrapped(val: T) -> None:
-            result = clonePipe.apply(val)
+        def on_next_wrapped(val: T) -> None:
+            result = clone_pipe.apply(val)
             if result is not None:
-                onNext(result)
+                on_next(result)
 
-        def onCompletedWrapped(val: Optional[T]) -> None:
-            if val is None or onCompleted is None:
+        def on_completed_wrapped(val: Optional[T]) -> None:
+            if val is None or on_completed is None:
                 return
-            result = clonePipe.apply(val)
+            result = clone_pipe.apply(val)
             if result is not None:
-                onCompleted(result)
+                on_completed(result)
 
-        return (onNextWrapped, onCompletedWrapped)
+        return (on_next_wrapped, on_completed_wrapped)
 
     def cancel(self, sub: ObservableSubscription[Any]) -> None:
         self.__parent.cancel(sub)
@@ -497,8 +497,8 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
                     op14,
                 ]
             )
-            .nonNull()
-            .toList()
+            .non_null()
+            .to_list()
         )
         return _PipeObservable(self, Pipe(T, V, opList))  # type: ignore
 
@@ -708,8 +708,8 @@ class Observable(_Observable[T]):
                     op14,
                 ]
             )
-            .nonNull()
-            .toList()
+            .non_null()
+            .to_list()
         )
         return _PipeObservable(self, Pipe(T, Any, opList))  # type: ignore
 
@@ -724,17 +724,17 @@ class Flowable(Observable[T]):
 
     def push(self) -> None:
         for v in self._values:
-            self._notifyAllSubs(v)
+            self._notify_all_subs(v)
 
-    def pushToSubOnSubscribe(self, sub: ObservableSubscription[T]) -> None:
+    def push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
         for v in self._values:
-            self.pushToSubscription(sub, v)
+            self.push_to_subscription(sub, v)
 
     def first(self) -> Observable[T]:
-        return Single(Stream(self._values).first().getActual())
+        return Single(Stream(self._values).first().get_actual())
 
     def last(self) -> Observable[T]:
-        return Single(self._lastVal if self._lastVal is not None else None)
+        return Single(self._last_val if self._last_val is not None else None)
 
 
 class Single(Flowable[T]):
@@ -746,10 +746,10 @@ class _SingleValueSubject(Single[T], _OnNext[T]):
     def __init__(self, value: Optional[T]) -> None:
         super().__init__(value)
 
-    def _onNext(self, val: Optional[T]) -> None:
+    def _on_next(self, val: Optional[T]) -> None:
         if val is not None:
             self._values = [val]
-            self._notifyAllSubs(val)
+            self._notify_all_subs(val)
 
 
 class BehaviorSubject(_SingleValueSubject[T]):
@@ -766,34 +766,34 @@ class PublishSubject(_SingleValueSubject[T]):
         Publish subject should not emmit anything on subscribe
         """
 
-    def pushToSubOnSubscribe(self, sub: ObservableSubscription[T]) -> None:
+    def push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
         """
         Publish subject should not emmit anything on subscribe
         """
 
 
 class ReplaySubject(Flowable[T], _OnNext[T]):
-    __slots__ = "__valueList"
+    __slots__ = "__value_list"
 
     def __init__(self, values: Iterable[T]) -> None:
         super().__init__(values)
-        self.__valueList: list[T] = []
+        self.__value_list: list[T] = []
 
-    def _onNext(self, val: Optional[T]) -> None:
+    def _on_next(self, val: Optional[T]) -> None:
         if val is not None:
-            self.__valueList.append(val)
-            self._notifyAllSubs(val)
+            self.__value_list.append(val)
+            self._notify_all_subs(val)
 
     def push(self) -> None:
         super().push()
-        for v in self.__valueList:
-            self._notifyAllSubs(v)
+        for v in self.__value_list:
+            self._notify_all_subs(v)
 
-    def pushToSubOnSubscribe(self, sub: ObservableSubscription[T]) -> None:
+    def push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
         for v in self._values:
-            self.pushToSubscription(sub, v)
-        for v in self.__valueList:
-            self.pushToSubscription(sub, v)
+            self.push_to_subscription(sub, v)
+        for v in self.__value_list:
+            self.push_to_subscription(sub, v)
 
 
 class BaseFilteringOperator(RxOperator[T, T]):
@@ -825,26 +825,26 @@ class Reduce(BaseFilteringOperator[T]):
             reducer (Callable[[T, T], T]): Reducer function
         """
         self.__reducer = reducer
-        self.__prevVal: Optional[T] = None
+        self.__prev_val: Optional[T] = None
         super().__init__(self.__mapper)
 
     def init(self) -> None:
-        self.__prevVal = None
+        self.__prev_val = None
 
     def __mapper(self, val: T) -> bool:
-        if self.__prevVal is None:
+        if self.__prev_val is None:
             # When reducing, the first value is always returned
-            self.__prevVal = val
+            self.__prev_val = val
             return True
-        reduced = self.__reducer(self.__prevVal, val)
-        if reduced != self.__prevVal:
+        reduced = self.__reducer(self.__prev_val, val)
+        if reduced != self.__prev_val:
             # Push and store the reduced value only if it's different than the previous value
-            self.__prevVal = reduced
+            self.__prev_val = reduced
             return True
         return False
 
 
-def rxReduce(reducer: Callable[[T, T], T]) -> RxOperator[T, T]:
+def rx_reduce(reducer: Callable[[T, T], T]) -> RxOperator[T, T]:
     """
     Reduces two consecutive values into one by applying the provided reducer function
 
@@ -868,7 +868,7 @@ class Filter(BaseFilteringOperator[T]):
         super().__init__(predicate)
 
 
-def rxFilter(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+def rx_filter(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
     """
     Allows only values that match the given predicate to flow through
 
@@ -892,7 +892,7 @@ class Map(BaseMappingOperator[T, V]):
         super().__init__(mapper)
 
 
-def rxMap(mapper: Callable[[T], V]) -> RxOperator[T, V]:
+def rx_map(mapper: Callable[[T], V]) -> RxOperator[T, V]:
     """
     Maps a value to a differnt value/form using the mapper function
 
@@ -915,20 +915,20 @@ class Take(BaseFilteringOperator[T]):
             count (int): The number of values that will pass through
         """
         self.__count = count
-        self.__currentlyPushed = 0
+        self.__currently_pushed = 0
         super().__init__(self.__take)
 
     def init(self) -> None:
-        self.__currentlyPushed = 0
+        self.__currently_pushed = 0
 
     def __take(self, val: T) -> bool:
-        if self.__currentlyPushed >= self.__count:
+        if self.__currently_pushed >= self.__count:
             return False
-        self.__currentlyPushed += 1
+        self.__currently_pushed += 1
         return True
 
 
-def rxTake(typ: type[T], count: int) -> RxOperator[T, T]:
+def rx_take(typ: type[T], count: int) -> RxOperator[T, T]:
     """
     Allows only the first "count" values to flow through
 
@@ -951,22 +951,22 @@ class TakeWhile(BaseFilteringOperator[T]):
             predicate (Callable[[T], bool]): The predicate
         """
         self.__fn = predicate
-        self.__shouldPush = True
+        self.__should_push = True
         super().__init__(self.__take)
 
     def init(self) -> None:
-        self.__shouldPush = True
+        self.__should_push = True
 
     def __take(self, val: T) -> bool:
-        if not self.__shouldPush:
+        if not self.__should_push:
             return False
         if not self.__fn(val):
-            self.__shouldPush = False
+            self.__should_push = False
             return False
         return True
 
 
-def rxTakeWhile(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+def rx_take_while(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
     """
     Allows values to pass through as long as they match the give predicate. After one value is found not matching, no other values will flow through
 
@@ -988,22 +988,22 @@ class TakeUntil(BaseFilteringOperator[T]):
             predicate (Callable[[T], bool]): The predicate
         """
         self.__fn = predicate
-        self.__shouldPush = True
+        self.__should_push = True
         super().__init__(self.__take)
 
     def init(self) -> None:
-        self.__shouldPush = True
+        self.__should_push = True
 
     def __take(self, val: T) -> bool:
-        if not self.__shouldPush:
+        if not self.__should_push:
             return False
         if self.__fn(val):
-            self.__shouldPush = False
+            self.__should_push = False
             return False
         return True
 
 
-def rxTakeUntil(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+def rx_take_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
     """
     Allows values to pass through until the first value found to match the give predicate. After that, no other values will flow through
 
@@ -1026,20 +1026,20 @@ class Drop(BaseFilteringOperator[T]):
             count (int): The number of values to pass through
         """
         self.__count = count
-        self.__currentlyDropped = 0
+        self.__currently_dropped = 0
         super().__init__(self.__drop)
 
     def init(self) -> None:
-        self.__currentlyDropped = 0
+        self.__currently_dropped = 0
 
     def __drop(self, val: T) -> bool:
-        if self.__currentlyDropped < self.__count:
-            self.__currentlyDropped += 1
+        if self.__currently_dropped < self.__count:
+            self.__currently_dropped += 1
             return False
         return True
 
 
-def rxDrop(typ: type[T], count: int) -> RxOperator[T, T]:
+def rx_drop(typ: type[T], count: int) -> RxOperator[T, T]:
     """
     Blocks the first "count" values, then allows all remaining values to pass through
 
@@ -1062,23 +1062,23 @@ class DropWhile(BaseFilteringOperator[T]):
             predicate (Callable[[T], bool]): The predicate
         """
         self.__fn = predicate
-        self.__shouldPush = False
+        self.__should_push = False
         super().__init__(self.__drop)
 
     def init(self) -> None:
-        self.__shouldPush = False
+        self.__should_push = False
 
     def __drop(self, val: T) -> bool:
-        if self.__shouldPush:
+        if self.__should_push:
             return True
 
         if not self.__fn(val):
-            self.__shouldPush = True
+            self.__should_push = True
             return True
         return False
 
 
-def rxDropWhile(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+def rx_drop_while(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
     """
     Blocks values as long as they match the given predicate. Once a value is encountered that does not match the predicate, all remaining values will be allowed to pass through
 
@@ -1100,23 +1100,23 @@ class DropUntil(BaseFilteringOperator[T]):
             predicate (Callable[[T], bool]): The predicate
         """
         self.__fn = predicate
-        self.__shouldPush = False
+        self.__should_push = False
         super().__init__(self.__drop)
 
     def init(self) -> None:
-        self.__shouldPush = False
+        self.__should_push = False
 
     def __drop(self, val: T) -> bool:
-        if self.__shouldPush:
+        if self.__should_push:
             return True
 
         if self.__fn(val):
-            self.__shouldPush = True
+            self.__should_push = True
             return True
         return False
 
 
-def rxDropUntil(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+def rx_drop_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
     """
     Blocks values until the first value found that matches the given predicate. All remaining values will be allowed to pass through
 

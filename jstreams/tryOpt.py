@@ -15,60 +15,60 @@ class ErrorLog(Protocol):
 class Try(Generic[T]):
     __slots__ = (
         "__fn",
-        "__thenChain",
-        "__onFailure",
-        "__errorLog",
-        "__errorMessage",
-        "__hasFailed",
+        "__then_chain",
+        "__on_failure",
+        "__error_log",
+        "__error_message",
+        "__has_failed",
         "__logger",
     )
 
     def __init__(self, fn: Callable[[], T]):
         self.__fn = fn
-        self.__thenChain: list[Callable[[T], Any]] = []
-        self.__onFailure: Optional[Callable[[BaseException], Any]] = None
-        self.__errorLog: Optional[ErrorLog] = None
-        self.__errorMessage: Optional[str] = None
-        self.__hasFailed = False
+        self.__then_chain: list[Callable[[T], Any]] = []
+        self.__on_failure: Optional[Callable[[BaseException], Any]] = None
+        self.__error_log: Optional[ErrorLog] = None
+        self.__error_message: Optional[str] = None
+        self.__has_failed = False
 
-    def withLogger(self, logger: ErrorLog) -> "Try[T]":
-        self.__errorLog = logger
+    def with_logger(self, logger: ErrorLog) -> "Try[T]":
+        self.__error_log = logger
         return self
 
-    def withErrorMessage(self, errorMessage: str) -> "Try[T]":
-        self.__errorMessage = errorMessage
+    def with_error_message(self, error_message: str) -> "Try[T]":
+        self.__error_message = error_message
         return self
 
-    def andThen(self, fn: Callable[[T], Any]) -> "Try[T]":
-        self.__thenChain.append(fn)
+    def and_then(self, fn: Callable[[T], Any]) -> "Try[T]":
+        self.__then_chain.append(fn)
         return self
 
-    def onFailure(self, fn: Callable[[BaseException], Any]) -> "Try[T]":
-        self.__onFailure = fn
+    def on_failure(self, fn: Callable[[BaseException], Any]) -> "Try[T]":
+        self.__on_failure = fn
         return self
 
-    def onFailureLog(self, message: str, errorLog: ErrorLog) -> "Try[T]":
-        return self.withErrorMessage(message).withLogger(errorLog)
+    def on_failure_log(self, message: str, error_log: ErrorLog) -> "Try[T]":
+        return self.with_error_message(message).with_logger(error_log)
 
     def get(self) -> Opt[T]:
         try:
             val = self.__fn()
-            for fn in self.__thenChain:
+            for fn in self.__then_chain:
                 fn(val)
             return Opt(val)
         except Exception as e:
-            self.__hasFailed = True
-            if self.__onFailure is not None:
-                self.__onFailure(e)
-            if self.__errorLog is not None:
-                if self.__errorMessage is not None:
-                    self.__errorLog.error(self.__errorMessage)
-                self.__errorLog.error(e, exc_info=True)
+            self.__has_failed = True
+            if self.__on_failure is not None:
+                self.__on_failure(e)
+            if self.__error_log is not None:
+                if self.__error_message is not None:
+                    self.__error_log.error(self.__error_message)
+                self.__error_log.error(e, exc_info=True)
         return Opt(None)
 
-    def hasFailed(self) -> bool:
+    def has_failed(self) -> bool:
         self.get()
-        return self.__hasFailed
+        return self.__has_failed
 
     @staticmethod
     def of(val: K) -> "Try[K]":

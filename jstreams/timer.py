@@ -13,10 +13,16 @@ class Timer(Thread, Cancellable):
 
     """
 
-    __slots__ = ("__time", "__cancelPollingTime", "__callback", "__canceled", "__lock")
+    __slots__ = (
+        "__time",
+        "__cancel_polling_time",
+        "__callback",
+        "__canceled",
+        "__lock",
+    )
 
     def __init__(
-        self, time: float, cancelPollingTime: float, callback: Callable[[], Any]
+        self, time: float, cancel_polling_time: float, callback: Callable[[], Any]
     ) -> None:
         """
         Constructor.
@@ -26,16 +32,16 @@ class Timer(Thread, Cancellable):
             cancelPollingTime (float): Number of seconds at which this timer will poll for cancel flag
             callback (Callable[[], Any]): The callback to be executed
         """
-        if time <= 0 or cancelPollingTime <= 0:
+        if time <= 0 or cancel_polling_time <= 0:
             raise ValueError(
                 "time and cancelPollingTime parameters must be higher than 0"
             )
 
-        if cancelPollingTime >= time:
+        if cancel_polling_time >= time:
             raise ValueError("cancelPollingTime cannot be higher than time")
 
         self.__time = time
-        self.__cancelPollingTime = cancelPollingTime
+        self.__cancel_polling_time = cancel_polling_time
         self.__callback: Callable[[], Any] = callback
         self.__canceled: bool = False
         self.__lock = Lock()
@@ -50,8 +56,8 @@ class Timer(Thread, Cancellable):
 
     def run(self) -> None:
         while self.__time > 0:
-            sleep(self.__cancelPollingTime)
-            self.__time = self.__time - self.__cancelPollingTime
+            sleep(self.__cancel_polling_time)
+            self.__time = self.__time - self.__cancel_polling_time
             with self.__lock:
                 if self.__canceled:
                     return
@@ -124,13 +130,13 @@ class CountdownTimer(Thread):
         self.__callback()
 
 
-def setTimer(timeout: float, callback: Callable[[], Any]) -> Cancellable:
+def set_timer(timeout: float, callback: Callable[[], Any]) -> Cancellable:
     timer = Timer(timeout, 1, callback)
     timer.start()
     return timer
 
 
-def setInterval(interval: float, callback: Callable[[], Any]) -> Cancellable:
+def set_interval(interval: float, callback: Callable[[], Any]) -> Cancellable:
     timer = Interval(interval, callback)
     timer.start()
     return timer

@@ -9,7 +9,7 @@ class TestStream(BaseTestCase):
         Test stream map function
         """
         self.assertEqual(
-            Stream(["Test", "Best", "Lest"]).map(str.upper).toList(),
+            Stream(["Test", "Best", "Lest"]).map(str.upper).to_list(),
             ["TEST", "BEST", "LEST"],
         )
 
@@ -20,37 +20,37 @@ class TestStream(BaseTestCase):
         self.assertEqual(
             Stream(["Test", "Best", "Lest"])
             .filter(lambda s: s.startswith("T"))
-            .toList(),
+            .to_list(),
             ["Test"],
         )
         self.assertFalse(
             Stream(["Test", "Best", "Lest"])
             .filter(lambda s: s.startswith("T"))
-            .isEmpty()
+            .is_empty()
         )
         self.assertTrue(
             Stream(["Test", "Best", "Lest"])
             .filter(lambda s: s.startswith("T"))
-            .isNotEmpty()
+            .is_not_empty()
         )
 
         self.assertEqual(
             Stream(["Test", "Best", "Lest"])
             .filter(lambda s: s.startswith("X"))
-            .toList(),
+            .to_list(),
             [],
         )
 
         self.assertTrue(
             Stream(["Test", "Best", "Lest"])
             .filter(lambda s: s.startswith("X"))
-            .isEmpty()
+            .is_empty()
         )
 
         self.assertFalse(
             Stream(["Test", "Best", "Lest"])
             .filter(lambda s: s.startswith("X"))
-            .isNotEmpty()
+            .is_not_empty()
         )
 
     def test_stream_anyMatch(self) -> None:
@@ -58,11 +58,11 @@ class TestStream(BaseTestCase):
         Test stream anyMatch function
         """
         self.assertFalse(
-            Stream(["Test", "Best", "Lest"]).anyMatch(lambda s: s.startswith("X"))
+            Stream(["Test", "Best", "Lest"]).any_match(lambda s: s.startswith("X"))
         )
 
         self.assertTrue(
-            Stream(["Test", "Best", "Lest"]).anyMatch(lambda s: s.startswith("T"))
+            Stream(["Test", "Best", "Lest"]).any_match(lambda s: s.startswith("T"))
         )
 
     def test_stream_allMatch(self) -> None:
@@ -70,11 +70,11 @@ class TestStream(BaseTestCase):
         Test stream allMatch function
         """
         self.assertTrue(
-            Stream(["Test", "Best", "Lest"]).allMatch(lambda s: s.endswith("est"))
+            Stream(["Test", "Best", "Lest"]).all_match(lambda s: s.endswith("est"))
         )
 
         self.assertFalse(
-            Stream(["Test", "Best", "Lest1"]).allMatch(lambda s: s.endswith("est"))
+            Stream(["Test", "Best", "Lest1"]).all_match(lambda s: s.endswith("est"))
         )
 
     def test_stream_noneMatch(self) -> None:
@@ -82,11 +82,11 @@ class TestStream(BaseTestCase):
         Test stream noneMatch function
         """
         self.assertFalse(
-            Stream(["Test", "Best", "Lest"]).noneMatch(lambda s: s.endswith("est"))
+            Stream(["Test", "Best", "Lest"]).none_match(lambda s: s.endswith("est"))
         )
 
         self.assertTrue(
-            Stream(["Test", "Best", "Lest1"]).noneMatch(lambda s: s.endswith("xx"))
+            Stream(["Test", "Best", "Lest1"]).none_match(lambda s: s.endswith("xx"))
         )
 
     def test_stream_findFirst(self) -> None:
@@ -96,8 +96,8 @@ class TestStream(BaseTestCase):
 
         self.assertEqual(
             Stream(["Test", "Best", "Lest"])
-            .findFirst(lambda s: s.startswith("L"))
-            .getActual(),
+            .find_first(lambda s: s.startswith("L"))
+            .get_actual(),
             "Lest",
         )
 
@@ -107,7 +107,7 @@ class TestStream(BaseTestCase):
         """
 
         self.assertEqual(
-            Stream(["Test", "Best", "Lest"]).first().getActual(),
+            Stream(["Test", "Best", "Lest"]).first().get_actual(),
             "Test",
         )
 
@@ -121,7 +121,7 @@ class TestStream(BaseTestCase):
             .filter(lambda el: el == "Test1")
             .cast(str)
             .first()
-            .getActual(),
+            .get_actual(),
             "Test1",
         )
 
@@ -131,7 +131,7 @@ class TestStream(BaseTestCase):
         """
 
         self.assertEqual(
-            Stream([["a", "b"], ["c", "d"]]).flatMap(list).toList(),
+            Stream([["a", "b"], ["c", "d"]]).flat_map(list).to_list(),
             ["a", "b", "c", "d"],
         )
 
@@ -141,7 +141,7 @@ class TestStream(BaseTestCase):
         """
 
         self.assertEqual(
-            Stream(["a", "b", "c", "d"]).skip(2).toList(),
+            Stream(["a", "b", "c", "d"]).skip(2).to_list(),
             ["c", "d"],
         )
 
@@ -151,7 +151,7 @@ class TestStream(BaseTestCase):
         """
 
         self.assertEqual(
-            Stream(["a", "b", "c", "d"]).limit(2).toList(),
+            Stream(["a", "b", "c", "d"]).limit(2).to_list(),
             ["a", "b"],
         )
 
@@ -162,8 +162,8 @@ class TestStream(BaseTestCase):
 
         self.assertEqual(
             Stream(["a1", "a2", "a3", "b", "c", "d"])
-            .takeWhile(lambda e: e.startswith("a"))
-            .toList(),
+            .take_while(lambda e: e.startswith("a"))
+            .to_list(),
             ["a1", "a2", "a3"],
         )
 
@@ -175,7 +175,7 @@ class TestStream(BaseTestCase):
         self.assertEqual(
             Stream(["aaa", "aa", "aaaa", "b", "c", "d"])
             .reduce(lambda el1, el2: el1 if len(el1) > len(el2) else el2)
-            .getActual(),
+            .get_actual(),
             "aaaa",
         )
 
@@ -185,7 +185,7 @@ class TestStream(BaseTestCase):
         """
 
         self.assertEqual(
-            Stream([1, 2, 3, 4, 20, 5, 6]).reduce(max).getActual(),
+            Stream([1, 2, 3, 4, 20, 5, 6]).reduce(max).get_actual(),
             20,
         )
 
@@ -195,7 +195,7 @@ class TestStream(BaseTestCase):
         """
 
         self.assertEqual(
-            Stream(["A", None, "B", None, None, "C", None, None]).nonNull().toList(),
+            Stream(["A", None, "B", None, None, "C", None, None]).non_null().to_list(),
             ["A", "B", "C"],
         )
 
@@ -208,7 +208,9 @@ class TestStream(BaseTestCase):
         """
 
         self.assertEqual(
-            Stream(["1", "333", "22", "4444", "55555"]).sort(self.str_len_cmp).toList(),
+            Stream(["1", "333", "22", "4444", "55555"])
+            .sort(self.str_len_cmp)
+            .to_list(),
             ["55555", "4444", "333", "22", "1"],
         )
 
@@ -221,7 +223,7 @@ class TestStream(BaseTestCase):
             Stream(["1", "333", "22", "4444", "55555"])
             .sort(self.str_len_cmp)
             .reverse()
-            .toList(),
+            .to_list(),
             ["1", "22", "333", "4444", "55555"],
         )
 
@@ -231,7 +233,7 @@ class TestStream(BaseTestCase):
         """
 
         self.assertEqual(
-            Stream(["1", "1", "2", "3", "3", "4"]).distinct().toList(),
+            Stream(["1", "1", "2", "3", "3", "4"]).distinct().to_list(),
             ["1", "2", "3", "4"],
         )
 
@@ -242,15 +244,15 @@ class TestStream(BaseTestCase):
 
         self.assertEqual(
             Stream(["a1", "a2", "a3", "b", "c", "d"])
-            .dropWhile(lambda e: e.startswith("a"))
-            .toList(),
+            .drop_while(lambda e: e.startswith("a"))
+            .to_list(),
             ["b", "c", "d"],
         )
 
         self.assertEqual(
             Stream(["a1", "a2", "a3", "a4", "a5", "a6"])
-            .dropWhile(lambda e: e.startswith("a"))
-            .toList(),
+            .drop_while(lambda e: e.startswith("a"))
+            .to_list(),
             [],
         )
 
@@ -260,7 +262,7 @@ class TestStream(BaseTestCase):
         """
 
         self.assertEqual(
-            Stream(["a", "b", "c", "d"]).concat(Stream(["e", "f"])).toList(),
+            Stream(["a", "b", "c", "d"]).concat(Stream(["e", "f"])).to_list(),
             ["a", "b", "c", "d", "e", "f"],
         )
 
@@ -270,12 +272,12 @@ class TestStream(BaseTestCase):
         """
 
         self.assertEqual(
-            Stream([["A", "B"], ["C", "D"], ["E", "F"]]).flatten(str).toList(),
+            Stream([["A", "B"], ["C", "D"], ["E", "F"]]).flatten(str).to_list(),
             ["A", "B", "C", "D", "E", "F"],
         )
 
         self.assertEqual(
-            Stream(["A", "B"]).flatten(str).toList(),
+            Stream(["A", "B"]).flatten(str).to_list(),
             ["A", "B"],
         )
 
@@ -287,7 +289,7 @@ class TestStream(BaseTestCase):
                 {"key": 1, "prop": "prop1", "value": "X3"},
                 {"key": 1, "prop": "prop1", "value": "X4"},
             ]
-        ).collectUsing(Collectors.groupingBy(lambda x: x["prop"]))
+        ).collect_using(Collectors.grouping_by(lambda x: x["prop"]))
         expected = {
             "prop": [
                 {"key": 1, "prop": "prop", "value": "X1"},
@@ -307,7 +309,7 @@ class TestStream(BaseTestCase):
             {"key": 1, "prop": "prop1", "value": "X3"},
             {"key": 1, "prop": "prop1", "value": "X4"},
         ]
-        values = Stream(expected).collectUsing(Collectors.toList())
+        values = Stream(expected).collect_using(Collectors.to_list())
         self.assertListEqual(
             values, expected, "Values should be collected in the same list"
         )
@@ -320,7 +322,7 @@ class TestStream(BaseTestCase):
                 {"key": 2, "prop": "prop1", "value": "X3"},
                 {"key": 2, "prop": "prop1", "value": "X4"},
             ]
-        ).collectUsing(Collectors.partitioningBy(lambda x: x["key"] == 1))
+        ).collect_using(Collectors.partitioning_by(lambda x: x["key"] == 1))
         expected = {
             True: [
                 {"key": 1, "prop": "prop", "value": "X1"},
@@ -335,7 +337,7 @@ class TestStream(BaseTestCase):
 
     def test_collector_joining_default(self) -> None:
         values = ["A", "B", "C"]
-        value = Stream(values).collectUsing(Collectors.joining())
+        value = Stream(values).collect_using(Collectors.joining())
         expected = "ABC"
         self.assertEqual(
             value, expected, "Value should contain the concatenated string array"
@@ -343,7 +345,7 @@ class TestStream(BaseTestCase):
 
     def test_collector_joining_specific(self) -> None:
         values = ["A", "B", "C"]
-        value = Stream(values).collectUsing(Collectors.joining(","))
+        value = Stream(values).collect_using(Collectors.joining(","))
         expected = "A,B,C"
         self.assertEqual(
             value, expected, "Value should contain the concatenated string array"
@@ -351,7 +353,7 @@ class TestStream(BaseTestCase):
 
     def test_collector_set(self) -> None:
         values = ["A", "B", "C"]
-        value = Stream(values).collectUsing(Collectors.toSet())
+        value = Stream(values).collect_using(Collectors.to_set())
         expected = {"A", "B", "C"}
         self.assertSetEqual(
             value, expected, "Collection should produce a set of the values"

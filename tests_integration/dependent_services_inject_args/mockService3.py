@@ -1,11 +1,11 @@
-from jstreams.ioc import StrVariable, injectArgs, service
+from jstreams.ioc import StrVariable, inject_args, service
 from iMockService1 import IMockService
 from mockService2 import MockService2
 
 
 @service()
 class MockService3:
-    @injectArgs(
+    @inject_args(
         {
             "mockService1": IMockService,
             "mockService2": MockService2,

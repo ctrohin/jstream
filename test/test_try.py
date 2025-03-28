@@ -40,7 +40,7 @@ class TestTry(BaseTestCase):
     def test_try(self) -> None:
         mock = CallRegister()
         self.assertEqual(
-            Try(self.noThrow).andThen(mock.mth1).andThen(mock.mth2).get().get(),
+            Try(self.noThrow).and_then(mock.mth1).and_then(mock.mth2).get().get(),
             "str",
         )
         self.assertTrue(mock.mth1Called)
@@ -48,18 +48,18 @@ class TestTry(BaseTestCase):
 
     def test_try_with_error_on_initial(self) -> None:
         mock = CallRegister()
-        self.assertIsNone(Try(self.throw).andThen(mock.mth1).get().getActual())
+        self.assertIsNone(Try(self.throw).and_then(mock.mth1).get().get_actual())
         self.assertFalse(mock.mth1Called)
 
     def test_try_with_error_on_chain(self) -> None:
         self.assertIsNone(
-            Try(self.noThrow).andThen(self.processThrow).get().getActual()
+            Try(self.noThrow).and_then(self.processThrow).get().get_actual()
         )
 
     def test_try_with_error_on_init_and_onFailure(self) -> None:
         mock = CallRegister()
         self.assertIsNone(
-            Try(self.throw).andThen(mock.mth1).onFailure(mock.mth2).get().getActual()
+            Try(self.throw).and_then(mock.mth1).on_failure(mock.mth2).get().get_actual()
         )
         self.assertFalse(mock.mth1Called)
         self.assertTrue(mock.mth2Called)
@@ -68,10 +68,10 @@ class TestTry(BaseTestCase):
         mock = CallRegister()
         self.assertIsNone(
             Try(self.noThrow)
-            .andThen(self.processThrow)
-            .onFailure(mock.mth1)
+            .and_then(self.processThrow)
+            .on_failure(mock.mth1)
             .get()
-            .getActual()
+            .get_actual()
         )
         self.assertTrue(mock.mth1Called)
 
@@ -79,9 +79,9 @@ class TestTry(BaseTestCase):
         mock = CallRegister()
         self.assertIsNone(
             Try(self.noThrow)
-            .andThen(self.processThrow)
-            .onFailureLog("Test", mock)
+            .and_then(self.processThrow)
+            .on_failure_log("Test", mock)
             .get()
-            .getActual()
+            .get_actual()
         )
         self.assertTrue(mock.errorLogged)

@@ -1,5 +1,4 @@
 # jstreams
-
 jstreams is a Python library aiming to replicate the following:
 - Java Streams and Optional functionality
 - a basic ReactiveX implementation
@@ -18,22 +17,25 @@ Use the package manager [pip](https://pip.pypa.io/en/stable/) to install jstream
 pip install jstreams
 ```
 ## Changelog
-### v2025.3.3
-Improvements:
-- Classes using attribute injection using *resolveDependencies* and *resolveVariables* no longer need the dependencies declared ahead of time
-- *Dependency* and *Variable* classes used for injecting dependencies have now the *isOptional* flag, which will use the *find* injection mechanism instead of the *get* mechanism.
-- Dependency injection profiles: you can now specify profiles for each provided component. In order to activate a profile, you can use the `injector().activateProfile(profile)` call.
+### v2025.4.1
+#### BREAKING CHANGES
+Since version **v2025.4.1** **jstreams** has been refactored to use naming conventions in compliance with **PEP8**. As such, any projects depending on **jstreams** must be updated to use the **snake_case** naming convention for members and functions, instead of the **mixedCase** used until this version.
+
+#### Improvements
+- Classes using attribute injection using *resolve_dependencies* and *resolve_variables* no longer need the dependencies declared ahead of time
+- *Dependency* and *Variable* classes used for injecting dependencies have now the *is_optional* flag, which will use the *find* injection mechanism instead of the *get* mechanism.
+- Dependency injection profiles: you can now specify profiles for each provided component. In order to activate a profile, you can use the `injector().activate_profile(profile)` call.
 This versions adds the following features:
 - stream collectors
     - the *Stream* class has been enriched with the *collectUsing* method to transform/reduce a stream
     - the *Collectors* class has been added containing the following collectors:
-        - toList - produces a list of the elements of the stream
-        - toSet - produces a set of the elements of the stream
-        - groupingBy - produces a dictionary of the stream with the grouping value as key and a list of elements as values
-        - partitioningBy - produces a dictionary of the string with True/False as key (as returned by the given condition) and a list of elements as values
+        - to_list - produces a list of the elements of the stream
+        - to_set - produces a set of the elements of the stream
+        - grouping_by - produces a dictionary of the stream with the grouping value as key and a list of elements as values
+        - partitioning_by - produces a dictionary of the string with True/False as key (as returned by the given condition) and a list of elements as values
         - joining - produces a string from all elements of the stream by joining them with the given separator
-- argument injection via the *injectArgs* decorator. See usage below in the *Attribute and argument injection* section.
-- the ability to retrieve all dependencies of a certain type using the *allOfType* and *allOfTypeStream* methods. This method is useful when multiple dependecies that implement the same parent class are provided, for cases where you have multiple validators that can be dynamically provided.
+- argument injection via the *inject_args* decorator. See usage below in the *Attribute and argument injection* section.
+- the ability to retrieve all dependencies of a certain type using the *all_of_type* and *all_of_type_stream* methods. This method is useful when multiple dependecies that implement the same parent class are provided, for cases where you have multiple validators that can be dynamically provided.
 - a simple state management API
 ```python
 class ValidatorInterface(abc.ABC):
@@ -50,13 +52,13 @@ class ContainsBValidator(ValidatorInterface):
         return "B" in value
 
 # Provide both validators
-injector().provideDependencies({
+injector().provide_dependencies({
     ContainsAValidator: ContainsAValidator(),
     ContainsBValidator: ContainsBValidator()
 })
 
 # Then validate a string against all provided validators implementing 'ValidatorInterface'
-validators = injector().allOfType(ValidatorInterface)
+validators = injector().all_of_type(ValidatorInterface)
 isValid = True
 testString = "AB"
 for validator in validators:
@@ -66,13 +68,13 @@ for validator in validators:
 print(isValid) # Prints out "True" since the string passes both validations
 
 # Or use the stream functionality
-isValid = injector().allOfTypeStream(ValidatorInterface).allMatch(lambda v: v.validate(testString))
+isValid = injector().all_of_type_stream(ValidatorInterface).all_match(lambda v: v.validate(testString))
 print(isValid) # Prints out "True" since the string passes both validations
 ```
 ### v2025.3.2
 This version adds more dependency injection options (for usage, check the Dependency injection section below):
-- *resolveVariables* decorator - provides class level variable injection
-- *resolveDependencies* decorator - provides class level dependency injection
+- *resolve_variables* decorator - provides class level variable injection
+- *resolve_dependencies* decorator - provides class level dependency injection
 - *component* decorator - provides decoration for classes. A decorated class will be injected once its module is imported
 - *InjectedVariable* class - a class providing access to a injected variable without the need for decoration or using the `injector` directly
 - added callable functionality to `InjectedDependency` and `OptionalInjectedDependency` classes. You can now call `dep()` instead of `dep.get()`
@@ -81,39 +83,39 @@ Version 2025.2.11 adds the following enhancements:
 #### Pair and Triplet
 The **Pair** and **Triplet** classes are object oriented substitutions for Python tuples of 2 and 3 values. A such, they don't need to be unpacked and can be used by calling the **left**, **right** and **middle**(Triplets only) methods.
 For enhanced support with predicates and streams, **jstreams** also provides the following predicates dedicated to pairs and triplets:
-- *leftMatches* - A predicate that takes another predicate as a parameter, and applies it to the **left** of a Pair/Triplet
-- *rightMatches* - A predicate that takes another predicate as a parameter, and applies it to the **right** of a Pair/Triplet
-- *middleMatches* - A predicate that takes another predicate as a parameter, and applies it to the **middle** of a Triplet
+- *left_matches* - A predicate that takes another predicate as a parameter, and applies it to the **left** of a Pair/Triplet
+- *right_matches* - A predicate that takes another predicate as a parameter, and applies it to the **right** of a Pair/Triplet
+- *middle_matches* - A predicate that takes another predicate as a parameter, and applies it to the **middle** of a Triplet
 
 ```python
 p = pair("string", 0)
-pred = rightMatches(isZero)
+pred = right_matches(isZero)
 pred(p) 
 # Returns True since the right value is, indeed, zero
 
 # Usage with optional
-optional(pair("string", 0)).filter(leftMatches(contains("tri"))).filter(rightMatches(isZero)).get() 
+optional(pair("string", 0)).filter(left_matches(contains("tri"))).filter(right_matches(is_zero)).get() 
 # Returns the pair, since both fields match the given predicates
 
 # Usage with stream
 pairs = [pair("test", 1), pair("another", 11), pair("test1", 2)]
-stream(pairs).filter(leftMatches(contains("test"))).filter(rightMatches(isHigherThan(1))).toList() 
+stream(pairs).filter(left_matches(contains("test"))).filter(right_matches(is_higher_than(1))).toList() 
 # Produces [pair("test1", 2)], since this is the only item that can pass both filters
 
 ```
 #### New predicates
 The following general purpose predicates have been added:
-- *isKeyIn* - checks if the predicate argument is present as a key in the predicate mapping
-- *isValueIn* - checks if the predicate argument is present as a value in the predicate mapping
+- *is_key_in* - checks if the predicate argument is present as a key in the predicate mapping
+- *is_value_in* - checks if the predicate argument is present as a value in the predicate mapping
 ```python
-predIsKeyIn = isKeyIn({"test": "1"})
+predIsKeyIn = is_key_in({"test": "1"})
 predIsKeyIn("test") 
 # Returns True, since the given string is a key in the predicate dictionary
 
 predIsKeyIn("other") 
 # Returns False, since the givem string is not a key in the predicate dictionary
 
-predIsValueIn = isValueIn({"test": "1"})
+predIsValueIn = is_value_in({"test": "1"})
 predIsValueIn("1")
 # Returns True, since the given string is a value in the predicate dictionary
 
@@ -125,33 +127,31 @@ predIsValueIn("0")
 From this version onwards, **jstreams** is switching the the following semantic versioning *YYYY.M.R*. YYYY means the release year, M means the month of the release within that year, and R means the number of release within that month. So, 2025.2.9 means the ninth release of February 2025.
 
 Version v2025.2.9 updates the *Predicate*, *PredicateWith*, *Mapper*, *MapperWith* and *Reducer* classes to be callable, so they can now be used without explicitly calling their underlying methods. This change allows predicates, mappers and reducers to be used as functions, not just in *Stream*, *Opt* and *Case* operations. v2025.2.9 also introduces a couple of new predicates:
-- hasKey - checks if a map contains a key
-- hasValue - checks if a map contains a value
-- isInInterval - checks if a value is in a closed interval, alias for *isBetweenClosed*
-- isInOpenInterval - checks if a value is in an open interval, aloas for *isBetween*
+- has_key - checks if a map contains a key
+- has_value - checks if a map contains a value
+- is_in_interval - checks if a value is in a closed interval, alias for *isBetweenClosed*
+- is_in_open_interval - checks if a value is in an open interval, aloas for *isBetween*
 - contains - checks if an Iterable contains an element (the symetrical function for *isIn*)
-- allOf - produces a new predicate that checks for a list of given predicates. Returns True if all predicates are satisfied
-- anyOf - produces a new predicate that checks for a list of given predicates. Returns True if any of the predicates are satisfied
-- noneOf - produces a new predicate that checks for a list of given predicates. Returns True if none of the predicates are satisfied
-- Not - alias of *not_*
-- NotStrict - alias of *notStrict*
+- all_of - produces a new predicate that checks for a list of given predicates. Returns True if all predicates are satisfied
+- any_of - produces a new predicate that checks for a list of given predicates. Returns True if any of the predicates are satisfied
+- none_of - produces a new predicate that checks for a list of given predicates. Returns True if none of the predicates are satisfied
 
-The *Predicate* and *PredicateWith* classes have been enriched with the *And* and *Or* methods in order to be chained with another predicate.
+The *Predicate* and *PredicateWith* classes have been enriched with the *and_* and *or_* methods in order to be chained with another predicate.
 
 ```python
 # Define a predicate
-isNonePredicate = predicateOf(isNone)
+isNonePredicate = predicate_of(isNone)
 
 # Before 2025.2.9
-isNonePredicate.Apply(None) # Returns True
-isNonePredicate.Apply("test") # Returns False
+isNonePredicate.apply(None) # Returns True
+isNonePredicate.apply("test") # Returns False
 
 # After 2025.2.9
 isNonePredicate(None) # Returns True, internally calls the *Apply* method of the predicate
 isNonePredicate("test") # Returns False
 
 # Chain predicates
-chainedPredicate = predicateOf(isNotNone).And(equals("test"))
+chainedPredicate = predicate_of(is_not_none).and_(equals("test"))
 chainedPredicate("test") # Returns True, since the parameter is not none and matches the equals predicate
 chainedPredicate(None) # Returns False, since the parameter fails the first predicate, isNotNone
 chainedPredicate("other") # Returns False, since the parameter passes the isNotNone
@@ -174,7 +174,7 @@ match("test").of(
 match("not-present").of(
     case("test", "Hurray!"),
     case("test1", "Not gonna happen"),
-    defaultCase("Should never get here!")
+    default_case("Should never get here!")
 )
 ```
 
@@ -182,23 +182,23 @@ Version 4.0.0 introduces the *Predicate*, *Mapper* and *Reducer* classes that ca
 ```python
 # Take the numbers from a stream until the third prime number is found.
 
-def isPrime(value: int) -> bool:
+def is_prime(value: int) -> bool:
     ...
 
 class TakeUntilThreePrimes(Predicate[int]):
     def __init__(self) -> None:
         self.numberOfPrimesFound = 0
 
-    def Apply(self, value: int) -> bool:
+    def apply(self, value: int) -> bool:
         if self.numberOfPrimesFound >= 3:
             return False
 
-        if isPrime(value):
+        if is_prime(value):
             self.numberOfPrimesFound += 1
         return True
 
 # Then we take a stream if ints
-Stream([3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15]).takeWhile(TakeUntilThreePrimes()).each(print)
+Stream([3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15]).take_while(TakeUntilThreePrimes()).each(print)
 # This will print 3, 4, 5, 6, 8, 9, 10, 11, then stop the stream since three prime numbers were found.
 ```
 
@@ -210,17 +210,17 @@ In version 4.0.0, the Opt class has been refactored to fall in line with the Jav
 # Old usage of orElse
 Opt(None).orElse(lambda: "test")
 # can be replaced with
-Opt(None).orElseGet(lambda: "test")
+Opt(None).or_else_get(lambda: "test")
 
 # Old usage of getOrElse
 Opt(None).getOrElse("test")
 # can be replaced with
-Opt(None).orElse("test")
+Opt(None).or_else("test")
 
 # Old usage of getOrElseGet, which was the same as orElse
 Opt(None).getOrElseGet(lambda: "test")
 # can be replaced with
-Opt(None).orElseGet(lambda: "test")
+Opt(None).or_else_get(lambda: "test")
 ```
 ## Usage
 ### Streams
@@ -241,28 +241,28 @@ print(Stream(["Test", "Best", "Lest"])
 # isNotEmpty checks if the stream is empty
 print(Stream(["Test", "Best", "Lest"])
             .filter(lambda s: s.startswith("T"))
-            .isNotEmpty())
+            .is_not_empty())
 # Will output True
 
 # Checks if all elements match a given condition
-print(Stream(["Test", "Best", "Lest"]).allMatch(lambda s: s.endswith("est")))
+print(Stream(["Test", "Best", "Lest"]).all_match(lambda s: s.endswith("est")))
 # Will output True
 
-print(Stream(["Test", "Best", "Lest"]).allMatch(lambda s: s.startswith("T")))
+print(Stream(["Test", "Best", "Lest"]).all_match(lambda s: s.startswith("T")))
 # Will output False
 
 # Checks if any element matches a given condition
-print(Stream(["Test", "Best", "Lest"]).anyMatch(lambda s: s.startswith("T")))
+print(Stream(["Test", "Best", "Lest"]).any_match(lambda s: s.startswith("T")))
 # Will output True
 
 # Checks if no elements match the given condition
-print(Stream(["Test", "Best", "Lest"]).noneMatch(lambda s: s.startswith("T")))
+print(Stream(["Test", "Best", "Lest"]).none_match(lambda s: s.startswith("T")))
 # Will output False
 
 # Gets the first value of the stream as an Opt (optional object)
 print(Stream(["Test", "Best", "Lest"])
-            .findFirst(lambda s: s.startswith("L"))
-            .getActual())
+            .find_first(lambda s: s.startswith("L"))
+            .get_actual())
 # Will output "Lest"
 
 # Returns the first element in the stream
@@ -278,18 +278,18 @@ print(Stream(["Test1", "Test2", 1, 2])
             .first())
 # Will output "Test1"
 
-# If the stream elements are Iterables, flatMap will produce a list of all contained items
-print(Stream([["a", "b"], ["c", "d"]]).flatMap(list).toList())
+# If the stream elements are Iterables, flat_map will produce a list of all contained items
+print(Stream([["a", "b"], ["c", "d"]]).flat_map(list).toList())
 # Will output ["a", "b", "c", "d"]
 
 # reduce will produce a single value, my applying the comparator function given as parameter
 # in order to decide which value is higher. The comparator function is applied on subsequent elements
 # and only the 'highest' one will be kept
-print(Stream([1, 2, 3, 4, 20, 5, 6]).reduce(max).getActual())
+print(Stream([1, 2, 3, 4, 20, 5, 6]).reduce(max).get_actual())
 # Will output 20
 
 # notNull returns a new stream containing only non null elements
-print(Stream(["A", None, "B", None, None, "C", None, None]).nonNull().toList())
+print(Stream(["A", None, "B", None, None, "C", None, None]).non_null().to_list())
 # Will output ["A", "B", "C"]
 
 ```
@@ -304,7 +304,7 @@ def collector_group_by() -> None:
             {"key": 1, "prop": "prop1", "value": "X3"},
             {"key": 1, "prop": "prop1", "value": "X4"},
         ]
-    ).collectUsing(Collectors.groupingBy(lambda x: x["prop"]))
+    ).collect_using(Collectors.grouping_by(lambda x: x["prop"]))
     # values will be equal to:
     # {
     #     "prop": [
@@ -324,8 +324,8 @@ def collector_group_by() -> None:
 from jstreams import Opt
 
 # Checks if the value given is present
-Opt(None).isPresent() # Will return False
-Opt("test").isPresent() # Will return True
+Opt(None).is_present() # Will return False
+Opt("test").is_present() # Will return True
 
 
 # There are two ways of getting the value from the Opt object. The get returns a non optional
@@ -333,78 +333,78 @@ Opt("test").isPresent() # Will return True
 # an optional object and does not raise a value error
 Opt("test").get() # Does not fail, and returns the string "test"
 Opt(None).get() # Raises ValueError since None cannot be casted to any type
-Opt(None).getActual() # Returns None, does not raise value error
+Opt(None).get_actual() # Returns None, does not raise value error
 
 # The ifPresent method will execute a lambda function if the object is present
-Opt("test").ifPresent(lambda s: print(s)) # Will print "test"
-Opt(None).ifPresent(lambda s: print(s)) # Does nothing, since the object is None
+Opt("test").if_present(lambda s: print(s)) # Will print "test"
+Opt(None).if_present(lambda s: print(s)) # Does nothing, since the object is None
 
 # The orElse method will return the value of the Opt if not None, otherwise the given parameter
-Opt("test").orElse("test1") # Will return "test", since the value is not None
-Opt(None).orElse("test1") # Will return "test1", since the value is  None
+Opt("test").or_else("test1") # Will return "test", since the value is not None
+Opt(None).or_else("test1") # Will return "test1", since the value is  None
 
 # The orElseGet method will return the value of the Opt if not None, otherwise it will execute 
 # the given function and return its value
-Opt("test").orElseGet(lambda: "test1") # Will return "test", since the value is not None
-Opt(None).orElseGet(lambda: "test1") # Will return "test1", since the value is  None
+Opt("test").or_else_get(lambda: "test1") # Will return "test", since the value is not None
+Opt(None).or_else_get(lambda: "test1") # Will return "test1", since the value is  None
 
 # stream will convert the object into a stream.
 Opt("test").stream() # Is equivalent with Stream(["test"])
 Opt(["test"]).stream() # Is equivalent with Stream([["test"]]). Notice the list stacking
 
-# flatStream will convert the object into a stream, with the advantage that it can
+# flat_stream will convert the object into a stream, with the advantage that it can
 # detect whether the object is a list and avoids stacking lists of lists.
-Opt("test").flatStream() # Is equivalent with Stream(["test"])
-Opt(["test", "test1", "test2"]).flatStream() # Is equivalent with Stream(["test", "test1", "test2"])
+Opt("test").flat_stream() # Is equivalent with Stream(["test"])
+Opt(["test", "test1", "test2"]).flat_stream() # Is equivalent with Stream(["test", "test1", "test2"])
 
 ```
 
 ### Predicates
 Predicates are functions and function wrappers that can be used to filter streams and optionals. **jstreams** contains a comprehensive list of predefined predicates. The names are pretty self explanatory. Here are some of the predicates included:
-- isTrue
-- isFalse
-- isNone
-- isNotNone
-- isIn
-- isNotIn
+- is_true
+- is_false
+- is_none
+- is_not_none
+- is_in
+- is_not_in
 - equals
-- isBlank
+- is_blank
 - default
-- allNone
-- allNotNone
-- strContains
-- strContainsIgnoreCase
-- strStartsWith
-- strStartsWithIgnoreCase
-- strEndsWith
-- strEndsWithIgnoreCase
-- strMatches
-- strNotMatches
-- strLongerThan
-- strShorterThan
-- strLongerThanOrEqual
-- strShorterThanOrEqual
-- equalsIgnoreCase
-- isEven
-- isOdd
-- isPositive
-- isNegative
-- isZero
-- isInt
-- isBeween
-- isBeweenClosed
-- isBeweenClosedStart
-- isBeweenClosedEnd
+- all_none
+- all_not_none
+- str_contains
+- str_contains_ignore_case
+- str_starts_with
+- str_starts_with_ignore_case
+- str_ends_with
+- str_ends_with_ignore_case
+- str_matches
+- str_not_matches
+- str_longer_than
+- str_shorter_than
+- str_longer_than_or_eq
+- str_shorter_than_or_eq
+- equals_ignore_case
+- is_even
+- is_odd
+- is_positive
+- is_negative
+- is_zero
+- is_int
+- is_beween
+- is_beween_closed
+- is_beween_closed_start
+- is_beween_closed_end
 - not_
-- notStrict
-- hasKey
-- hasValue
-- isInInterval
-- isInOpenInterval
+- not_strict
+- has_key
+- has_value
+- is_in_interval
+- is_in_open_interval
 - contains
-- anyOf
-- allOf
-- noneOf
+- any_of
+- all_of
+- none_of
 
 The predicates provided fall into one of two categories:
 - functions - can be applied directly to a value
@@ -412,29 +412,29 @@ The predicates provided fall into one of two categories:
 
 Examples:
 ```python
-from jstreams import isBlank, isNotBlank, isZero, isBetween, not_
+from jstreams import is_blank, is_not_blank, is_zero, is_between, not_
 
 # functions
-isBlank("test") # returns False
-isZero(0) # returns True
+is_blank("test") # returns False
+is_zero(0) # returns True
 
 # function wrappers
-isBetween(1,10)(5) # First call generates the wraper, that can then be used for the value comparison
+is_between(1,10)(5) # First call generates the wraper, that can then be used for the value comparison
 # reusing a function wrapper
-isBetween1And10 = isBetween(1, 10)
+isBetween1And10 = is_between(1, 10)
 isBetween1And10(5) # Returns True
 isBetween1And10(20) # Returns False
 
-not_(isBlank)("test") # Returns True. The not_ predicate negates the given predicate, in this case isBlank, then applies it to the given value "test"
+not_(is_blank)("test") # Returns True. The not_ predicate negates the given predicate, in this case isBlank, then applies it to the given value "test"
 
 # Usage with Opt and Stream
-Stream([2, 4, 5, 20, 40]).filter(isBetween(0, 10)).toList() # Results in [2, 4, 5], since the rest of the items are filtered out
+Stream([2, 4, 5, 20, 40]).filter(is_between(0, 10)).to_list() # Results in [2, 4, 5], since the rest of the items are filtered out
 # Usage of not with Opt and Stream
-Stream(["", "", "", "test"]).filter(not_(isBlank)).toList() # Results in ["test"] since the rest of the items are blank
+Stream(["", "", "", "test"]).filter(not_(is_blank)).to_list() # Results in ["test"] since the rest of the items are blank
 # this is equivalent to 
-Stream(["", "", "", "test"]).filter(isNotBlank).toList() # isNotBlank is another predefined predicate that uses not_(isBlank) in its actual implementation
+Stream(["", "", "", "test"]).filter(is_not_blank).to_list() # isNotBlank is another predefined predicate that uses not_(isBlank) in its actual implementation
 # Check if a stream contains the value 0
-Stream([1, 2, 4, 0, 5]).anyMatch(isZero) # Returns True, since 0 exists in the stream
+Stream([1, 2, 4, 0, 5]).any_match(is_zero) # Returns True, since 0 exists in the stream
 ```
 
 
@@ -449,13 +449,13 @@ def returnStr() -> str:
     return "test"
 
 # It is important to call the get method, as this method actually triggers the entire chain
-Try(throwErr).onFailure(lambda e: print(e)).get() # The onFailure is called
+Try(throwErr).on_failure(lambda e: print(e)).get() # The onFailure is called
 
-Try(returnStr).andThen(lambda s: print(s)).get() # Will print out "test"
+Try(returnStr).and_then(lambda s: print(s)).get() # Will print out "test"
 
 # The of method can actually be used as a method to inject a value into a Try without
 # actually calling a method or lambda
-Try.of("test").andThen(lambda s: print(s)).get() # Will print out "test"
+Try.of("test").and_then(lambda s: print(s)).get() # Will print out "test"
 ```
 
 ### ReactiveX
@@ -503,7 +503,7 @@ from jstreams import BehaviorSubject
 
 # Initialize the subject with a default value
 subject = BehaviorSubject("A")
-subject.onNext("B")
+subject.on_next("B")
 
 # Will print out "B" as this is the current value stored in the Subject
 subject.subscribe(
@@ -512,7 +512,7 @@ subject.subscribe(
 
 # Will print out "C" as this is the next value stored in the Subject,
 # any new subscription at this point will receive "C"
-subject.onNext("C")
+subject.on_next("C")
 
 # For long lived subjects and observables, it is wise to call the
 # dispose method so that all subscriptions can be cleared and no
@@ -536,7 +536,7 @@ subject.subscribe(
 
 # Will print out "C" as this is the next value sent tothe Subject.
 # Any new subscription after this call not receive a value
-subject.onNext("C")
+subject.on_next("C")
 
 # No value is sent to the subscriber, so nothing to print
 subject.subscribe(
@@ -565,7 +565,7 @@ subject.subscribe(
 
 # Will print out "D" as this is the next value added in the Subject,
 # any new subscription at this point will receive "A", then "B", then "C", then "D"
-subject.onNext("D")
+subject.on_next("D")
 
 # For long lived subjects and observables, it is wise to call the
 # dispose method so that all subscriptions can be cleared and no
@@ -577,26 +577,26 @@ subject.dispose()
 #### Operators
 **jstreams** provides a couple of operators, with more operators in the works.
 The current operators are:
-- *map* - converts a value to a different form or type
-- *filter* - blocks or allows a value to be passed to the subscribers
-- *reduce* - causes the observable to emit a single value produced by the reducer function.
-- *take* - takes a number of values and ignores the rest
-- *takeWhile* - takes values as long as they match the given predicate. Once a value is detected that does not match, no more values will be passing through
-- *takeUntil* - takes values until the first value is found matching the given predicate. Once a value is detected that does not match, no more values will be passing through
-- *drop* - blocks a number of values and allows the rest to pass through
-- *dropWhile* - blocks values that match a given predicate. Once the first value is found not matching, all remaining values are allowed through
-- *dropUntil* - blocks values until the first value that matches a given predicate. Once the first value is found matching, all remaining values are allowed through
+- *rx_map* - converts a value to a different form or type
+- *rx_filter* - blocks or allows a value to be passed to the subscribers
+- *rx_reduce* - causes the observable to emit a single value produced by the reducer function.
+- *rx_take* - takes a number of values and ignores the rest
+- *rx_take_while* - takes values as long as they match the given predicate. Once a value is detected that does not match, no more values will be passing through
+- *rx_take_until* - takes values until the first value is found matching the given predicate. Once a value is detected that does not match, no more values will be passing through
+- *rx_drop* - blocks a number of values and allows the rest to pass through
+- *rx_drop_while* - blocks values that match a given predicate. Once the first value is found not matching, all remaining values are allowed through
+- *rx_drop_until* - blocks values until the first value that matches a given predicate. Once the first value is found matching, all remaining values are allowed through
 
-##### Map - rxMap
+##### Map - rx_map
 ```python
-from jstreams import ReplaySubject, rxMap
+from jstreams import ReplaySubject, rx_map
 
 # Initialize the subject with a default value
 subject = ReplaySubject(["A", "BB", "CCC"])
 # Create an operators pipe
 pipe = subject.pipe(
     # Map the strings to their length
-    rxMap(lambda s: len(s))
+    rx_map(lambda s: len(s))
 )
 # Will print out 1, 2, 3, the lengths of the replay values
 pipe.subscribe(
@@ -604,16 +604,16 @@ pipe.subscribe(
 )
 ```
 
-##### Filter - rxFilter
+##### Filter - rx_filter
 ```python
-from jstreams import ReplaySubject, rxFilter
+from jstreams import ReplaySubject, rx_filter
 
 # Initialize the subject with a default value
 subject = ReplaySubject(["A", "BB", "CCC"])
 # Create an operators pipe
 pipe = subject.pipe(
     # Filters the values for length higher than 2
-    rxFilter(lambda s: len(s) > 2)
+    rx_filter(lambda s: len(s) > 2)
 )
 # Will print out "CCC", as this is the only string with a length higher than 2
 pipe.subscribe(
@@ -621,16 +621,16 @@ pipe.subscribe(
 )
 ```
 
-##### Reduce - rxReduce
+##### Reduce - rx_reduce
 ```python
-from jstreams import ReplaySubject, rxReduce
+from jstreams import ReplaySubject, rx_reduce
 
 # Initialize the subject with a default value
 subject = ReplaySubject([1, 20, 3, 12])
 # Create an operators pipe
 pipe = subject.pipe(
     # Reduce the value to max
-    rxReduce(max)
+    rx_reduce(max)
 )
 # Will print out 1, then 20 since 1 is the first value, then 20, as the maximum between 
 # the previous max (1) and the next value (20)
@@ -638,13 +638,13 @@ pipe.subscribe(
     lambda v: print(v)
 )
 ```
-##### Take - rxTake
+##### Take - rx_take
 ```python
-from jstreams import ReplaySubject, rxTake
+from jstreams import ReplaySubject, rx_take
 
 subject = ReplaySubject([1, 7, 20, 5, 100, 40])
 pipe1 = subject.pipe(
-    rxTake(int, 3)
+    rx_take(int, 3)
 )
 # Will print out the first 3 elements, 1, 7 and 20
 pipe1.subscribe(
@@ -654,13 +654,13 @@ pipe1.subscribe(
 subject.onNext(9)
 ```
 
-##### TakeWhile - rxTakeWhile
+##### TakeWhile - rx_take_while
 ```python
-from jstreams import ReplaySubject, rxTakeWhile
+from jstreams import ReplaySubject, rx_take_while
 
 subject = ReplaySubject([1, 7, 20, 5, 100, 40])
 pipe1 = subject.pipe(
-    rxTakeWhile(lambda v: v < 10)
+    rx_take_while(lambda v: v < 10)
 )
 # Will print out 1, 7, since 20 is higher than 10
 pipe1.subscribe(
@@ -670,83 +670,83 @@ pipe1.subscribe(
 subject.onNext(9)
 ```
 
-##### TakeUntil - rxTakeUntil
+##### TakeUntil - rx_take_until
 ```python
-from jstreams import ReplaySubject, rxTakeUntil
+from jstreams import ReplaySubject, rx_take_until
 
 subject = ReplaySubject([1, 7, 20, 5, 100, 40])
 pipe1 = subject.pipe(
-    rxTakeUntil(lambda v: v > 10)
+    rx_take_until(lambda v: v > 10)
 )
 # Will print out 1, 7, since 20 is higher than 10, which is our until condition
 pipe1.subscribe(
     lambda v: print(v)
 )
 # Won't print anything since the until condition has already been reached
-subject.onNext(9)
+subject.on_next(9)
 ```
 
-##### Drop - rxDrop
+##### Drop - rx_drop
 ```python
-from jstreams import ReplaySubject, rxDrop
+from jstreams import ReplaySubject, rx_drop
 
 subject = ReplaySubject([1, 7, 20, 5, 100, 40])
 self.val = []
 pipe1 = subject.pipe(
-    rxDrop(int, 3)
+    rx_drop(int, 3)
 )
 # Will print out 5, 100, 50, skipping the first 3 values
 pipe1.subscribe(
     lambda v: print(v)
 )
 # Will print out 9, since it already skipped the first 3 values
-subject.onNext(9)
+subject.on_next(9)
 ```
 
-##### DropWhile - rxDropWhile
+##### DropWhile - rx_drop_while
 ```python
-from jstreams import ReplaySubject, rxDropWhile
+from jstreams import ReplaySubject, rx_drop_while
 
 subject = ReplaySubject([1, 7, 20, 5, 100, 40])
 self.val = []
 pipe1 = subject.pipe(
-    rxDropWhile(lambda v: v < 100)
+    rx_drop_while(lambda v: v < 100)
 )
 # Will print 100, 40, since the first items that are less than 100 are dropped
 pipe1.subscribe(lambda v: print(v))
 # Will 9, since the first items that are less than 100 are dropped, and 9 appears after the drop while condition is fulfilled
-subject.onNext(9)
+subject.on_next(9)
 ```
 
-##### DropUntil - rxDropUntil
+##### DropUntil - rx_drop_until
 ```python
-from jstreams import ReplaySubject, rxDropWhile
+from jstreams import ReplaySubject, rx_drop_until
 
 subject = ReplaySubject([1, 7, 20, 5, 100, 40])
 self.val = []
 pipe1 = subject.pipe(
-    rxDropUntil(lambda v: v > 20)
+    rx_drop_until(lambda v: v > 20)
 )
 # Will print out 100, 40, skipping the rest of the values until the first one 
 # that fulfills the condition appears
 pipe1.subscribe(self.addVal)
 # Will print out 9, since the condition is already fulfilled and all remaining values will
 # flow through
-subject.onNext(9)
+subject.on_next(9)
 ```
 
 ##### Combining operators
 ```python
-from jstreams import ReplaySubject, rxReduce, rxFilter
+from jstreams import ReplaySubject, rx_reduce, rx_filter
 
 # Initialize the subject with a default value
 subject = ReplaySubject([1, 7, 11, 20, 3, 12])
 # Create an operators pipe
 pipe = subject.pipe(
     # Filters only the values higher than 10
-    rxFilter(lambda v: v > 10)
+    rx_filter(lambda v: v > 10)
     # Reduce the value to max
-    rxReduce(max)
+    rx_reduce(max)
 )
 # Will print out 11, then 20 since 11 is the first value found higher than 10, then 20, as the maximum between the previous max (11) and the next value (20)
 pipe.subscribe(
@@ -761,10 +761,9 @@ subject = ReplaySubject(range(1, 100))
 val = []
 val2 = []
 chainedPipe = subject.pipe(
-                rxTakeUntil(lambda e: e > 20)
-            )
-            .pipe(
-                rxFilter(lambda e: e < 10)
+                rx_take_until(lambda e: e > 20)
+            ).pipe(
+                rx_filter(lambda e: e < 10)
             )
 # val will contain 0..9
 chainedPipe.subscribe(val.append)
@@ -866,7 +865,7 @@ from mypackage import MyClass, MyOtherClass
 injector().provide(MyClass, MyClass())
 
 # Providing multiple dependecies
-injector().provideDependencies({
+injector().provide_dependencies({
     MyClass: MyClass(),
     MyOtherClass: MyOtherClass(),
 })
@@ -939,7 +938,7 @@ class Interface(abc.ABC):
 
 **service.py**
 ```python
-@component(className=Interface)
+@component(class_name=Interface)
 class Service(Interface):
     def doSomething(self) -> None:
         print("Something got done")
@@ -947,7 +946,7 @@ class Service(Interface):
 
 **main.py**
 ```python
-injector().scanModules(["service"]) # Provide fully qualified name for the module
+injector().scan_modules(["service"]) # Provide fully qualified name for the module
 injector().get(Interface).doSomething() # Wil print out 'Something got done'
 ```
 
@@ -985,8 +984,8 @@ class ProdConfiguration:
 **dev.py**
 ```python
 # This would be the development launcher of your application
-injector().scanModules(["configuration_dev"]) # Inform the container where to load the configuration from
-injector().activateProfile("dev")
+injector().scan_modules(["configuration_dev"]) # Inform the container where to load the configuration from
+injector().activate_profile("dev")
 apiConfiguration = inject(APIConfiguration)
 print(apiConfiguration.apiHost) # Will print out 'dev.host.api'
 ```
@@ -994,8 +993,8 @@ print(apiConfiguration.apiHost) # Will print out 'dev.host.api'
 **main.py**
 ```python
 # This would be the production launcher of your application
-injector().scanModules(["configuration_prod"]) # Inform the container where to load the configuration from
-injector().activateProfile("prod")
+injector().scan_modules(["configuration_prod"]) # Inform the container where to load the configuration from
+injector().activate_profile("prod")
 apiConfiguration = inject(APIConfiguration)
 print(apiConfiguration.apiHost) # Will print out 'prod.host.api'
 ```
@@ -1019,12 +1018,12 @@ myClass = injector().find(MyClass, "qualifiedName")
 myClassDifferentInstance = injector().find(MyClass, "differentName")
 
 # Using defaults. This method will try to resolve the object for MyNotCalledClass, and if no object is found, the builder function provider will be called and its return value returned and used by the container for the given class.
-myNotCalledObject = injector().findOr(MyNotCalledClass, lambda: MyNotCalledClass())
+myNotCalledObject = injector().find_or(MyNotCalledClass, lambda: MyNotCalledClass())
 ```
 
 # Retrieving dependencies using @autowired and @autowiredOptional decorators
 ```python
-from jstreams import autowired, autowiredOptional, returnAutowired, returnAutowiredOptional
+from jstreams import autowired, autowired_optional, return_autowired, return_autowired_optional
 
 injector().provide(MyClass, MyClass())
 
@@ -1032,13 +1031,13 @@ injector().provide(MyClass, MyClass())
 def getMyClass() -> MyClass:
     # This method does not have to return anything, but for
     # strict typechecking, we need to use this masking method
-    return returnAutowired(MyClass)
+    return return_autowired(MyClass)
 
-@autowiredOptional(MyClass)
+@autowired_optional(MyClass)
 def getMyClass() -> Optional[MyClass]:
     # This method does not have to return anything, but for
     # strict typechecking, we need to use this masking method
-    return returnAutowiredOptional(MyClass)
+    return return_autowired_optional(MyClass)
 
 print(getMyClass()) # Will print out the injected class string representation
 ```
@@ -1048,23 +1047,23 @@ print(getMyClass()) # Will print out the injected class string representation
 from jstreams import injector
 
 # Provide a single variable of type string
-injector().provideVar(str, "myString", "myStringValue")
+injector().provide_var(str, "myString", "myStringValue")
 
 # Provide a single variable of type int
-injector().provideVar(int, "myInt", 7)
+injector().provide_var(int, "myInt", 7)
 
 # Provide multiple variables
-injector().provideVariables([
+injector().provide_variables([
     (str, "myString", "myStringValue"),
     (int, "myInt", 7),
 ])
 
 # Retrieving a variable value using get. This method will raise a ValueError if no object was provided for the variable class and the given name
-myString = injector().getVar(str, "myString")
+myString = injector().get_var(str, "myString")
 # retrieving another value using find. This method returns an Optional and does not raise a ValueError. The missing value needs to be handled by the caller
-myInt = injector().findVar(int, "myInt")
+myInt = injector().find_var(int, "myInt")
 # retrieving a value with a default fallback if the value is not present
-myString = injector().findVarOr(str, "myStrint", "defaultValue")
+myString = injector().find_var_or(str, "myStrint", "defaultValue")
 ```
 Qualified dependencies can also be injected by using the `component` decorator:
 You can also use qualifiers with the `component` decorator:
@@ -1082,7 +1081,7 @@ injector().get(ServiceInterface, "service")
 ##### Attribute injection
 Attributes can be injected by providing the dependency classes or variable definitions.
 ```python
-@resoveDependencies({
+@resove_dependencies({
     "myAttribute": AttributeClassName
 })
 class MyDependentComponent:
@@ -1095,13 +1094,13 @@ myDepComp = MyDependentComponent() # The dependency gets injected when the const
 myDepComp.myAttribute # Will have the value provided
 
 
-@resolveVariables({
+@resolve_variables({
     "myVariable": StrVariable("myVar"), # Type agnostic syntax: Variable(str, "myVar")
 })
 class MyVariableNeededComponent:
     myVariable: str
 
-injector().provideVar(str, "myVariable", "myVariableValue")
+injector().provide_var(str, "myVariable", "myVariableValue")
 
 myVarNeededComp = MyVariableNeededComponent() # Value gets injected when the constructor is called
 print(myVarNeededComp.myVariable) # Will print out 'myVariableValue'
@@ -1116,7 +1115,7 @@ Arguments can be injected to functions, methods and class constructors.
 injector().provide(str, "test")
 injector().provide(int, 10)
 
-@injectArgs({"a": str, "b": int})
+@inject_args({"a": str, "b": int})
 def fn(a: str, b: int) -> None:
     print(a + str(b))
 
@@ -1127,7 +1126,7 @@ fn(a="other") # Will print out "other10" as only the argument 'a' is overriden. 
 
 # 2. To constructors
 class TestArgInjection:
-    @injectArgs({"a": str, "b": int})
+    @inject_args({"a": str, "b": int})
     def __init__(self, a: str, b: int) -> None:
         self.a = a
         self.b = b
@@ -1141,7 +1140,7 @@ TestArgInjection("other", 5).print() # Will print out "other5" as all args are o
 
 ```
 #### Injected dependecies
-Injected dependecies can be used when the needed dependencies are not present in the container ahead of time (this is also possible now with *resovleDependencies* and *resolveVariables*). For example, you can create a class that requires a dependency even if the dependency is not yet present, provide the dependency later on, then use it in the class you've initialized.
+Injected dependecies can be used when the needed dependencies are not present in the container ahead of time (this is also possible now with *resovle_dependencies* and *resolve_variables*). For example, you can create a class that requires a dependency even if the dependency is not yet present, provide the dependency later on, then use it in the class you've initialized.
 
 Injected dependencies are available through 3 classes:
 - InjectedDependency
@@ -1171,13 +1170,13 @@ class Test2:
     pass
 
 # Both Test1 and Test2 components will be available when selecting "profileA"
-injector().activateProfile("profileA")
+injector().activate_profile("profileA")
 
 # Only Test1 component will be available when selecting "profileB"
-injector().activateProfile("profileB")
+injector().activate_profile("profileB")
 
 # Only Test2 component will be available when selecting "profileC"
-injector().activateProfile("profileC")
+injector().activate_profile("profileC")
 
 # You can also provide the profiles to the "provide" and "provideDependencies" methods
 # this example uses a lambda to provide the component, so that the component is not created
@@ -1191,12 +1190,12 @@ class LoggerInterface(abc.ABC):
     def log(operation: str) -> None:
         pass
 
-@component(className=LoggerInterface, profiles=["console"])
+@component(class_name=LoggerInterface, profiles=["console"])
 class ConsoleLogger(LoggerInterface):
     def log(operation: str) -> None:
         print(operation)
 
-@component(className=LoggerInterface, profiles=["file"])
+@component(class_name=LoggerInterface, profiles=["file"])
 class FileLogger(LoggerInterface):
     fileName = "logfile"
     def log(operation: str) -> None:
@@ -1204,13 +1203,13 @@ class FileLogger(LoggerInterface):
             file.write(operation)
 
 # activate console profile
-injector().activateProfile("console")
+injector().activate_profile("console")
 inject(LoggerInterface).log("test") # Will print out to console, as the console profile activation will inject the ConsoleLogger class
 
 # or
 
 # activate file profile
-injector().activateProfile("file")
+injector().activate_profile("file")
 inject(LoggerInterface).log("test") # Will write the content to the "logfile" file, as the file profile activation will inject the FileLogger class
 
 ```
@@ -1311,10 +1310,10 @@ jstreams also provides some helper functions to simplify the usage of timers in 
 from jstreams import setTimer, setInterval, clear
 
 # Starts a timer for 5 seconds
-setTimer(5, lambda: print("Timer done"))
+set_timer(5, lambda: print("Timer done"))
 
 # Starts an interval at 5 seconds
-setInterval(5, lambda: print("Interval executed"))
+set_interval(5, lambda: print("Interval executed"))
 
 # Starts another timer for 10 seconds
 timer = setTimer(10, lambda: print("Second timer done"))
@@ -1324,7 +1323,7 @@ sleep(5)
 clear(timer)
 
 # Starts another interval at 2 seconds
-interval = setInterval(2, lambda: print("Second interval executed"))
+interval = set_interval(2, lambda: print("Second interval executed"))
 # Allow the interval to execute for 10 seconds
 sleep(10)
 # Cancel the interval. This interval will stop executing the callback
@@ -1341,7 +1340,7 @@ The State management API aims to provide sharing data between your application's
 STATE_KEY = "myState"
 
 # Simple synchronous usage, provide a state key, and the default value
-(getState, setState) = useState(STATE_KEY, "initial")
+(getState, setState) = use_state(STATE_KEY, "initial")
 
 print(getState()) # Prints out "initial", as there have been no changes to the state
 
@@ -1350,16 +1349,16 @@ setState("updated")
 print(getState()) # Prints out "updated"
 
 # Asynchronous usage
-(getAsyncState, setAsyncState) = useAsyncState(STATE_KEY, "initial")
+(getAsyncState, setAsyncState) = use_async_state(STATE_KEY, "initial")
 print(getAsyncState()) # Will print out "updated" since that is the state's current value
 
 # You can also provide an onChange callback to the state.
-# The difference between useState and useAsyncState is that the onChange callbacks
-# will be called in a synchronous manner (in order of subscription) for the useState
-# while the useAsyncState provided callbacks will be called from separate threads.
+# The difference between use_state and use_async_state is that the onChange callbacks
+# will be called in a synchronous manner (in order of subscription) for the use_state
+# while the use_async_state provided callbacks will be called from separate threads.
 # This behavior aims to avoid waiting to a callback that may do intensive processing
 # and unlock the other callbacks as soon as possible
-(getAsyncStateCB, setAsyncStateCB) = useAsyncState(
+(getAsyncStateCB, setAsyncStateCB) = use_async_state(
     STATE_KEY, 
     "initial", 
     lambda newState, oldState: print("New state is '" + str(newState) + "' old state is '" + str(oldState) + "'")

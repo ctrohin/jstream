@@ -7,7 +7,7 @@ from typing import Any, Callable, Generic, Optional, TypeVar, Union, cast
 
 from jstreams.noop import NoOp, NoOpCls
 from jstreams.stream import Opt, Stream
-from jstreams.utils import isCallable, requireNotNull
+from jstreams.utils import is_callable, require_non_null
 
 
 class Strategy(Enum):
@@ -23,13 +23,13 @@ class Dependency:
         self.__qualifier = qualifier
         self._isOptional = False
 
-    def getType(self) -> type:
+    def get_type(self) -> type:
         return self.__typ
 
-    def getQualifier(self) -> Optional[str]:
+    def get_qualifier(self) -> Optional[str]:
         return self.__qualifier
 
-    def isOptional(self) -> bool:
+    def is_optional(self) -> bool:
         return self._isOptional
 
 
@@ -40,51 +40,51 @@ class OptionalDependency(Dependency):
 
 
 class Variable:
-    __slots__ = ("__typ", "__key", "__isOptional")
+    __slots__ = ("__typ", "__key", "__is_optional")
 
     def __init__(self, typ: type, key: str, isOptional: bool = False) -> None:
         self.__typ = typ
         self.__key = key
-        self.__isOptional = isOptional
+        self.__is_optional = isOptional
 
-    def getType(self) -> type:
+    def get_type(self) -> type:
         return self.__typ
 
-    def getKey(self) -> str:
+    def get_key(self) -> str:
         return self.__key
 
-    def isOptional(self) -> bool:
-        return self.__isOptional
+    def is_optional(self) -> bool:
+        return self.__is_optional
 
 
 class StrVariable(Variable):
-    def __init__(self, key: str, isOptional: bool = False) -> None:
-        super().__init__(str, key, isOptional)
+    def __init__(self, key: str, is_optional: bool = False) -> None:
+        super().__init__(str, key, is_optional)
 
 
 class IntVariable(Variable):
-    def __init__(self, key: str, isOptional: bool = False) -> None:
-        super().__init__(int, key, isOptional)
+    def __init__(self, key: str, is_optional: bool = False) -> None:
+        super().__init__(int, key, is_optional)
 
 
 class FloatVariable(Variable):
-    def __init__(self, key: str, isOptional: bool = False) -> None:
-        super().__init__(float, key, isOptional)
+    def __init__(self, key: str, is_optional: bool = False) -> None:
+        super().__init__(float, key, is_optional)
 
 
 class ListVariable(Variable):
-    def __init__(self, key: str, isOptional: bool = False) -> None:
-        super().__init__(list, key, isOptional)
+    def __init__(self, key: str, is_optional: bool = False) -> None:
+        super().__init__(list, key, is_optional)
 
 
 class DictVariable(Variable):
-    def __init__(self, key: str, isOptional: bool = False) -> None:
-        super().__init__(dict, key, isOptional)
+    def __init__(self, key: str, is_optional: bool = False) -> None:
+        super().__init__(dict, key, is_optional)
 
 
 class SetVariable(Variable):
-    def __init__(self, key: str, isOptional: bool = False) -> None:
-        super().__init__(set, key, isOptional)
+    def __init__(self, key: str, is_optional: bool = False) -> None:
+        super().__init__(set, key, is_optional)
 
 
 class AutoStart:
@@ -110,18 +110,18 @@ class AutoInit:
 
 
 class _ContainerDependency:
-    __slots__ = ("qualifiedDependencies", "lock")
+    __slots__ = ("qualified_dependencies", "lock")
 
     def __init__(self) -> None:
-        self.qualifiedDependencies: dict[str, Any] = {}
+        self.qualified_dependencies: dict[str, Any] = {}
         self.lock = RLock()
 
 
 class _VariableDependency:
-    __slots__ = ("qualifiedVariables", "lock")
+    __slots__ = ("qualified_variables", "lock")
 
     def __init__(self) -> None:
-        self.qualifiedVariables: dict[str, Any] = {}
+        self.qualified_variables: dict[str, Any] = {}
 
 
 T = TypeVar("T")
@@ -129,47 +129,47 @@ T = TypeVar("T")
 
 class _Injector:
     instance: Optional["_Injector"] = None
-    instanceLock: Lock = Lock()
-    provideLock: Lock = Lock()
-    loadModulesLock: Lock = Lock()
+    instance_lock: Lock = Lock()
+    provide_lock: Lock = Lock()
+    load_modules_lock: Lock = Lock()
 
     def __init__(self) -> None:
         self.__components: dict[type, _ContainerDependency] = {}
         self.__variables: dict[type, _VariableDependency] = {}
-        self.__defaultQualifier: str = "".join(
+        self.__default_qualifier: str = "".join(
             choice(digits + ascii_letters) for i in range(64)
         )
-        self.__defaultProfile = "".join(
+        self.__default_profile = "".join(
             choice(digits + ascii_letters) for i in range(16)
         )
         self.__profile: Optional[str] = None
-        self.__modulesToScan: list[str] = []
-        self.__modulesScanned = False
-        self.__raiseBeansError = False
+        self.__modules_to_scan: list[str] = []
+        self.__modules_scanned = False
+        self.__raise_beans_error = False
 
-    def scanModules(self, modulesToScan: list[str]) -> "_Injector":
-        self.__modulesToScan = modulesToScan
+    def scan_modules(self, modules_to_scan: list[str]) -> "_Injector":
+        self.__modules_to_scan = modules_to_scan
         return self
 
-    def __retrieveComponents(self) -> None:
-        if self.__modulesScanned:
+    def __retrieve_components(self) -> None:
+        if self.__modules_scanned:
             return
-        with self.loadModulesLock:
-            if self.__modulesScanned:
+        with self.load_modules_lock:
+            if self.__modules_scanned:
                 return
-            self.__modulesScanned = True
-            for module in self.__modulesToScan:
+            self.__modules_scanned = True
+            for module in self.__modules_to_scan:
                 importlib.import_module(module)
 
-    def __getProfileStr(self) -> str:
+    def __get_profile_str(self) -> str:
         if self.__profile is None:
-            return self.__defaultProfile
+            return self.__default_profile
         return self.__profile
 
-    def __computeProfile(self, profile: Optional[str]) -> str:
-        return profile if profile is not None else self.__defaultProfile
+    def __compute_profile(self, profile: Optional[str]) -> str:
+        return profile if profile is not None else self.__default_profile
 
-    def activateProfile(self, profile: str) -> None:
+    def activate_profile(self, profile: str) -> None:
         """
         Activates the given injection profile.
         Only components that use the given profile or no profile will be available once a profile is activated.
@@ -184,15 +184,15 @@ class _Injector:
             raise ValueError(f"Profile ${self.__profile} is already active")
         self.__profile = profile
 
-    def getActiveProfile(self) -> Optional[str]:
+    def get_active_profile(self) -> Optional[str]:
         return self.__profile
 
-    def raiseBeanErrors(self, raiseBeanErrors: bool) -> "_Injector":
-        self.__raiseBeansError = raiseBeanErrors
+    def raise_bean_errors(self, raiseBeanErrors: bool) -> "_Injector":
+        self.__raise_beans_error = raiseBeanErrors
         return self
 
-    def handleBeanError(self, message: str) -> None:
-        if self.__raiseBeansError:
+    def handle_bean_error(self, message: str) -> None:
+        if self.__raise_beans_error:
             raise TypeError(message)
         print(message)
 
@@ -200,112 +200,114 @@ class _Injector:
         self.__components = {}
         self.__variables = {}
         self.__profile = None
-        self.__modulesScanned = False
-        self.__modulesToScan = []
+        self.__modules_scanned = False
+        self.__modules_to_scan = []
 
-    def get(self, className: type[T], qualifier: Optional[str] = None) -> T:
-        if (foundObj := self.find(className, qualifier)) is None:
-            raise ValueError("No object found for class " + str(className))
+    def get(self, class_name: type[T], qualifier: Optional[str] = None) -> T:
+        if (foundObj := self.find(class_name, qualifier)) is None:
+            raise ValueError("No object found for class " + str(class_name))
         return foundObj
 
-    def getVar(self, className: type[T], qualifier: str) -> T:
-        if (foundVar := self.findVar(className, qualifier)) is None:
+    def get_var(self, class_name: type[T], qualifier: str) -> T:
+        if (found_var := self.find_var(class_name, qualifier)) is None:
             raise ValueError(
                 "No variable found for class "
-                + str(className)
+                + str(class_name)
                 + " and qualifier "
                 + qualifier
             )
-        return foundVar
+        return found_var
 
-    def findVar(self, className: type[T], qualifier: str) -> Optional[T]:
-        foundVar = self._getVar(className, qualifier)
-        if foundVar is None:
-            foundVar = self._getVar(
-                className,
-                self.__getComponentKeyWithProfile(
-                    qualifier or self.__defaultQualifier, self.__defaultProfile
+    def find_var(self, class_name: type[T], qualifier: str) -> Optional[T]:
+        found_var = self._get_var(class_name, qualifier)
+        if found_var is None:
+            found_var = self._get_var(
+                class_name,
+                self.__get_component_key_with_profile(
+                    qualifier or self.__default_qualifier, self.__default_profile
                 ),
                 True,
             )
 
-        return foundVar if foundVar is None else cast(T, foundVar)
+        return found_var if found_var is None else cast(T, found_var)
 
-    def findVarOr(self, className: type[T], qualifier: str, orVal: T) -> Optional[T]:
-        foundVar = self.findVar(className, qualifier)
-        return orVal if foundVar is None else foundVar
+    def find_var_or(
+        self, class_name: type[T], qualifier: str, or_val: T
+    ) -> Optional[T]:
+        found_var = self.find_var(class_name, qualifier)
+        return or_val if found_var is None else found_var
 
-    def find(self, className: type[T], qualifier: Optional[str] = None) -> Optional[T]:
+    def find(self, class_name: type[T], qualifier: Optional[str] = None) -> Optional[T]:
         # Try to get the dependency using the active profile
-        foundObj = self._get(className, qualifier)
-        if foundObj is None:
+        found_obj = self._get(class_name, qualifier)
+        if found_obj is None:
             # or get it for the default profile
-            foundObj = self._get(
-                className,
-                self.__getComponentKeyWithProfile(
-                    qualifier or self.__defaultQualifier, self.__defaultProfile
+            found_obj = self._get(
+                class_name,
+                self.__get_component_key_with_profile(
+                    qualifier or self.__default_qualifier, self.__default_profile
                 ),
                 True,
             )
-        return foundObj if foundObj is None else cast(T, foundObj)
+        return found_obj if found_obj is None else cast(T, found_obj)
 
-    def findOr(
+    def find_or(
         self,
-        className: type[T],
-        orCall: Callable[[], T],
+        class_name: type[T],
+        or_call: Callable[[], T],
         qualifier: Optional[str] = None,
     ) -> T:
-        foundObj = self.find(className, qualifier)
-        return orCall() if foundObj is None else foundObj
+        found_obj = self.find(class_name, qualifier)
+        return or_call() if found_obj is None else found_obj
 
-    def findNoOp(
-        self, className: type[T], qualifier: Optional[str] = None
+    def find_noop(
+        self, class_name: type[T], qualifier: Optional[str] = None
     ) -> Union[T, NoOpCls]:
-        if (foundObj := self.find(className, qualifier)) is None:
+        if (found_obj := self.find(class_name, qualifier)) is None:
             return NoOp
-        return foundObj
+        return found_obj
 
     @staticmethod
-    def getInstance() -> "_Injector":
+    def get_instance() -> "_Injector":
         # If the instance is not initialized
         if _Injector.instance is None:
             # Lock for instantiation
-            with _Injector.instanceLock:
+            with _Injector.instance_lock:
                 # Check if the instance was not already initialized before acquiring the lock
                 if _Injector.instance is None:
                     # Initialize
                     _Injector.instance = _Injector()
         return _Injector.instance
 
-    def provideVarIfNotNull(
-        self, className: type, qualifier: str, value: Any
+    def provide_var_if_not_null(
+        self, class_name: type, qualifier: str, value: Any
     ) -> "_Injector":
         if value is not None:
-            self.provideVar(className, qualifier, value)
+            self.provide_var(class_name, qualifier, value)
         return self
 
-    def provideVar(
+    def provide_var(
         self,
-        className: type,
+        class_name: type,
         qualifier: str,
         value: Any,
         profiles: Optional[list[str]] = None,
     ) -> "_Injector":
-        with self.provideLock:
-            if (varDep := self.__variables.get(className)) is None:
-                varDep = _VariableDependency()
-                self.__variables[className] = varDep
+        with self.provide_lock:
+            if (var_dep := self.__variables.get(class_name)) is None:
+                var_dep = _VariableDependency()
+                self.__variables[class_name] = var_dep
             if profiles is not None:
                 for profile in profiles:
-                    varDep.qualifiedVariables[
-                        self.__getComponentKeyWithProfile(
-                            qualifier, self.__computeProfile(profile)
+                    var_dep.qualified_variables[
+                        self.__get_component_key_with_profile(
+                            qualifier, self.__compute_profile(profile)
                         )
                     ] = value
             else:
-                varDep.qualifiedVariables[
-                    self.__getComponentKeyWithProfile(
-                        qualifier, self.__computeProfile(None)
+                var_dep.qualified_variables[
+                    self.__get_component_key_with_profile(
+                        qualifier, self.__compute_profile(None)
                     )
                 ] = value
 
@@ -313,169 +315,174 @@ class _Injector:
 
     def provide(
         self,
-        className: type,
+        class_name: type,
         comp: Union[Any, Callable[[], Any]],
         qualifier: Optional[str] = None,
         profiles: Optional[list[str]] = None,
     ) -> "_Injector":
-        self.__provide(className, comp, qualifier, profiles, False)
+        self.__provide(class_name, comp, qualifier, profiles, False)
         return self
 
-    def __computeFullQualifier(
-        self, qualifier: str, overrideQualifier: bool, profile: Optional[str]
+    def __compute_full_qualifier(
+        self, qualifier: str, override_qualifier: bool, profile: Optional[str]
     ) -> str:
         return (
             qualifier
-            if overrideQualifier
-            else self.__getComponentKeyWithProfile(
-                qualifier, self.__computeProfile(profile)
+            if override_qualifier
+            else self.__get_component_key_with_profile(
+                qualifier, self.__compute_profile(profile)
             )
         )
 
     # Register a component with the container
     def __provide(
         self,
-        className: type,
+        class_name: type,
         comp: Union[Any, Callable[[], Any]],
         qualifier: Optional[str] = None,
         profiles: Optional[list[str]] = None,
-        overrideQualifier: bool = False,
+        override_qualifier: bool = False,
     ) -> "_Injector":
-        with self.provideLock:
-            if (containerDep := self.__components.get(className)) is None:
-                containerDep = _ContainerDependency()
-                self.__components[className] = containerDep
+        with self.provide_lock:
+            if (container_dep := self.__components.get(class_name)) is None:
+                container_dep = _ContainerDependency()
+                self.__components[class_name] = container_dep
             if qualifier is None:
-                qualifier = self.__defaultQualifier
+                qualifier = self.__default_qualifier
             if profiles is not None:
                 for profile in profiles:
-                    fullQualifier = self.__computeFullQualifier(
-                        qualifier, overrideQualifier, profile
+                    full_qualifier = self.__compute_full_qualifier(
+                        qualifier, override_qualifier, profile
                     )
-                    containerDep.qualifiedDependencies[fullQualifier] = comp
+                    container_dep.qualified_dependencies[full_qualifier] = comp
             else:
-                fullQualifier = self.__computeFullQualifier(
-                    qualifier, overrideQualifier, None
+                full_qualifier = self.__compute_full_qualifier(
+                    qualifier, override_qualifier, None
                 )
-                containerDep.qualifiedDependencies[fullQualifier] = comp
-            self.__initMeta(comp)
+                container_dep.qualified_dependencies[full_qualifier] = comp
+            self.__init_meta(comp)
 
         return self
 
-    def _getAll(self, className: type[T]) -> list[T]:
+    def _get_all(self, class_name: type[T]) -> list[T]:
         elements: list[T] = []
         for key in self.__components:
             dep = self.__components[key]
-            for dependencyKey in dep.qualifiedDependencies:
-                if self.__isDependencyActive(dependencyKey):
-                    comp = self._get(key, dependencyKey, True)
-                    if isinstance(comp, className):
+            for dependency_key in dep.qualified_dependencies:
+                if self.__is_dependency_active(dependency_key):
+                    comp = self._get(key, dependency_key, True)
+                    if isinstance(comp, class_name):
                         elements.append(comp)
         return elements
 
-    def __isDependencyActive(self, dependencyKey: str) -> bool:
+    def __is_dependency_active(self, dependency_key: str) -> bool:
         return (
             self.__profile is None
-            or dependencyKey.startswith(self.__defaultProfile)
-            or dependencyKey.startswith(self.__profile)
+            or dependency_key.startswith(self.__default_profile)
+            or dependency_key.startswith(self.__profile)
         )
 
-    def __getComponentKey(self, qualifier: str) -> str:
-        return self.__getProfileStr() + qualifier
+    def __get_component_key(self, qualifier: str) -> str:
+        return self.__get_profile_str() + qualifier
 
-    def __getComponentKeyWithProfile(self, qualifier: str, profile: str) -> str:
+    def __get_component_key_with_profile(self, qualifier: str, profile: str) -> str:
         return profile + qualifier
 
-    def __getFullQualifier(
-        self, qualifier: Optional[str], overrideQualifier: bool
+    def __get_full_qualifier(
+        self, qualifier: Optional[str], override_qualifier: bool
     ) -> str:
         if qualifier is None:
-            qualifier = self.__defaultQualifier
-        return qualifier if overrideQualifier else self.__getComponentKey(qualifier)
+            qualifier = self.__default_qualifier
+        return qualifier if override_qualifier else self.__get_component_key(qualifier)
 
-    def __initializeAndGet(
-        self, containerDep: _ContainerDependency, fullQualifier: str
+    def __initialize_and_get(
+        self, container_dep: _ContainerDependency, full_qualifier: str
     ) -> Any:
-        foundComponent = containerDep.qualifiedDependencies.get(
-            fullQualifier,
+        found_component = container_dep.qualified_dependencies.get(
+            full_qualifier,
             None,
         )
 
-        if isCallable(foundComponent):
-            comp = foundComponent()
+        if is_callable(found_component):
+            comp = found_component()
             # Remove the old dependency
-            containerDep.qualifiedDependencies[fullQualifier] = self.__initMeta(comp)
+            container_dep.qualified_dependencies[full_qualifier] = self.__init_meta(
+                comp
+            )
             return comp
-        return foundComponent
+        return found_component
 
     # Get a component from the container
     def _get(
-        self, className: type, qualifier: Optional[str], overrideQualifier: bool = False
+        self,
+        class_name: type,
+        qualifier: Optional[str],
+        override_qualifier: bool = False,
     ) -> Any:
-        self.__retrieveComponents()
-        if (containerDep := self.__components.get(className)) is None:
+        self.__retrieve_components()
+        if (container_dep := self.__components.get(class_name)) is None:
             return None
-        fullQualifier = self.__getFullQualifier(qualifier, overrideQualifier)
-        foundComponent = containerDep.qualifiedDependencies.get(
-            fullQualifier,
+        full_qualifier = self.__get_full_qualifier(qualifier, override_qualifier)
+        found_component = container_dep.qualified_dependencies.get(
+            full_qualifier,
             None,
         )
 
-        if foundComponent is None:
+        if found_component is None:
             return None
 
         # We've got a lazy component
-        if isCallable(foundComponent):
+        if is_callable(found_component):
             # We need to lock in the instantiation, so it will only happen once.
-            with containerDep.lock:
+            with container_dep.lock:
                 # Once we've got the lock, get the component again, and make sure no other thread has already instatiated it
-                return self.__initializeAndGet(containerDep, fullQualifier)
+                return self.__initialize_and_get(container_dep, full_qualifier)
 
-        return foundComponent
+        return found_component
 
-    def _getVar(
-        self, className: type, qualifier: str, overrideQualifier: bool = False
+    def _get_var(
+        self, class_name: type, qualifier: str, override_qualifier: bool = False
     ) -> Any:
-        self.__retrieveComponents()
+        self.__retrieve_components()
 
-        if (varDep := self.__variables.get(className)) is None:
+        if (varDep := self.__variables.get(class_name)) is None:
             return None
 
-        fullQualifier = (
-            qualifier if overrideQualifier else self.__getComponentKey(qualifier)
+        full_qualifier = (
+            qualifier if override_qualifier else self.__get_component_key(qualifier)
         )
 
-        return varDep.qualifiedVariables.get(fullQualifier, None)
+        return varDep.qualified_variables.get(full_qualifier, None)
 
-    def __initMeta(self, comp: Any) -> Any:
+    def __init_meta(self, comp: Any) -> Any:
         if isinstance(comp, AutoInit):
             comp.init()
         if isinstance(comp, AutoStart):
             comp.start()
         return comp
 
-    def provideDependencies(
+    def provide_dependencies(
         self, dependencies: dict[type, Any], profiles: Optional[list[str]] = None
     ) -> "_Injector":
-        for componentClass in dependencies:
-            service = dependencies[componentClass]
-            self.provide(componentClass, service, profiles=profiles)
+        for component_class in dependencies:
+            service = dependencies[component_class]
+            self.provide(component_class, service, profiles=profiles)
         return self
 
-    def provideVariables(
+    def provide_variables(
         self, variables: list[tuple[type, str, Any]], profiles: Optional[list[str]]
     ) -> "_Injector":
-        for varClass, qualifier, value in variables:
-            self.provideVar(varClass, qualifier, value, profiles)
+        for var_class, qualifier, value in variables:
+            self.provide_var(var_class, qualifier, value, profiles)
         return self
 
-    def optional(self, className: type[T], qualifier: Optional[str] = None) -> Opt[T]:
-        return Opt(self.find(className, qualifier))
+    def optional(self, class_name: type[T], qualifier: Optional[str] = None) -> Opt[T]:
+        return Opt(self.find(class_name, qualifier))
 
-    def varOptional(self, className: type[T], qualifier: str) -> Opt[T]:
-        return Opt(self.findVar(className, qualifier))
+    def var_optional(self, class_name: type[T], qualifier: str) -> Opt[T]:
+        return Opt(self.find_var(class_name, qualifier))
 
-    def allOfType(self, className: type[T]) -> list[T]:
+    def all_of_type(self, class_name: type[T]) -> list[T]:
         """
         Returns a list of all objects that have or subclass the given type,
         regardless of their actual declared class or qualifiers.
@@ -484,14 +491,14 @@ class _Injector:
         of validators that implement the same interface.
 
         Args:
-            className (type[T]): The class or parent class
+            class_name (type[T]): The class or parent class
 
         Returns:
             list[T]: The list of dependencies available
         """
-        return self._getAll(className)
+        return self._get_all(class_name)
 
-    def allOfTypeStream(self, className: type[T]) -> Stream[T]:
+    def all_of_type_stream(self, class_name: type[T]) -> Stream[T]:
         """
         Returns a stream of all objects that have or subclass the given type,
         regardless of their actual declared class or qualifiers.
@@ -500,43 +507,43 @@ class _Injector:
         of validators that implement the same interface.
 
         Args:
-            className (type[T]): The class or parent class
+            class_name (type[T]): The class or parent class
 
         Returns:
             Stream[T]: A stream of the dependencies available
         """
-        return Stream(self.allOfType(className))
+        return Stream(self.all_of_type(class_name))
 
 
-Injector = _Injector.getInstance()
+Injector = _Injector.get_instance()
 
 
 def injector() -> _Injector:
     return Injector
 
 
-def inject(className: type[T], qualifier: Optional[str] = None) -> T:
-    return injector().get(className, qualifier)
+def inject(class_name: type[T], qualifier: Optional[str] = None) -> T:
+    return injector().get(class_name, qualifier)
 
 
-def var(className: type[T], qualifier: str) -> T:
-    return injector().getVar(className, qualifier)
+def var(class_name: type[T], qualifier: str) -> T:
+    return injector().get_var(class_name, qualifier)
 
 
 def service(
-    className: Optional[type] = None,
+    class_name: Optional[type] = None,
     qualifier: Optional[str] = None,
     profiles: Optional[list[str]] = None,
 ) -> Callable[[type[T]], type[T]]:
     """
     Proxy for @component with the strategy always set to Strategy.LAZY
     """
-    return component(Strategy.LAZY, className, qualifier, profiles)
+    return component(Strategy.LAZY, class_name, qualifier, profiles)
 
 
 def component(
     strategy: Strategy = Strategy.LAZY,
-    className: Optional[type] = None,
+    class_name: Optional[type] = None,
     qualifier: Optional[str] = None,
     profiles: Optional[list[str]] = None,
 ) -> Callable[[type[T]], type[T]]:
@@ -545,7 +552,7 @@ def component(
 
     Args:
         strategy (Strategy, optional): The strategy used for instantiation: EAGER means instantiate as soon as possible, LAZY means instantiate when needed. Defaults to Strategy.LAZY.
-        className (Optional[type], optional): Specify which class to use with the container. Defaults to declared class.
+        class_name (Optional[type], optional): Specify which class to use with the container. Defaults to declared class.
         qualifier (Optional[str], optional): Specify the qualifer to be used for the dependency. Defaults to None.
         profiles (Optional[list[str]], optional): Specify the profiles for which this dependency should be available. Defaults to None.
 
@@ -555,7 +562,7 @@ def component(
 
     def wrap(cls: type[T]) -> type[T]:
         injector().provide(
-            className if className is not None else cls,
+            class_name if class_name is not None else cls,
             cls() if strategy == Strategy.EAGER else lambda: cls(),
             qualifier,
             profiles,
@@ -585,7 +592,7 @@ def configuration(profiles: Optional[list[str]] = None) -> Callable[[type[T]], t
         Callable[[type[T]], type[T]]: The decorated class
     """
 
-    def runBean(obj: Any, attr: str) -> None:
+    def run_bean(obj: Any, attr: str) -> None:
         try:
             getattr(obj, attr)(profiles=profiles)
         except TypeError as _:
@@ -596,15 +603,15 @@ def configuration(profiles: Optional[list[str]] = None) -> Callable[[type[T]], t
                 + str(type(obj))
                 + " is not properly decorated. In a configuration class, each public method must produce a dependency decorated with the @provide decorator. For internal logic, please use protected _method or private __method."
             )
-            injector().handleBeanError(message)
+            injector().handle_bean_error(message)
 
     def wrap(cls: type[T]) -> type[T]:
         obj = cls()
         (
             Stream(dir(obj))
             .filter(lambda s: not s.startswith("_"))
-            .filter(lambda s: isCallable(getattr(obj, s)))
-            .each(lambda s: runBean(obj, s))
+            .filter(lambda s: is_callable(getattr(obj, s)))
+            .each(lambda s: run_bean(obj, s))
         )
         return cls
 
@@ -612,7 +619,7 @@ def configuration(profiles: Optional[list[str]] = None) -> Callable[[type[T]], t
 
 
 def provide(
-    className: type[T], qualifier: Optional[str] = None
+    class_name: type[T], qualifier: Optional[str] = None
 ) -> Callable[[Callable[..., T]], Callable[..., None]]:
     """
     Provide decorator. Used for methods inside @configuration classes.
@@ -620,7 +627,7 @@ def provide(
     define injected dependencies.
 
     Args:
-        className (type[T]): The dependency class
+        class_name (type[T]): The dependency class
         qualifier (Optional[str], optional): Optional dependency qualifier. Defaults to None.
 
     Returns:
@@ -633,15 +640,15 @@ def provide(
             if "profiles" in kwds:
                 profiles = kwds.pop("profiles")
 
-            injector().provide(className, lambda: func(*args), qualifier, profiles)
+            injector().provide(class_name, lambda: func(*args), qualifier, profiles)
 
         return wrapped
 
     return wrapper
 
 
-def provideVariable(
-    className: type[T], qualifier: str
+def provide_variable(
+    class_name: type[T], qualifier: str
 ) -> Callable[[Callable[..., T]], Callable[..., None]]:
     """
     Provide variable decorator. Used for methods inside @configuration classes.
@@ -649,7 +656,7 @@ def provideVariable(
     define injected variables.
 
     Args:
-        className (type[T]): The dependency class
+        class_name (type[T]): The dependency class
         qualifier (str): Mandatory variable qualifier. Defaults to None.
 
     Returns:
@@ -662,14 +669,14 @@ def provideVariable(
             if "profiles" in kwds:
                 profiles = kwds.pop("profiles")
 
-            injector().provideVar(className, qualifier, func(*args), profiles)
+            injector().provide_var(class_name, qualifier, func(*args), profiles)
 
         return wrapped
 
     return wrapper
 
 
-def validateDependencies(dependencies: dict[str, Any]) -> None:
+def validate_dependencies(dependencies: dict[str, Any]) -> None:
     for key in dependencies:
         if key.startswith("__"):
             raise ValueError(
@@ -678,7 +685,7 @@ def validateDependencies(dependencies: dict[str, Any]) -> None:
             )
 
 
-def resolveDependencies(
+def resolve_dependencies(
     dependencies: dict[str, Union[type, Dependency]],
 ) -> Callable[[type[T]], type[T]]:
     """
@@ -686,11 +693,11 @@ def resolveDependencies(
     Allows class decoration for parameter injection.
     Example:
 
-    @resolveDependencies({"testField": ClassName})
+    @resolve_dependencies({"test_field": ClassName})
     class TestClass:
-        testField: Optional[ClassName]
+        test_field: Optional[ClassName]
 
-    Will inject the dependency associated with 'ClassName' into the 'testField' member
+    Will inject the dependency associated with 'ClassName' into the 'test_field' member
 
     Args:
         dependencies (Union[type, Dependency]]): A map of dependencies
@@ -699,16 +706,16 @@ def resolveDependencies(
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
 
-    validateDependencies(dependencies)
+    validate_dependencies(dependencies)
 
     def wrap(cls: type[T]) -> type[T]:
-        originalGetAttribute = cls.__getattribute__
+        original_get_attribute = cls.__getattribute__
 
-        def __getattribute__(self, attrName: str) -> Any:  # type: ignore[no-untyped-def]
-            if attrName in dependencies:
-                quali = dependencies.get(attrName, NoOpCls)
-                return _getDep(quali)
-            return originalGetAttribute(self, attrName)
+        def __getattribute__(self, attr_name: str) -> Any:  # type: ignore[no-untyped-def]
+            if attr_name in dependencies:
+                quali = dependencies.get(attr_name, NoOpCls)
+                return _get_dep(quali)
+            return original_get_attribute(self, attr_name)
 
         cls.__getattribute__ = __getattribute__  # type: ignore[method-assign]
         return cls
@@ -716,7 +723,7 @@ def resolveDependencies(
     return wrap
 
 
-def resolveVariables(
+def resolve_variables(
     variables: dict[str, Variable],
 ) -> Callable[[type[T]], type[T]]:
     """
@@ -724,11 +731,11 @@ def resolveVariables(
     Allows class decoration for variables injection.
     Example:
 
-    @resolveVariables({"strValue": Variable(str, "strQualifier", True)})
+    @resolve_variables({"str_value": Variable(str, "strQualifier", True)})
     class TestClass:
-        strValue: Optional[str]
+        str_value: Optional[str]
 
-    Will inject the value associated with 'strQualifier' of type 'str' into the 'strValue' member
+    Will inject the value associated with 'strQualifier' of type 'str' into the 'str_value' member
 
     Args:
         variables: dict[str, dict[str, Variable]]: A map of variable names to type and key tuple
@@ -737,19 +744,19 @@ def resolveVariables(
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
 
-    validateDependencies(variables)
+    validate_dependencies(variables)
 
     def wrap(cls: type[T]) -> type[T]:
-        originalGetAttribute = cls.__getattribute__
+        original_get_attribute = cls.__getattribute__
 
-        def __getattribute__(self, attrName: str) -> Any:  # type: ignore[no-untyped-def]
-            if attrName in variables:
-                variable = variables.get(attrName)
+        def __getattribute__(self, attr_name: str) -> Any:  # type: ignore[no-untyped-def]
+            if attr_name in variables:
+                variable = variables.get(attr_name)
                 if variable is None:
-                    return originalGetAttribute(self, attrName)
-                return _getDep(variable)
-            return originalGetAttribute(
-                self, attrName
+                    return original_get_attribute(self, attr_name)
+                return _get_dep(variable)
+            return original_get_attribute(
+                self, attr_name
             )  # Call the original __getattribute__
 
         cls.__getattribute__ = __getattribute__  # type: ignore[method-assign]
@@ -758,34 +765,36 @@ def resolveVariables(
     return wrap
 
 
-def _getDep(dep: Union[type, Dependency, Variable]) -> Any:
-    qualif: Optional[str] = None
-    isOptional = False
-    isVariable = False
+def _get_dep(dep: Union[type, Dependency, Variable]) -> Any:
+    qualifier: Optional[str] = None
+    is_optional = False
+    is_variable = False
     if isinstance(dep, Dependency):
-        qualif = dep.getQualifier()
-        typ = dep.getType()
-        isOptional = dep.isOptional()
+        qualifier = dep.get_qualifier()
+        typ = dep.get_type()
+        is_optional = dep.is_optional()
     elif isinstance(dep, Variable):
-        qualif = dep.getKey()
-        typ = dep.getType()
-        isVariable = True
-        isOptional = dep.isOptional()
+        qualifier = dep.get_key()
+        typ = dep.get_type()
+        is_variable = True
+        is_optional = dep.is_optional()
     else:
         typ = dep
 
     return (
         (
-            injector().findVar(typ, requireNotNull(qualif))
-            if isOptional
-            else injector().getVar(typ, requireNotNull(qualif))
+            injector().find_var(typ, require_non_null(qualifier))
+            if is_optional
+            else injector().get_var(typ, require_non_null(qualifier))
         )
-        if isVariable
-        else (injector().find(typ, qualif) if isOptional else inject(typ, qualif))
+        if is_variable
+        else (
+            injector().find(typ, qualifier) if is_optional else inject(typ, qualifier)
+        )
     )
 
 
-def injectArgs(
+def inject_args(
     dependencies: dict[str, Union[type, Dependency, Variable]],
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
@@ -797,9 +806,9 @@ def injectArgs(
     # Example 1:
     injector().provide(str, "test")
     injector().provide(int, 10)
-    injector().provideVar(str, "var1", "var1Value")
+    injector().provide_var(str, "var1", "var1Value")
 
-    @injectArgs({"param1": str, "param2": int})
+    @inject_args({"param1": str, "param2": int})
     def fn(param1: str, param2: int) -> None:
         print(param1 + "_" + param2)
 
@@ -814,7 +823,7 @@ def injectArgs(
     fn("test2") # will result in an ERROR as not all params are provided by the positional arguments
 
     class TestArgInjection:
-        @injectArgs({"a": str, "b": int, "c": StrVariable("var1)})
+        @inject_args({"a": str, "b": int, "c": StrVariable("var1)})
         def __init__(self, a: str, b: int, c: str) -> None:
             self.a = a
             self.b = b
@@ -832,7 +841,7 @@ def injectArgs(
     Returns:
         Callable[[Callable[..., T]], Callable[..., T]]: The decorated function or method
     """
-    validateDependencies(dependencies)
+    validate_dependencies(dependencies)
 
     def wrapper(func: Callable[..., T]) -> Callable[..., T]:
         def wrapped(*args: Any, **kwds: Any) -> T:
@@ -840,12 +849,12 @@ def injectArgs(
                 # We are dealing with a constructor, and must provide positional arguments
                 for key in dependencies:
                     dep = dependencies[key]
-                    args = args + (_getDep(dep),)
+                    args = args + (_get_dep(dep),)
             elif len(args) == 0:
                 for key in dependencies:
                     if kwds.get(key) is None:
                         dep = dependencies[key]
-                        kwds[key] = _getDep(dep)
+                        kwds[key] = _get_dep(dep)
             return func(*args, **kwds)
 
         return wrapped
@@ -854,31 +863,31 @@ def injectArgs(
 
 
 def autowired(
-    className: type[T], qualifier: Optional[str] = None
+    class_name: type[T], qualifier: Optional[str] = None
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     def wrapper(func: Callable[..., T]) -> Callable[..., T]:
         def wrapped(*args: Any, **kwds: Any) -> T:
-            return injector().get(className, qualifier)
+            return injector().get(class_name, qualifier)
 
         return wrapped
 
     return wrapper
 
 
-def returnWired(className: type[T]) -> T:
+def return_wired(className: type[T]) -> T:
     return cast(T, NoOp)
 
 
-def returnWiredOptional(className: type[T]) -> Optional[T]:
+def return_wired_optional(className: type[T]) -> Optional[T]:
     return None
 
 
-def autowiredOptional(
-    className: type[T], qualifier: Optional[str] = None
+def autowired_optional(
+    class_name: type[T], qualifier: Optional[str] = None
 ) -> Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]:
     def wrapper(func: Callable[..., Optional[T]]) -> Callable[..., Optional[T]]:
         def wrapped(*args: Any, **kwds: Any) -> Optional[T]:
-            return injector().find(className, qualifier)
+            return injector().find(class_name, qualifier)
 
         return wrapped
 
@@ -921,7 +930,7 @@ class InjectedVariable(Generic[T]):
         self.__quali = qualifier
 
     def get(self) -> T:
-        return injector().getVar(self.__typ, self.__quali)
+        return injector().get_var(self.__typ, self.__quali)
 
     def __call__(self) -> T:
         return self.get()

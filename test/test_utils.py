@@ -1,14 +1,14 @@
 from baseTest import BaseTestCase
 from jstreams import (
-    allNotNone,
+    all_not_none,
     default,
     equals,
-    isBlank,
-    isIn,
-    isNotIn,
+    is_blank,
+    is_in,
+    is_not_in,
     Stream,
-    isNumber,
-    requireNotNull,
+    is_number,
+    require_non_null,
 )
 
 
@@ -17,16 +17,16 @@ class TestHelpers(BaseTestCase):
         """
         Test requireNotNull function
         """
-        self.assertEqual(requireNotNull("str"), "str")
-        self.assertThrowsExceptionOfType(lambda: requireNotNull(None), ValueError)
+        self.assertEqual(require_non_null("str"), "str")
+        self.assertThrowsExceptionOfType(lambda: require_non_null(None), ValueError)
 
     def test_allSatisty(self) -> None:
         """
         Test allSatisfy function
         """
-        self.assertFalse(Stream(["A", "B"]).allMatch(lambda e: e is None))
-        self.assertFalse(Stream(["A", None]).allMatch(lambda e: e is None))
-        self.assertTrue(Stream([None, None]).allMatch(lambda e: e is None))
+        self.assertFalse(Stream(["A", "B"]).all_match(lambda e: e is None))
+        self.assertFalse(Stream(["A", None]).all_match(lambda e: e is None))
+        self.assertTrue(Stream([None, None]).all_match(lambda e: e is None))
 
     def test_areSame(self) -> None:
         """
@@ -47,25 +47,25 @@ class TestHelpers(BaseTestCase):
         self.assertFalse(equals({"a": "b"})({"a": "b1"}), "Dict should not be the same")
 
     def test_allNotNone(self) -> None:
-        self.assertTrue(allNotNone(["A", "B", "C"]), "All should not be none")
-        self.assertFalse(allNotNone(["A", "B", None]), "One should contain none")
+        self.assertTrue(all_not_none(["A", "B", "C"]), "All should not be none")
+        self.assertFalse(all_not_none(["A", "B", None]), "One should contain none")
 
     def test_isIn(self) -> None:
-        self.assertTrue(isIn(["A", "B", "C"])("A"), "A should be in array")
-        self.assertFalse(isIn(["A", "B", "C"])("D"), "D should not be in array")
+        self.assertTrue(is_in(["A", "B", "C"])("A"), "A should be in array")
+        self.assertFalse(is_in(["A", "B", "C"])("D"), "D should not be in array")
 
     def test_isNotIn(self) -> None:
-        self.assertFalse(isNotIn(["A", "B", "C"])("A"), "A should be in array")
-        self.assertTrue(isNotIn(["A", "B", "C"])("D"), "D should not be in array")
+        self.assertFalse(is_not_in(["A", "B", "C"])("A"), "A should be in array")
+        self.assertTrue(is_not_in(["A", "B", "C"])("D"), "D should not be in array")
 
     def test_isBlank(self) -> None:
-        self.assertFalse(isBlank(["A", "B", "C"]), "Array should not be blank")
-        self.assertTrue(isBlank([]), "Array should be blank")
-        self.assertTrue(isBlank(None), "Object should be blank")
-        self.assertTrue(isBlank(""), "Object should be blank")
-        self.assertTrue(isBlank({}), "Dict should be blank")
-        self.assertFalse(isBlank("Test"), "String should not be blank")
-        self.assertFalse(isBlank({"a": "b"}), "Dict should not be blank")
+        self.assertFalse(is_blank(["A", "B", "C"]), "Array should not be blank")
+        self.assertTrue(is_blank([]), "Array should be blank")
+        self.assertTrue(is_blank(None), "Object should be blank")
+        self.assertTrue(is_blank(""), "Object should be blank")
+        self.assertTrue(is_blank({}), "Dict should be blank")
+        self.assertFalse(is_blank("Test"), "String should not be blank")
+        self.assertFalse(is_blank({"a": "b"}), "Dict should not be blank")
 
     def test_defVal(self) -> None:
         self.assertEqual(default("str")(None), "str", "Default value should be applied")
@@ -74,8 +74,8 @@ class TestHelpers(BaseTestCase):
         )
 
     def test_isNumber(self) -> None:
-        self.assertTrue(isNumber(10), "10 should be a number")
-        self.assertTrue(isNumber(0), "0 should be a number")
-        self.assertTrue(isNumber(0.5), "0.5 should be a number")
-        self.assertTrue(isNumber("10"), "10 string should be a number")
-        self.assertFalse(isNumber(None), "None should not be a number")
+        self.assertTrue(is_number(10), "10 should be a number")
+        self.assertTrue(is_number(0), "0 should be a number")
+        self.assertTrue(is_number(0.5), "0.5 should be a number")
+        self.assertTrue(is_number("10"), "10 string should be a number")
+        self.assertFalse(is_number(None), "None should not be a number")
