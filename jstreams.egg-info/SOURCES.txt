@@ -14,7 +14,7 @@ jstreams/state.py
 jstreams/stream.py
 jstreams/thread.py
 jstreams/timer.py
-jstreams/tryOpt.py
+jstreams/try_opt.py
 jstreams/tuples.py
 jstreams/utils.py
 jstreams.egg-info/PKG-INFO
