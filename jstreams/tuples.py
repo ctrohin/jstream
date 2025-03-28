@@ -89,8 +89,8 @@ def left_matches(
         Predicate[Pair[T, V]]: The produced predicate
     """
 
-    def wrap(pairArg: Pair[T, V]) -> bool:
-        return predicate_of(predicate_arg)(pairArg.left())
+    def wrap(pair_arg: Pair[T, V]) -> bool:
+        return predicate_of(predicate_arg)(pair_arg.left())
 
     return predicate_of(wrap)
 
@@ -108,8 +108,8 @@ def right_matches(
         Predicate[Pair[T, V]]: The produced predicate
     """
 
-    def wrap(pairArg: Pair[T, V]) -> bool:
-        return predicate_of(predicate_arg)(pairArg.right())
+    def wrap(pair_arg: Pair[T, V]) -> bool:
+        return predicate_of(predicate_arg)(pair_arg.right())
 
     return predicate_of(wrap)
 

@@ -478,7 +478,7 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
         op13: Optional[RxOperator[L, M]] = None,
         op14: Optional[RxOperator[M, V]] = None,
     ) -> "_PipeObservable[T, V]":
-        opList = (
+        op_list = (
             Stream(
                 [
                     op1,
@@ -500,7 +500,7 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
             .non_null()
             .to_list()
         )
-        return _PipeObservable(self, Pipe(T, V, opList))  # type: ignore
+        return _PipeObservable(self, Pipe(T, V, op_list))  # type: ignore
 
 
 class Observable(_Observable[T]):
@@ -689,7 +689,7 @@ class Observable(_Observable[T]):
         op13: Optional[RxOperator[L, M]] = None,
         op14: Optional[RxOperator[M, V]] = None,
     ) -> _PipeObservable[T, V]:
-        opList = (
+        op_list = (
             Stream(
                 [
                     op1,
@@ -711,7 +711,7 @@ class Observable(_Observable[T]):
             .non_null()
             .to_list()
         )
-        return _PipeObservable(self, Pipe(T, Any, opList))  # type: ignore
+        return _PipeObservable(self, Pipe(T, Any, op_list))  # type: ignore
 
 
 class Flowable(Observable[T]):

@@ -16,12 +16,12 @@ class Strategy(Enum):
 
 
 class Dependency:
-    __slots__ = ("__typ", "__qualifier", "_isOptional")
+    __slots__ = ["__typ", "__qualifier", "_is_optional"]
 
     def __init__(self, typ: type, qualifier: Optional[str] = None) -> None:
         self.__typ = typ
         self.__qualifier = qualifier
-        self._isOptional = False
+        self._is_optional = False
 
     def get_type(self) -> type:
         return self.__typ
@@ -30,22 +30,22 @@ class Dependency:
         return self.__qualifier
 
     def is_optional(self) -> bool:
-        return self._isOptional
+        return self._is_optional
 
 
 class OptionalDependency(Dependency):
     def __init__(self, typ: type, qualifier: Optional[str] = None) -> None:
         super().__init__(typ, qualifier)
-        self._isOptional = True
+        self._is_optional = True
 
 
 class Variable:
     __slots__ = ("__typ", "__key", "__is_optional")
 
-    def __init__(self, typ: type, key: str, isOptional: bool = False) -> None:
+    def __init__(self, typ: type, key: str, is_optional: bool = False) -> None:
         self.__typ = typ
         self.__key = key
-        self.__is_optional = isOptional
+        self.__is_optional = is_optional
 
     def get_type(self) -> type:
         return self.__typ
@@ -187,8 +187,8 @@ class _Injector:
     def get_active_profile(self) -> Optional[str]:
         return self.__profile
 
-    def raise_bean_errors(self, raiseBeanErrors: bool) -> "_Injector":
-        self.__raise_beans_error = raiseBeanErrors
+    def raise_bean_errors(self, flag: bool) -> "_Injector":
+        self.__raise_beans_error = flag
         return self
 
     def handle_bean_error(self, message: str) -> None:
@@ -204,9 +204,9 @@ class _Injector:
         self.__modules_to_scan = []
 
     def get(self, class_name: type[T], qualifier: Optional[str] = None) -> T:
-        if (foundObj := self.find(class_name, qualifier)) is None:
+        if (found_obj := self.find(class_name, qualifier)) is None:
             raise ValueError("No object found for class " + str(class_name))
-        return foundObj
+        return found_obj
 
     def get_var(self, class_name: type[T], qualifier: str) -> T:
         if (found_var := self.find_var(class_name, qualifier)) is None:
@@ -445,14 +445,14 @@ class _Injector:
     ) -> Any:
         self.__retrieve_components()
 
-        if (varDep := self.__variables.get(class_name)) is None:
+        if (var_dep := self.__variables.get(class_name)) is None:
             return None
 
         full_qualifier = (
             qualifier if override_qualifier else self.__get_component_key(qualifier)
         )
 
-        return varDep.qualified_variables.get(full_qualifier, None)
+        return var_dep.qualified_variables.get(full_qualifier, None)
 
     def __init_meta(self, comp: Any) -> Any:
         if isinstance(comp, AutoInit):
@@ -874,11 +874,11 @@ def autowired(
     return wrapper
 
 
-def return_wired(className: type[T]) -> T:
+def return_wired(class_name: type[T]) -> T:
     return cast(T, NoOp)
 
 
-def return_wired_optional(className: type[T]) -> Optional[T]:
+def return_wired_optional(class_name: type[T]) -> Optional[T]:
     return None
 
 

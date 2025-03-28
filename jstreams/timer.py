@@ -61,11 +61,11 @@ class Timer(Thread, Cancellable):
             with self.__lock:
                 if self.__canceled:
                     return
-        shouldExecute = False
+        should_execute = False
         with self.__lock:
             if not self.__canceled:
-                shouldExecute = True
-        if shouldExecute:
+                should_execute = True
+        if should_execute:
             self.__callback()
 
 

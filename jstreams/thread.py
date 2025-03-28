@@ -59,5 +59,5 @@ class CallbackLoopingThread(LoopingThread):
         self.__target()
 
 
-def cancelThread(thread: Cancellable) -> None:
+def cancel_thread(thread: Cancellable) -> None:
     thread.cancel()

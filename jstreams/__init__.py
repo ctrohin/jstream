@@ -26,7 +26,7 @@ from jstreams.stream import (
     extract_non_null_list,
 )
 
-from jstreams.tryOpt import (
+from jstreams.try_opt import (
     Try,
     ErrorLog,
 )
@@ -70,7 +70,7 @@ from jstreams.rx import (
 from jstreams.thread import (
     LoopingThread,
     CallbackLoopingThread,
-    cancelThread,
+    cancel_thread,
     Cancellable,
 )
 
@@ -262,7 +262,7 @@ __all__ = [
     "Timer",
     "Interval",
     "CountdownTimer",
-    "cancelThread",
+    "cancel_thread",
     "set_timer",
     "set_interval",
     "clear",
@@ -341,7 +341,6 @@ __all__ = [
     "MapperWith",
     "Reducer",
     "reducer_of",
-    "Not",
     "has_key",
     "has_value",
     "is_in_interval",

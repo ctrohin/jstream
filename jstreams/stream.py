@@ -43,13 +43,13 @@ class Predicate(ABC, Generic[T]):
 
 class PredicateWith(ABC, Generic[T, K]):
     @abstractmethod
-    def apply(self, value: T, withValue: K) -> bool:
+    def apply(self, value: T, with_value: K) -> bool:
         """
         Apply a condition to two given values.
 
         Args:
             value (T): The value
-            withValue (K): The second value
+            with_value (K): The second value
 
         Returns:
             bool: True if the values matche the predicate, False otherwise
@@ -61,28 +61,28 @@ class PredicateWith(ABC, Generic[T, K]):
     def and_(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
         return predicate_with_of(lambda v, k: self.apply(v, k) and other.apply(v, k))
 
-    def __call__(self, value: T, withValue: K) -> bool:
-        return self.apply(value, withValue)
+    def __call__(self, value: T, with_value: K) -> bool:
+        return self.apply(value, with_value)
 
 
 class _WrapPredicate(Predicate[T]):
-    __slots__ = ["__predicateFn"]
+    __slots__ = ["__predicate_fn"]
 
     def __init__(self, fn: Callable[[T], bool]) -> None:
-        self.__predicateFn = fn
+        self.__predicate_fn = fn
 
     def apply(self, value: T) -> bool:
-        return self.__predicateFn(value)
+        return self.__predicate_fn(value)
 
 
 class _WrapPredicateWith(PredicateWith[T, K]):
-    __slots__ = ["__predicateFn"]
+    __slots__ = ["__predicate_fn"]
 
     def __init__(self, fn: Callable[[T, K], bool]) -> None:
-        self.__predicateFn = fn
+        self.__predicate_fn = fn
 
     def apply(self, value: T, withValue: K) -> bool:
-        return self.__predicateFn(value, withValue)
+        return self.__predicate_fn(value, withValue)
 
 
 class Mapper(ABC, Generic[T, V]):
@@ -104,20 +104,20 @@ class Mapper(ABC, Generic[T, V]):
 
 class MapperWith(ABC, Generic[T, K, V]):
     @abstractmethod
-    def map(self, value: T, withValue: K) -> V:
+    def map(self, value: T, with_value: K) -> V:
         """
         Maps the given two values, to a new value.
 
         Args:
             value (T): The given value
-            withValue (K): The scond value
+            with_value (K): The scond value
 
         Returns:
             V: The produced value
         """
 
-    def __call__(self, value: T, withValue: K) -> V:
-        return self.map(value, withValue)
+    def __call__(self, value: T, with_value: K) -> V:
+        return self.map(value, with_value)
 
 
 class _WrapMapper(Mapper[T, V]):
@@ -941,8 +941,8 @@ class Opt(Generic[T]):
 class ClassOps:
     __slots__ = ("__class_type",)
 
-    def __init__(self, classType: type) -> None:
-        self.__class_type = classType
+    def __init__(self, class_type: type) -> None:
+        self.__class_type = class_type
 
     def instance_of(self, obj: Any) -> bool:
         return isinstance(obj, self.__class_type)
@@ -976,9 +976,9 @@ class _FilterIterable(_GenericIterable[T]):
 
     def __next__(self) -> T:
         while True:
-            nextObj = self._iterator.__next__()
-            if self.__predicate.apply(nextObj):
-                return nextObj
+            next_obj = self._iterator.__next__()
+            if self.__predicate.apply(next_obj):
+                return next_obj
 
 
 class _CastIterable(Generic[T, V], Iterator[T], Iterable[T]):
@@ -994,8 +994,8 @@ class _CastIterable(Generic[T, V], Iterator[T], Iterable[T]):
         return self
 
     def __next__(self) -> T:
-        nextObj = self.__iterator.__next__()
-        return cast(T, nextObj)
+        next_obj = self.__iterator.__next__()
+        return cast(T, next_obj)
 
 
 class _SkipIterable(_GenericIterable[T]):
@@ -1231,7 +1231,7 @@ class Stream(Generic[T]):
 
         return Stream(_FilterIterable(self.__arg, predicate_of(predicate)))
 
-    def cast(self, castTo: type[V]) -> "Stream[V]":
+    def cast(self, cast_to: type[V]) -> "Stream[V]":
         """
         Returns a stream of objects casted to the given type. Useful when receiving untyped data lists
         and they need to be used in a typed context.
@@ -1242,7 +1242,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: The stream of casted objects
         """
-        return Stream(_CastIterable(self.__arg, castTo))
+        return Stream(_CastIterable(self.__arg, cast_to))
 
     def any_match(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> bool:
         """
@@ -1409,8 +1409,8 @@ class Stream(Generic[T]):
         Returns:
             dict[V, T]: The resulting dictionary
         """
-        valueMapperObj = mapper_of(value_mapper)
-        return {v: valueMapperObj.map(v) for v in self.__arg}
+        value_mapper_obj = mapper_of(value_mapper)
+        return {v: value_mapper_obj.map(v) for v in self.__arg}
 
     def each(self, action: Callable[[T], Any]) -> "Stream[T]":
         """
@@ -1552,18 +1552,18 @@ class Stream(Generic[T]):
             return self
         return Stream(_DistinctIterable(self.__arg))
 
-    def concat(self, newStream: "Stream[T]") -> "Stream[T]":
+    def concat(self, new_stream: "Stream[T]") -> "Stream[T]":
         """
         Returns a stream concatenating the values from this stream with the ones
         from the given stream.
 
         Args:
-            newStream (Stream[T]): The stream to be concatenated with
+            new_stream (Stream[T]): The stream to be concatenated with
 
         Returns:
             Stream[T]: The resulting stream
         """
-        return Stream(_ConcatIterable(self.__arg, newStream.__arg))
+        return Stream(_ConcatIterable(self.__arg, new_stream.__arg))
 
 
 def stream(it: Iterable[T]) -> Stream[T]:

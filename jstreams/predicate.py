@@ -157,21 +157,21 @@ def is_not_blank(obj: Any) -> bool:
     return not_(is_blank)(obj)
 
 
-def default(defaultVal: T) -> Callable[[Optional[T]], T]:
+def default(default_val: T) -> Callable[[Optional[T]], T]:
     """
     Default value predicate.
     Usage: default(defaultValue)(myValue)
     Usage with Opt: Opt(myValue).map(default(defaultValue))
 
     Args:
-        defaultVal (T): The default value
+        default_val (T): The default value
 
     Returns:
         Callable[[Optional[T], T]]: The predicate
     """
 
     def wrap(val: Optional[T]) -> T:
-        return defaultVal if val is None else val
+        return default_val if val is None else val
 
     return wrap
 
@@ -455,10 +455,10 @@ def is_beween_closed_start(
 
 
 def is_beween_closed_end(
-    intervalStart: float, intervalEnd: float
+    interval_start: float, interval_end: float
 ) -> Predicate[Optional[float]]:
     def wrap(val: Optional[float]) -> bool:
-        return val is not None and intervalStart < val <= intervalEnd
+        return val is not None and interval_start < val <= interval_end
 
     return predicate_of(wrap)
 
