@@ -1,10 +1,10 @@
 from baseTest import BaseTestCase
-from jstreams.state import defaultState, nullState, useState
+from jstreams.state import default_state, null_state, use_state
 
 
 class TestState(BaseTestCase):
     def test_use_state_simple(self) -> None:
-        (getValue, setValue) = useState("test", "A")
+        (getValue, setValue) = use_state("test", "A")
         self.assertEqual(getValue(), "A", "State value should be A")
         setValue("B")
         self.assertEqual(getValue(), "B", "State value should be B")
@@ -16,7 +16,7 @@ class TestState(BaseTestCase):
         self.callback_test_use_state_with_on_change_old_value = oldValue
 
     def test_use_state_with_on_change(self) -> None:
-        (getValue, setValue) = useState(
+        (getValue, setValue) = use_state(
             "test2", "A", self.__callback_test_use_state_with_on_change
         )
         self.assertEqual(getValue(), "A", "State value should be A")
@@ -34,8 +34,8 @@ class TestState(BaseTestCase):
         )
 
     def test_use_state_multiple(self) -> None:
-        (getValue, setValue) = useState("test3", "A")
-        (getValue1, setValue1) = useState("test3", "A")
+        (getValue, setValue) = use_state("test3", "A")
+        (getValue1, setValue1) = use_state("test3", "A")
         self.assertEqual(getValue(), "A", "State value should be A")
         self.assertEqual(getValue1(), "A", "State value should be A")
         setValue("B")
@@ -43,13 +43,13 @@ class TestState(BaseTestCase):
         self.assertEqual(getValue1(), "B", "State value should be B")
 
     def test_use_state_none_default(self) -> None:
-        (getValue, setValue) = useState("test4", defaultState(str))
+        (getValue, setValue) = use_state("test4", default_state(str))
         self.assertIsNone(getValue(), "State value should be None")
         setValue("Test")
         self.assertEqual(getValue(), "Test", "State value should be Test")
 
     def test_use_state_null_state(self) -> None:
-        (getValue, setValue) = useState("test5", nullState(str))
+        (getValue, setValue) = use_state("test5", null_state(str))
         self.assertIsNone(getValue(), "State value should be None")
         setValue("Test")
         self.assertEqual(getValue(), "Test", "State value should be Test")

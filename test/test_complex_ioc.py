@@ -5,17 +5,17 @@ from jstreams.ioc import (
     InjectedVariable,
     OptionalInjectedDependency,
     StrVariable,
-    injectArgs,
+    inject_args,
     injector,
-    resolveDependencies,
-    resolveVariables,
+    resolve_dependencies,
+    resolve_variables,
     component,
     Strategy,
     service,
 )
 
 
-@resolveVariables(
+@resolve_variables(
     {
         "label": StrVariable("label"),
     }
@@ -30,7 +30,7 @@ class MockWithVariables:
         return self.label + str(self.value)
 
 
-@resolveDependencies(
+@resolve_dependencies(
     {
         "label": str,
     }
@@ -45,12 +45,12 @@ class MockWithDependencies:
         return self.label + str(self.value)
 
 
-@resolveDependencies(
+@resolve_dependencies(
     {
         "label1": str,
     }
 )
-@resolveVariables(
+@resolve_variables(
     {
         "label2": StrVariable("label"),
     }
@@ -72,13 +72,13 @@ LAZY_TEST_INIT_CALLED = False
 
 class TestComplexIoc(BaseTestCase):
     def test_resolve_variables(self) -> None:
-        injector().provideVar(str, "label", "labelValue")
+        injector().provide_var(str, "label", "labelValue")
         mock = MockWithVariables(12)
         self.assertEqual(mock.printValues(), "labelValue12")
 
     def test_resolve_variables_after_instantiation(self) -> None:
         mock = MockWithVariables(12)
-        injector().provideVar(str, "label", "labelValue")
+        injector().provide_var(str, "label", "labelValue")
         self.assertEqual(mock.printValues(), "labelValue12")
 
     def test_resolve_dependency(self) -> None:
@@ -92,7 +92,7 @@ class TestComplexIoc(BaseTestCase):
         self.assertEqual(mock.printValues(), "labelValue10")
 
     def test_resolve_variables_and_dependencies(self) -> None:
-        injector().provideVar(str, "label", "labelValueVar")
+        injector().provide_var(str, "label", "labelValueVar")
         injector().provide(str, "labelValueDep")
         mock = MockWithDependenciesAndVariables(7)
         self.assertEqual(mock.printValues(), "labelValueDep7labelValueVar")
@@ -168,17 +168,17 @@ class TestComplexIoc(BaseTestCase):
         self.assertEqual(dep().mock(), "test", "Dependency should be injected")
 
     def test_injected_variable(self) -> None:
-        injector().provideVar(str, "test", "string")
+        injector().provide_var(str, "test", "string")
         var = InjectedVariable(str, "test")
         self.assertEqual(
             var(), "string", "Variable should have been injected and correct"
         )
 
     def test_argument_injection(self) -> None:
-        injector().provideDependencies({str: "test", int: 10})
+        injector().provide_dependencies({str: "test", int: 10})
 
         class Test:
-            @injectArgs({"a": str, "b": int})
+            @inject_args({"a": str, "b": int})
             def __init__(self, a: str, b: int) -> None:
                 self.val = a + str(b)
 
@@ -186,20 +186,20 @@ class TestComplexIoc(BaseTestCase):
 
     def test_argument_injection_lazy_inject(self) -> None:
         class Test:
-            @injectArgs({"a": str, "b": int})
+            @inject_args({"a": str, "b": int})
             def __init__(self, a: str, b: int) -> None:
                 self.val = a + str(b)
 
-        injector().provideDependencies({str: "test", int: 10})
+        injector().provide_dependencies({str: "test", int: 10})
         self.assertEqual(Test().val, "test10")
 
     def test_argument_injection_lazy_declare(self) -> None:
         class Test:
-            @injectArgs({"a": str, "b": int})
+            @inject_args({"a": str, "b": int})
             def __init__(self, a: str, b: int) -> None:
                 self.val = a + str(b)
 
-        injector().provideDependencies({str: lambda: "test", int: lambda: 10})
+        injector().provide_dependencies({str: lambda: "test", int: lambda: 10})
         self.assertEqual(Test().val, "test10")
 
     def test_all_of_type(self) -> None:
@@ -218,9 +218,9 @@ class TestComplexIoc(BaseTestCase):
                 return "B" in value
 
         testString = "AB"
-        stream = injector().allOfTypeStream(ValidatorInterface)
-        self.assertEqual(len(stream.toList()), 2)
-        valid = stream.allMatch(lambda v: v.validate(testString))
+        stream = injector().all_of_type_stream(ValidatorInterface)
+        self.assertEqual(len(stream.to_list()), 2)
+        valid = stream.all_match(lambda v: v.validate(testString))
         self.assertTrue(valid)
 
     def test_component_profile(self) -> None:
@@ -238,11 +238,11 @@ class TestComplexIoc(BaseTestCase):
             def validate(self, value: str) -> bool:
                 return "B" in value
 
-        injector().activateProfile("A")
-        stream = injector().allOfTypeStream(ValidatorInterface)
-        self.assertEqual(len(stream.toList()), 1)
+        injector().activate_profile("A")
+        stream = injector().all_of_type_stream(ValidatorInterface)
+        self.assertEqual(len(stream.to_list()), 1)
         testString = "AAA"
-        valid = stream.allMatch(lambda v: v.validate(testString))
+        valid = stream.all_match(lambda v: v.validate(testString))
         self.assertTrue(valid)
 
     def test_component_profile_alternate_A(self) -> None:
@@ -250,17 +250,17 @@ class TestComplexIoc(BaseTestCase):
             def validate(self, value: str) -> bool:
                 pass
 
-        @component(className=ValidatorInterface, profiles=["PROFILE_A"])
+        @component(class_name=ValidatorInterface, profiles=["PROFILE_A"])
         class ContainsAValidator(ValidatorInterface):
             def validate(self, value: str) -> bool:
                 return "A" in value
 
-        @component(className=ValidatorInterface, profiles=["PROFILE_B"])
+        @component(class_name=ValidatorInterface, profiles=["PROFILE_B"])
         class ContainsBValidator(ValidatorInterface):
             def validate(self, value: str) -> bool:
                 return "B" in value
 
-        injector().activateProfile("PROFILE_A")
+        injector().activate_profile("PROFILE_A")
         comp = inject(ValidatorInterface)
         self.assertIsInstance(comp, ContainsAValidator)
 
@@ -269,17 +269,17 @@ class TestComplexIoc(BaseTestCase):
             def validate(self, value: str) -> bool:
                 pass
 
-        @component(className=ValidatorInterface, profiles=["A"])
+        @component(class_name=ValidatorInterface, profiles=["A"])
         class ContainsAValidator(ValidatorInterface):
             def validate(self, value: str) -> bool:
                 return "A" in value
 
-        @component(className=ValidatorInterface, profiles=["B"])
+        @component(class_name=ValidatorInterface, profiles=["B"])
         class ContainsBValidator(ValidatorInterface):
             def validate(self, value: str) -> bool:
                 return "B" in value
 
-        injector().activateProfile("B")
+        injector().activate_profile("B")
         comp = inject(ValidatorInterface)
         self.assertIsInstance(comp, ContainsBValidator)
 
@@ -298,11 +298,11 @@ class TestComplexIoc(BaseTestCase):
             def validate(self, value: str) -> bool:
                 return "B" in value
 
-        injector().activateProfile("A")
-        stream = injector().allOfTypeStream(ValidatorInterface)
-        self.assertEqual(len(stream.toList()), 1)
+        injector().activate_profile("A")
+        stream = injector().all_of_type_stream(ValidatorInterface)
+        self.assertEqual(len(stream.to_list()), 1)
         testString = "AAA"
-        valid = stream.allMatch(lambda v: v.validate(testString))
+        valid = stream.all_match(lambda v: v.validate(testString))
         self.assertTrue(valid)
 
     def test_service_profile_alternate_A(self) -> None:
@@ -310,17 +310,17 @@ class TestComplexIoc(BaseTestCase):
             def validate(self, value: str) -> bool:
                 pass
 
-        @service(className=ValidatorInterface, profiles=["PROFILE_A"])
+        @service(class_name=ValidatorInterface, profiles=["PROFILE_A"])
         class ContainsAValidator(ValidatorInterface):
             def validate(self, value: str) -> bool:
                 return "A" in value
 
-        @service(className=ValidatorInterface, profiles=["PROFILE_B"])
+        @service(class_name=ValidatorInterface, profiles=["PROFILE_B"])
         class ContainsBValidator(ValidatorInterface):
             def validate(self, value: str) -> bool:
                 return "B" in value
 
-        injector().activateProfile("PROFILE_A")
+        injector().activate_profile("PROFILE_A")
         comp = inject(ValidatorInterface)
         self.assertIsInstance(comp, ContainsAValidator)
 
@@ -329,17 +329,17 @@ class TestComplexIoc(BaseTestCase):
             def validate(self, value: str) -> bool:
                 pass
 
-        @service(className=ValidatorInterface, profiles=["A"])
+        @service(class_name=ValidatorInterface, profiles=["A"])
         class ContainsAValidator(ValidatorInterface):
             def validate(self, value: str) -> bool:
                 return "A" in value
 
-        @service(className=ValidatorInterface, profiles=["B"])
+        @service(class_name=ValidatorInterface, profiles=["B"])
         class ContainsBValidator(ValidatorInterface):
             def validate(self, value: str) -> bool:
                 return "B" in value
 
-        injector().activateProfile("B")
+        injector().activate_profile("B")
         comp = inject(ValidatorInterface)
         self.assertIsInstance(comp, ContainsBValidator)
 
@@ -348,8 +348,8 @@ class TestComplexIoc(BaseTestCase):
         class Service:
             pass
 
-        @resolveDependencies({"service": Service})
-        @resolveVariables({"variable": StrVariable("variable")})
+        @resolve_dependencies({"service": Service})
+        @resolve_variables({"variable": StrVariable("variable")})
         class Test:
             service: Service
             variable: str
@@ -357,7 +357,7 @@ class TestComplexIoc(BaseTestCase):
             def mock(self) -> str:
                 return "test"
 
-        injector().provideVar(str, "variable", "value")
+        injector().provide_var(str, "variable", "value")
         test = Test()
         self.assertIsNotNone(test.service)
         self.assertIsNotNone(test.variable)

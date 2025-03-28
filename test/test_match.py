@@ -1,15 +1,15 @@
 from typing import Optional
 from baseTest import BaseTestCase
 from jstreams import (
-    isNone,
-    isNotNone,
+    is_none,
+    is_not_none,
     case,
-    defaultCase,
+    default_case,
     match,
-    matchOpt,
-    isBeweenClosed,
-    isHigherThanOrEqual,
-    isLessThan,
+    match_opt,
+    is_beween_closed,
+    is_higher_than_or_eq,
+    is_less_than,
 )
 
 
@@ -36,7 +36,7 @@ class TestMatch(BaseTestCase):
         val = match(5).of(
             case(1, "test1"),
             case(2, "test2"),
-            case(isBeweenClosed(3, 6), "testBetween"),
+            case(is_beween_closed(3, 6), "testBetween"),
             case(7, "test7"),
         )
         self.assertEqual(val, "testBetween", "Value should be correct")
@@ -45,7 +45,7 @@ class TestMatch(BaseTestCase):
         val = match(5).of(
             case(1, "test1"),
             case(2, "test2"),
-            case(isBeweenClosed(3, 6), lambda: "testBetween"),
+            case(is_beween_closed(3, 6), lambda: "testBetween"),
             case(7, "test7"),
         )
         self.assertEqual(val, "testBetween", "Value should be correct")
@@ -54,29 +54,29 @@ class TestMatch(BaseTestCase):
         val = match(5).of(
             case(1, "test1"),
             case(2, "test2"),
-            defaultCase("default"),
+            default_case("default"),
         )
         self.assertEqual(val, "default", "Value should be default")
 
     def test_match_predicates_suppliers(self) -> None:
         val = match(8).of(
-            case(isLessThan(5), lambda: str(5)),
-            case(isHigherThanOrEqual(5), lambda: str(5) + "H"),
+            case(is_less_than(5), lambda: str(5)),
+            case(is_higher_than_or_eq(5), lambda: str(5) + "H"),
         )
         self.assertEqual(val, "5H", "Value should be correctly mapped")
 
     def test_match_opt_none(self) -> None:
         v: Optional[str] = None
-        val = matchOpt(v).of(
-            case(isNone, "None"),
-            case(isNotNone, "Not none"),
+        val = match_opt(v).of(
+            case(is_none, "None"),
+            case(is_not_none, "Not none"),
         )
         self.assertEqual(val, "None", "Case should be isNone")
 
     def test_match_opt_not_none(self) -> None:
         v: Optional[str] = "str"
-        val = matchOpt(v).of(
-            case(isNone, "None"),
-            case(isNotNone, "Not none"),
+        val = match_opt(v).of(
+            case(is_none, "None"),
+            case(is_not_none, "Not none"),
         )
         self.assertEqual(val, "Not none", "Case should be isNotNone")

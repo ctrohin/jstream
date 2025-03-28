@@ -3,12 +3,14 @@ README.md
 pyproject.toml
 setup.py
 jstreams/__init__.py
+jstreams/collectors.py
 jstreams/ioc.py
 jstreams/match.py
 jstreams/noop.py
 jstreams/predicate.py
 jstreams/py.typed
 jstreams/rx.py
+jstreams/state.py
 jstreams/stream.py
 jstreams/thread.py
 jstreams/timer.py
@@ -26,7 +28,9 @@ test/test_match.py
 test/test_not.py
 test/test_opt.py
 test/test_predicate.py
+test/test_profile.py
 test/test_rx.py
+test/test_state.py
 test/test_stream.py
 test/test_timers.py
 test/test_try.py

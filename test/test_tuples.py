@@ -1,6 +1,6 @@
 from baseTest import BaseTestCase
-from jstreams.predicate import Not, contains, isInInterval, isZero
-from jstreams.tuples import leftMatches, middleMatches, pair, rightMatches, triplet
+from jstreams.predicate import not_, contains, is_in_interval, is_zero
+from jstreams.tuples import left_matches, middle_matches, pair, right_matches, triplet
 
 
 class TestTuples(BaseTestCase):
@@ -17,28 +17,28 @@ class TestTuples(BaseTestCase):
 
     def test_pair_predicate(self) -> None:
         v = pair("test", 0)
-        self.assertTrue(leftMatches(contains("es"))(v), "Left should match predicate")
+        self.assertTrue(left_matches(contains("es"))(v), "Left should match predicate")
         self.assertFalse(
-            leftMatches(contains("as"))(v), "Left should not match predicate"
+            left_matches(contains("as"))(v), "Left should not match predicate"
         )
-        self.assertTrue(rightMatches(isZero)(v), "Right should match predicate")
+        self.assertTrue(right_matches(is_zero)(v), "Right should match predicate")
         self.assertFalse(
-            rightMatches(Not(isZero))(v), "Right should not match predicate"
+            right_matches(not_(is_zero))(v), "Right should not match predicate"
         )
 
     def test_triplet_predicate(self) -> None:
         v = triplet("test", 0, 1.5)
-        self.assertTrue(leftMatches(contains("es"))(v), "Left should match predicate")
+        self.assertTrue(left_matches(contains("es"))(v), "Left should match predicate")
         self.assertFalse(
-            leftMatches(contains("as"))(v), "Left should not match predicate"
+            left_matches(contains("as"))(v), "Left should not match predicate"
         )
-        self.assertTrue(middleMatches(isZero)(v), "Middle should match predicate")
+        self.assertTrue(middle_matches(is_zero)(v), "Middle should match predicate")
         self.assertFalse(
-            middleMatches(Not(isZero))(v), "Middle should not match predicate"
+            middle_matches(not_(is_zero))(v), "Middle should not match predicate"
         )
         self.assertTrue(
-            rightMatches(isInInterval(1, 2))(v), "Right should match predicate"
+            right_matches(is_in_interval(1, 2))(v), "Right should match predicate"
         )
         self.assertFalse(
-            rightMatches(isInInterval(1.6, 2))(v), "Right should not match predicate"
+            right_matches(is_in_interval(1.6, 2))(v), "Right should not match predicate"
         )

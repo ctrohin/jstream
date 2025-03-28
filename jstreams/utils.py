@@ -31,7 +31,7 @@ FnType = type(_f)
 MthType = type(_F().mth)
 
 
-def isCallable(var: Any) -> bool:
+def is_callable(var: Any) -> bool:
     """
     Checks if the given argument is either a function or a method in a class.
 
@@ -41,11 +41,11 @@ def isCallable(var: Any) -> bool:
     Returns:
         bool: True if var is a function or method, False otherwise
     """
-    varType = type(var)
-    return varType is FnType or varType is MthType
+    var_type = type(var)
+    return var_type is FnType or var_type is MthType
 
 
-def requireNotNull(obj: Optional[T], message: Optional[str] = None) -> T:
+def require_non_null(obj: Optional[T], message: Optional[str] = None) -> T:
     """
     Returns a non null value of the object provided. If the provided value is null,
     the function raises a ValueError.
@@ -65,23 +65,23 @@ def requireNotNull(obj: Optional[T], message: Optional[str] = None) -> T:
     return obj
 
 
-def isNumber(anyVal: Any) -> bool:
+def is_number(any_val: Any) -> bool:
     """Checks if the value provided is a number
 
     Args:
-        anyVal (any): the value
+        any_val (any): the value
 
     Returns:
         bool: True if anyVal is a number, False otherwise
     """
     try:
-        _: float = float(anyVal) + 1
+        _: float = float(any_val) + 1
     except Exception:
         return False
     return True
 
 
-def toInt(val: Any) -> int:
+def to_int(val: Any) -> int:
     """
     Returns an int representation of the given value.
     Raises a ValueError if the value cannot be represented as an int.
@@ -95,7 +95,7 @@ def toInt(val: Any) -> int:
     return int(str(val))
 
 
-def toFloat(val: Any) -> float:
+def to_float(val: Any) -> float:
     """
     Returns a float representation of the given value.
     Raises a ValueError if the value cannot be represented as a float.
@@ -109,7 +109,7 @@ def toFloat(val: Any) -> float:
     return float(str(val))
 
 
-def asList(dct: dict[Any, T]) -> list[T]:
+def as_list(dct: dict[Any, T]) -> list[T]:
     """
     Returns the values in a dict as a list.
 
@@ -122,7 +122,7 @@ def asList(dct: dict[Any, T]) -> list[T]:
     return [v for _, v in dct.items()]
 
 
-def keysAsList(dct: dict[T, Any]) -> list[T]:
+def keys_as_list(dct: dict[T, Any]) -> list[T]:
     """
     Returns the keys in a dict as a list
 
@@ -135,13 +135,13 @@ def keysAsList(dct: dict[T, Any]) -> list[T]:
     return [k for k, _ in dct.items()]
 
 
-def loadJson(
+def load_json(
     s: Union[str, bytes, bytearray],
 ) -> Optional[Union[list[Any], dict[Any, Any]]]:
-    return loadJsonEx(s, None)
+    return load_json_ex(s, None)
 
 
-def loadJsonEx(
+def load_json_ex(
     s: Union[str, bytes, bytearray], handler: Optional[Callable[[Exception], Any]]
 ) -> Optional[Union[list[Any], dict[Any, Any]]]:
     try:
@@ -166,7 +166,7 @@ def identity(value: T) -> T:
 
 
 def extract(
-    typ: type[T], val: Any, keys: list[Any], defaultValue: Optional[T] = None
+    typ: type[T], val: Any, keys: list[Any], default_value: Optional[T] = None
 ) -> Optional[T]:
     """
     Extract a property from a complex object
@@ -175,31 +175,31 @@ def extract(
         typ (type[T]): The property type
         val (Any): The object the property will be extracted from
         keys (list[Any]): The list of keys to be applied. For each key, a value will be extracted recursively
-        defaultValue (Optional[T], optional): Default value if property is not found. Defaults to None.
+        default_value (Optional[T], optional): Default value if property is not found. Defaults to None.
 
     Returns:
         Optional[T]: The found property or the default value
     """
     if val is None:
-        return defaultValue
+        return default_value
 
     if len(keys) == 0:
-        return cast(typ, val) if val is not None else defaultValue  # type: ignore[valid-type]
+        return cast(typ, val) if val is not None else default_value  # type: ignore[valid-type]
 
     if isinstance(val, list):
         if len(val) < keys[0]:
-            return defaultValue
-        return extract(typ, val[keys[0]], keys[1:], defaultValue)
+            return default_value
+        return extract(typ, val[keys[0]], keys[1:], default_value)
 
     if isinstance(val, dict):
-        return extract(typ, val.get(keys[0], None), keys[1:], defaultValue)
+        return extract(typ, val.get(keys[0], None), keys[1:], default_value)
 
     if hasattr(val, keys[0]):
-        return extract(typ, getattr(val, keys[0]), keys[:1], defaultValue)
-    return defaultValue
+        return extract(typ, getattr(val, keys[0]), keys[:1], default_value)
+    return default_value
 
 
-def isNotNone(element: Optional[T]) -> bool:
+def is_not_none(element: Optional[T]) -> bool:
     """
     Checks if the given element is not None. This function is meant to be used
     instead of lambdas for non null checks
@@ -213,7 +213,7 @@ def isNotNone(element: Optional[T]) -> bool:
     return element is not None
 
 
-def isEmptyOrNone(
+def is_empty_or_none(
     obj: Union[list[Any], dict[Any, Any], str, None, Any, Iterable[Any]],
 ) -> bool:
     """
@@ -240,7 +240,7 @@ def isEmptyOrNone(
     return False
 
 
-def cmpToKey(mycmp: Callable[[C, C], int]) -> type:
+def cmp_to_key(mycmp: Callable[[C, C], int]) -> type:
     """Convert a cmp= function into a key= function"""
 
     class Key(Generic[C]):  # type: ignore[misc]
@@ -284,7 +284,7 @@ def each(target: Optional[Iterable[T]], action: Callable[[T], Any]) -> None:
         action(el)
 
 
-def dictUpdate(target: dict[K, V], key: K, value: V) -> None:
+def dict_update(target: dict[K, V], key: K, value: V) -> None:
     target[key] = value
 
 
@@ -301,4 +301,4 @@ def sort(target: list[T], comparator: Callable[[T, T], int]) -> list[T]:
         list[T]: The resulting list
     """
 
-    return sorted(target, key=cmpToKey(comparator))
+    return sorted(target, key=cmp_to_key(comparator))

@@ -7,7 +7,7 @@ from jstreams.ioc import injector
 from mockService3 import MockService3
 
 tc = unittest.TestCase()
-injector().scanModules(["mockService1"])
+injector().scan_modules(["mockService1"])
 
 ms3 = injector().find(MockService3)
 

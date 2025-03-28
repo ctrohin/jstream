@@ -4,9 +4,9 @@ from jstreams import Dependency, injector
 from jstreams.ioc import (
     InjectedDependency,
     StrVariable,
-    injectArgs,
-    resolveDependencies,
-    resolveVariables,
+    inject_args,
+    resolve_dependencies,
+    resolve_variables,
 )
 from jstreams.predicate import equals
 
@@ -64,7 +64,7 @@ class TestIOC(BaseTestCase):
         )
 
     def test_autowire_public_attr(self) -> None:
-        @resolveDependencies({"testIf": TestInterface})
+        @resolve_dependencies({"testIf": TestInterface})
         class Test:
             testIf: TestInterface
 
@@ -77,7 +77,7 @@ class TestIOC(BaseTestCase):
         )
 
     def test_autowire_protected_attr(self) -> None:
-        @resolveDependencies({"_testIf": TestInterface})
+        @resolve_dependencies({"_testIf": TestInterface})
         class Test:
             _testIf: TestInterface
 
@@ -140,19 +140,19 @@ class TestIOC(BaseTestCase):
 
     def test_injector_optional(self) -> None:
         self.assertFalse(
-            injector().optional(str).isPresent(), "Dependency should not be present"
+            injector().optional(str).is_present(), "Dependency should not be present"
         )
         injector().provide(str, "Test")
         self.assertTrue(
-            injector().optional(str).isPresent(), "Dependency should be present"
+            injector().optional(str).is_present(), "Dependency should be present"
         )
         self.assertTrue(
-            injector().optional(str).filter(equals("Test")).isPresent(),
+            injector().optional(str).filter(equals("Test")).is_present(),
             "Dependency should be correct",
         )
 
     def test_injected_variable_class_fail(self) -> None:
-        @resolveVariables({"val": StrVariable("valKey", True)})
+        @resolve_variables({"val": StrVariable("valKey", True)})
         class Test:
             val: Optional[str]
 
@@ -160,17 +160,17 @@ class TestIOC(BaseTestCase):
         self.assertIsNone(test.val, "Value should be none")
 
     def test_injected_variable_class_success(self) -> None:
-        @resolveVariables({"val": StrVariable("valKey")})
+        @resolve_variables({"val": StrVariable("valKey")})
         class Test:
             val: Optional[str]
 
-        injector().provideVar(str, "valKey", "Test")
+        injector().provide_var(str, "valKey", "Test")
 
         test = Test()
         self.assertEqual(test.val, "Test", "Value should be none")
 
     def test_inject_to_functions(self) -> None:
-        @injectArgs({"a": int, "b": str})
+        @inject_args({"a": int, "b": str})
         def fn(a: int, b: str) -> str:
             return str(a) + "_" + b
 
@@ -183,7 +183,7 @@ class TestIOC(BaseTestCase):
         self.assertEqual(fn(10, "other"), "10_other")
 
     def test_inject_to_functions_with_qualifiers(self) -> None:
-        @injectArgs({"a": Dependency(int, "a"), "b": str})
+        @inject_args({"a": Dependency(int, "a"), "b": str})
         def fn(a: int, b: str) -> str:
             return str(a) + "_" + b
 

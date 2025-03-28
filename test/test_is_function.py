@@ -1,5 +1,5 @@
 from baseTest import BaseTestCase
-from jstreams import isCallable
+from jstreams import is_callable
 
 
 class _Class:
@@ -18,10 +18,10 @@ class TestIsCallable(BaseTestCase):
         return False
 
     def test_is_function(self) -> None:
-        self.assertTrue(isCallable(fn_test), "Should be a function")
-        self.assertTrue(isCallable(self.fn), "Should be a method")
-        self.assertTrue(isCallable(self.fn1), "Should be a method")
+        self.assertTrue(is_callable(fn_test), "Should be a function")
+        self.assertTrue(is_callable(self.fn), "Should be a method")
+        self.assertTrue(is_callable(self.fn1), "Should be a method")
         val = "Test"
-        self.assertFalse(isCallable(val), "Should not be a function or method")
+        self.assertFalse(is_callable(val), "Should not be a function or method")
         obj = _Class()
-        self.assertFalse(isCallable(obj), "Should not be a function or method")
+        self.assertFalse(is_callable(obj), "Should not be a function or method")

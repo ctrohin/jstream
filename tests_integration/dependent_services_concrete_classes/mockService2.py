@@ -1,10 +1,10 @@
-from jstreams import resolveDependencies
+from jstreams import resolve_dependencies
 from jstreams.ioc import service
 from mockService1 import MockService1
 
 
 @service()
-@resolveDependencies({"mockService1": MockService1})
+@resolve_dependencies({"mockService1": MockService1})
 class MockService2:
     mockService1: MockService1
 

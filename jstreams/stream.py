@@ -10,7 +10,7 @@ from typing import (
     Union,
 )
 from abc import ABC, abstractmethod
-from jstreams.utils import isNotNone, requireNotNull, each, isEmptyOrNone, sort
+from jstreams.utils import is_not_none, require_non_null, each, is_empty_or_none, sort
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -20,7 +20,7 @@ C = TypeVar("C")
 
 class Predicate(ABC, Generic[T]):
     @abstractmethod
-    def Apply(self, value: T) -> bool:
+    def apply(self, value: T) -> bool:
         """
         Apply a condition to a given value.
 
@@ -31,63 +31,63 @@ class Predicate(ABC, Generic[T]):
             bool: True if the value matches, False otherwise
         """
 
-    def Or(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
-        return predicateOf(lambda v: self.Apply(v) or predicateOf(other).Apply(v))
+    def or_(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
+        return predicate_of(lambda v: self.apply(v) or predicate_of(other).apply(v))
 
-    def And(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
-        return predicateOf(lambda v: self.Apply(v) and predicateOf(other).Apply(v))
+    def and_(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
+        return predicate_of(lambda v: self.apply(v) and predicate_of(other).apply(v))
 
     def __call__(self, value: T) -> bool:
-        return self.Apply(value)
+        return self.apply(value)
 
 
 class PredicateWith(ABC, Generic[T, K]):
     @abstractmethod
-    def Apply(self, value: T, withValue: K) -> bool:
+    def apply(self, value: T, with_value: K) -> bool:
         """
         Apply a condition to two given values.
 
         Args:
             value (T): The value
-            withValue (K): The second value
+            with_value (K): The second value
 
         Returns:
             bool: True if the values matche the predicate, False otherwise
         """
 
-    def Or(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
-        return predicateWithOf(lambda v, k: self.Apply(v, k) or other.Apply(v, k))
+    def or_(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
+        return predicate_with_of(lambda v, k: self.apply(v, k) or other.apply(v, k))
 
-    def And(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
-        return predicateWithOf(lambda v, k: self.Apply(v, k) and other.Apply(v, k))
+    def and_(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
+        return predicate_with_of(lambda v, k: self.apply(v, k) and other.apply(v, k))
 
-    def __call__(self, value: T, withValue: K) -> bool:
-        return self.Apply(value, withValue)
+    def __call__(self, value: T, with_value: K) -> bool:
+        return self.apply(value, with_value)
 
 
 class _WrapPredicate(Predicate[T]):
-    __slots__ = ["__predicateFn"]
+    __slots__ = ["__predicate_fn"]
 
     def __init__(self, fn: Callable[[T], bool]) -> None:
-        self.__predicateFn = fn
+        self.__predicate_fn = fn
 
-    def Apply(self, value: T) -> bool:
-        return self.__predicateFn(value)
+    def apply(self, value: T) -> bool:
+        return self.__predicate_fn(value)
 
 
 class _WrapPredicateWith(PredicateWith[T, K]):
-    __slots__ = ["__predicateFn"]
+    __slots__ = ["__predicate_fn"]
 
     def __init__(self, fn: Callable[[T, K], bool]) -> None:
-        self.__predicateFn = fn
+        self.__predicate_fn = fn
 
-    def Apply(self, value: T, withValue: K) -> bool:
-        return self.__predicateFn(value, withValue)
+    def apply(self, value: T, withValue: K) -> bool:
+        return self.__predicate_fn(value, withValue)
 
 
 class Mapper(ABC, Generic[T, V]):
     @abstractmethod
-    def Map(self, value: T) -> V:
+    def map(self, value: T) -> V:
         """
         Maps the given value, to a new value of maybe a different type.
 
@@ -99,25 +99,25 @@ class Mapper(ABC, Generic[T, V]):
         """
 
     def __call__(self, value: T) -> V:
-        return self.Map(value)
+        return self.map(value)
 
 
 class MapperWith(ABC, Generic[T, K, V]):
     @abstractmethod
-    def Map(self, value: T, withValue: K) -> V:
+    def map(self, value: T, with_value: K) -> V:
         """
         Maps the given two values, to a new value.
 
         Args:
             value (T): The given value
-            withValue (K): The scond value
+            with_value (K): The scond value
 
         Returns:
             V: The produced value
         """
 
-    def __call__(self, value: T, withValue: K) -> V:
-        return self.Map(value, withValue)
+    def __call__(self, value: T, with_value: K) -> V:
+        return self.map(value, with_value)
 
 
 class _WrapMapper(Mapper[T, V]):
@@ -126,7 +126,7 @@ class _WrapMapper(Mapper[T, V]):
     def __init__(self, mapper: Callable[[T], V]) -> None:
         self.__mapper = mapper
 
-    def Map(self, value: T) -> V:
+    def map(self, value: T) -> V:
         return self.__mapper(value)
 
 
@@ -136,13 +136,13 @@ class _WrapMapperWith(MapperWith[T, K, V]):
     def __init__(self, mapper: Callable[[T, K], V]) -> None:
         self.__mapper = mapper
 
-    def Map(self, value: T, withValue: K) -> V:
+    def map(self, value: T, withValue: K) -> V:
         return self.__mapper(value, withValue)
 
 
 class Reducer(ABC, Generic[T]):
     @abstractmethod
-    def Reduce(self, a: T, b: T) -> T:
+    def reduce(self, a: T, b: T) -> T:
         """
         Reduce two values to a single one.
 
@@ -155,7 +155,7 @@ class Reducer(ABC, Generic[T]):
         """
 
     def __call__(self, a: T, b: T) -> T:
-        return self.Reduce(a, b)
+        return self.reduce(a, b)
 
 
 class _WrapReducer(Reducer[T]):
@@ -164,17 +164,17 @@ class _WrapReducer(Reducer[T]):
     def __init__(self, reducer: Callable[[T, T], T]) -> None:
         self.__reducer = reducer
 
-    def Reduce(self, a: T, b: T) -> T:
+    def reduce(self, a: T, b: T) -> T:
         return self.__reducer(a, b)
 
 
-def reducerOf(reducer: Union[Reducer[T], Callable[[T, T], T]]) -> Reducer[T]:
+def reducer_of(reducer: Union[Reducer[T], Callable[[T, T], T]]) -> Reducer[T]:
     if isinstance(reducer, Reducer):
         return reducer
     return _WrapReducer(reducer)
 
 
-def mapperOf(mapper: Union[Mapper[T, V], Callable[[T], V]]) -> Mapper[T, V]:
+def mapper_of(mapper: Union[Mapper[T, V], Callable[[T], V]]) -> Mapper[T, V]:
     """
     If the value passed is a mapper, it is returned without changes.
     If a function is passed, it will be wrapped into a Mapper object.
@@ -190,7 +190,7 @@ def mapperOf(mapper: Union[Mapper[T, V], Callable[[T], V]]) -> Mapper[T, V]:
     return _WrapMapper(mapper)
 
 
-def mapperWithOf(
+def mapper_with_of(
     mapper: Union[MapperWith[T, K, V], Callable[[T, K], V]],
 ) -> MapperWith[T, K, V]:
     """
@@ -209,7 +209,7 @@ def mapperWithOf(
     return _WrapMapperWith(mapper)
 
 
-def predicateOf(predicate: Union[Predicate[T], Callable[[T], bool]]) -> Predicate[T]:
+def predicate_of(predicate: Union[Predicate[T], Callable[[T], bool]]) -> Predicate[T]:
     """
     If the value passed is a predicate, it is returned without any changes.
     If a function is passed, it will be wrapped into a Predicate object.
@@ -225,7 +225,7 @@ def predicateOf(predicate: Union[Predicate[T], Callable[[T], bool]]) -> Predicat
     return _WrapPredicate(predicate)
 
 
-def predicateWithOf(
+def predicate_with_of(
     predicate: Union[PredicateWith[T, K], Callable[[T, K], bool]],
 ) -> PredicateWith[T, K]:
     """
@@ -243,7 +243,7 @@ def predicateWithOf(
     return _WrapPredicateWith(predicate)
 
 
-def findFirst(
+def find_first(
     target: Optional[Iterable[T]], predicate: Union[Predicate[T], Callable[[T], bool]]
 ) -> Optional[T]:
     """
@@ -260,12 +260,12 @@ def findFirst(
         return None
 
     for el in target:
-        if predicateOf(predicate).Apply(el):
+        if predicate_of(predicate).apply(el):
             return el
     return None
 
 
-def mapIt(
+def map_it(
     target: Iterable[T], mapper: Union[Mapper[T, V], Callable[[T], V]]
 ) -> list[V]:
     """
@@ -280,18 +280,18 @@ def mapIt(
     """
     if target is None:
         return []
-    mapperObj = mapperOf(mapper)
-    return [mapperObj.Map(el) for el in target]
+    mapper_obj = mapper_of(mapper)
+    return [mapper_obj.map(el) for el in target]
 
 
-def flatMap(
+def flat_map(
     target: Iterable[T],
     mapper: Union[Mapper[T, Iterable[V]], Callable[[T], Iterable[V]]],
 ) -> list[V]:
     """
     Returns a flattened map. The mapper function is called for each element of the target
     iterable, then all elements are added to a result list.
-    Ex: flatMap([1, 2], lambda x: [x, x + 1]) returns [1, 2, 2, 3]
+    Ex: flat_map([1, 2], lambda x: [x, x + 1]) returns [1, 2, 2, 3]
 
     Args:
         target (Iterable[T]): The target iterable
@@ -304,10 +304,10 @@ def flatMap(
     if target is None:
         return ret
 
-    mapperObj = mapperOf(mapper)
+    mapper_obj = mapper_of(mapper)
 
     for el in target:
-        mapped = mapperObj.Map(el)
+        mapped = mapper_obj.map(el)
         each(mapped, ret.append)
     return ret
 
@@ -329,13 +329,14 @@ def matching(
     if target is None:
         return ret
 
+    pred = predicate_of(predicate)
     for el in target:
-        if predicateOf(predicate).Apply(el):
+        if pred.apply(el):
             ret.append(el)
     return ret
 
 
-def takeWhile(
+def take_while(
     target: Iterable[T], predicate: Union[Predicate[T], Callable[[T], bool]]
 ) -> list[T]:
     """
@@ -353,15 +354,16 @@ def takeWhile(
     if target is None:
         return ret
 
+    pred = predicate_of(predicate)
     for el in target:
-        if predicateOf(predicate).Apply(el):
+        if pred.apply(el):
             ret.append(el)
         else:
             break
     return ret
 
 
-def dropWhile(
+def drop_while(
     target: Iterable[T], predicate: Union[Predicate[T], Callable[[T], bool]]
 ) -> list[T]:
     """
@@ -382,8 +384,9 @@ def dropWhile(
 
     index = 0
 
+    pred = predicate_of(predicate)
     for el in target:
-        if predicateOf(predicate).Apply(el):
+        if pred.apply(el):
             index += 1
         else:
             break
@@ -407,14 +410,14 @@ def reduce(
     if target is None:
         return None
 
-    elemList = list(target)
-    if len(elemList) == 0:
+    elem_list = list(target)
+    if len(elem_list) == 0:
         return None
 
-    result: T = elemList[0]
-    reducerObj = reducerOf(reducer)
-    for el in elemList:
-        result = reducerObj.Reduce(el, result)
+    result: T = elem_list[0]
+    reducer_obj = reducer_of(reducer)
+    for el in elem_list:
+        result = reducer_obj.reduce(el, result)
     return result
 
 
@@ -425,7 +428,7 @@ class Opt(Generic[T]):
     def __init__(self, val: Optional[T]) -> None:
         self.__val = val
 
-    def __getNone(self) -> "Opt[T]":
+    def __get_none(self) -> "Opt[T]":
         if Opt.__NONE is None:
             Opt.__NONE = Opt(None)
         return cast(Opt[T], Opt.__NONE)
@@ -444,7 +447,7 @@ class Opt(Generic[T]):
             raise ValueError("Object is None")
         return self.__val
 
-    def getActual(self) -> Optional[T]:
+    def get_actual(self) -> Optional[T]:
         """
         Returns the actual value of the Opt without raising any errors
 
@@ -453,7 +456,7 @@ class Opt(Generic[T]):
         """
         return self.__val
 
-    def orElse(self, val: T) -> T:
+    def or_else(self, val: T) -> T:
         """
         Returns the value of the Opt if present, otherwise return the given parameter as a fallback.
         This functiona should be used when the given fallback is a constant or it does not require
@@ -467,7 +470,7 @@ class Opt(Generic[T]):
         """
         return self.__val if self.__val is not None else val
 
-    def orElseOpt(self, val: Optional[T]) -> Optional[T]:
+    def or_else_opt(self, val: Optional[T]) -> Optional[T]:
         """
         Returns the value of the Opt if present, otherwise return the given parameter as a fallback.
         This functiona should be used when the given fallback is a constant or it does not require
@@ -481,7 +484,7 @@ class Opt(Generic[T]):
         """
         return self.__val if self.__val is not None else val
 
-    def orElseGetOpt(self, supplier: Callable[[], Optional[T]]) -> Optional[T]:
+    def or_else_get_opt(self, supplier: Callable[[], Optional[T]]) -> Optional[T]:
         """
         Returns the value of the Opt if present, otherwise it will call the supplier
         function and return that value. This function is useful when the fallback value
@@ -495,7 +498,7 @@ class Opt(Generic[T]):
         """
         return self.__val if self.__val is not None else supplier()
 
-    def orElseGet(self, supplier: Callable[[], T]) -> T:
+    def or_else_get(self, supplier: Callable[[], T]) -> T:
         """
         Returns the value of the Opt if present, otherwise it will call the supplier
         function and return that value. This function is useful when the fallback value
@@ -509,7 +512,7 @@ class Opt(Generic[T]):
         """
         return self.__val if self.__val is not None else supplier()
 
-    def isPresent(self) -> bool:
+    def is_present(self) -> bool:
         """
         Returns whether the Opt is present
 
@@ -518,7 +521,7 @@ class Opt(Generic[T]):
         """
         return self.__val is not None
 
-    def isEmpty(self) -> bool:
+    def is_empty(self) -> bool:
         """
         Returns whether the Opt is empty
 
@@ -527,7 +530,7 @@ class Opt(Generic[T]):
         """
         return self.__val is None
 
-    def ifPresent(self, action: Callable[[T], Any]) -> "Opt[T]":
+    def if_present(self, action: Callable[[T], Any]) -> "Opt[T]":
         """
         Executes an action on the value of the Opt if the value is present
 
@@ -540,22 +543,22 @@ class Opt(Generic[T]):
             action(self.__val)
         return self
 
-    def ifPresentWith(self, withVal: K, action: Callable[[T, K], Any]) -> "Opt[T]":
+    def if_present_with(self, with_val: K, action: Callable[[T, K], Any]) -> "Opt[T]":
         """
         Executes an action on the value of the Opt if the value is present, by providing
         the action an additional parameter
 
         Args:
-            withVal (K): The additional parameter
+            with_val (K): The additional parameter
             action (Callable[[T, K], Any]): The action
         Returns:
             Opt[T]: This optional
         """
         if self.__val is not None:
-            action(self.__val, withVal)
+            action(self.__val, with_val)
         return self
 
-    def ifNotPresent(self, action: Callable[[], Any]) -> "Opt[T]":
+    def if_not_present(self, action: Callable[[], Any]) -> "Opt[T]":
         """
         Executes an action on if the value is not present
 
@@ -568,56 +571,59 @@ class Opt(Generic[T]):
             action()
         return self
 
-    def ifNotPresentWith(self, withVal: K, action: Callable[[K], Any]) -> "Opt[T]":
+    def if_not_present_with(self, with_val: K, action: Callable[[K], Any]) -> "Opt[T]":
         """
         Executes an action on if the value is not present, by providing
         the action an additional parameter
 
         Args:
-            withVal (K): The additional parameter
+            with_val (K): The additional parameter
             action (Callable[[K], Any]): The action
         Returns:
             Opt[T]: This optional
         """
         if self.__val is None:
-            action(withVal)
+            action(with_val)
         return self
 
-    def ifPresentOrElse(
-        self, action: Callable[[T], Any], emptyAction: Callable[[], Any]
+    def if_present_or_else(
+        self, action: Callable[[T], Any], empty_action: Callable[[], Any]
     ) -> "Opt[T]":
         """
         Executes an action on the value of the Opt if the value is present, or executes
-        the emptyAction if the Opt is empty
+        the empty_action if the Opt is empty
 
         Args:
             action (Callable[[T], Any]): The action to be executed when present
-            emptyAction (Callable[[], Any]): The action to be executed when empty
+            empty_action (Callable[[], Any]): The action to be executed when empty
         Returns:
             Opt[T]: This optional
         """
         if self.__val is not None:
             action(self.__val)
         else:
-            emptyAction()
+            empty_action()
         return self
 
-    def ifPresentOrElseWith(
-        self, withVal: K, action: Callable[[T, K], Any], emptyAction: Callable[[K], Any]
+    def if_present_or_else_with(
+        self,
+        with_val: K,
+        action: Callable[[T, K], Any],
+        empty_action: Callable[[K], Any],
     ) -> "Opt[T]":
         """
         Executes an action on the value of the Opt by providing the actions an additional parameter,
-        if the value is present, or executes the emptyAction if the Opt is empty
+        if the value is present, or executes the empty_action if the Opt is empty
 
         Args:
-            withVal (K): The additional parameter
+            with_val (K): The additional parameter
             action (Callable[[T, K], Any]): The action to be executed when present
-            emptyAction (Callable[[K], Any]): The action to be executed when empty
+            empty_action (Callable[[K], Any]): The action to be executed when empty
         """
         if self.__val is not None:
-            action(self.__val, withVal)
+            action(self.__val, with_val)
         else:
-            emptyAction(withVal)
+            empty_action(with_val)
         return self
 
     def filter(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> "Opt[T]":
@@ -632,19 +638,19 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return self
-        if predicateOf(predicate).Apply(self.__val):
+        if predicate_of(predicate).apply(self.__val):
             return self
-        return self.__getNone()
+        return self.__get_none()
 
-    def filterWith(
-        self, withVal: K, predicate: Union[PredicateWith[T, K], Callable[[T, K], bool]]
+    def filter_with(
+        self, with_val: K, predicate: Union[PredicateWith[T, K], Callable[[T, K], bool]]
     ) -> "Opt[T]":
         """
         Returns the filtered value of the Opt if it matches the given predicate, by
         providing the predicat with an additional value
 
         Args:
-            withVal (K): the additional value
+            with_val (K): the additional value
             predicate (Union[PredicateWith[T, K], Callable[[T, K], bool]]): The predicate
 
         Returns:
@@ -652,9 +658,9 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return self
-        if predicateWithOf(predicate).Apply(self.__val, withVal):
+        if predicate_with_of(predicate).apply(self.__val, with_val):
             return self
-        return self.__getNone()
+        return self.__get_none()
 
     def map(self, mapper: Union[Mapper[T, V], Callable[[T], V]]) -> "Opt[V]":
         """
@@ -667,59 +673,59 @@ class Opt(Generic[T]):
             Opt[V]: The resulting Opt
         """
         if self.__val is None:
-            return cast(Opt[V], self.__getNone())
-        return Opt(mapperOf(mapper).Map(self.__val))
+            return cast(Opt[V], self.__get_none())
+        return Opt(mapper_of(mapper).map(self.__val))
 
-    def mapWith(
-        self, withVal: K, mapper: Union[MapperWith[T, K, V], Callable[[T, K], V]]
+    def map_with(
+        self, with_val: K, mapper: Union[MapperWith[T, K, V], Callable[[T, K], V]]
     ) -> "Opt[V]":
         """
         Maps the Opt value into another Opt by applying the mapper function with an additional parameter
 
         Args:
-            withVal (K): The additional parameter
+            with_val (K): The additional parameter
             mapper (Callable[[T, K], V]): The mapper function
 
         Returns:
             Opt[V]: The resulting Opt
         """
         if self.__val is None:
-            return cast(Opt[V], self.__getNone())
-        return Opt(mapperWithOf(mapper).Map(self.__val, withVal))
+            return cast(Opt[V], self.__get_none())
+        return Opt(mapper_with_of(mapper).map(self.__val, with_val))
 
-    def orElseGetWith(self, withVal: K, supplier: Callable[[K], T]) -> "Opt[T]":
+    def or_else_get_with(self, with_val: K, supplier: Callable[[K], T]) -> "Opt[T]":
         """
         Returns this Opt if present, otherwise will return the supplier result with
         the additional parameter
 
         Args:
-            withVal (K): The additional parameter
+            with_val (K): The additional parameter
             supplier (Callable[[K], T]): The supplier
 
         Returns:
             Opt[T]: The resulting Opt
         """
-        return self.orElseGetWithOpt(withVal, supplier)
+        return self.or_else_get_with_opt(with_val, supplier)
 
-    def orElseGetWithOpt(
-        self, withVal: K, supplier: Callable[[K], Optional[T]]
+    def or_else_get_with_opt(
+        self, with_val: K, supplier: Callable[[K], Optional[T]]
     ) -> "Opt[T]":
         """
         Returns this Opt if present, otherwise will return the supplier result with
         the additional parameter
 
         Args:
-            withVal (K): The additional parameter
+            with_val (K): The additional parameter
             supplier (Callable[[K], Optional[T]]): The supplier
 
         Returns:
             Opt[T]: The resulting Opt
         """
-        if self.isPresent():
+        if self.is_present():
             return self
-        return Opt(supplier(withVal))
+        return Opt(supplier(with_val))
 
-    def ifMatches(
+    def if_matches(
         self,
         predicate: Union[Predicate[T], Callable[[T], bool]],
         action: Callable[[T], Any],
@@ -735,11 +741,11 @@ class Opt(Generic[T]):
         Returns:
             Opt[T]: The same Opt
         """
-        if self.__val is not None and predicateOf(predicate).Apply(self.__val):
+        if self.__val is not None and predicate_of(predicate).apply(self.__val):
             action(self.__val)
         return self
 
-    def ifMatchesOpt(
+    def if_matches_opt(
         self,
         predicate: Union[Predicate[Optional[T]], Callable[[Optional[T]], bool]],
         action: Callable[[Optional[T]], Any],
@@ -755,7 +761,7 @@ class Opt(Generic[T]):
         Returns:
             Opt[T]: The same Opt
         """
-        if predicateOf(predicate).Apply(self.__val):
+        if predicate_of(predicate).apply(self.__val):
             action(self.__val)
         return self
 
@@ -770,7 +776,7 @@ class Opt(Generic[T]):
             return Stream([self.__val])
         return Stream([])
 
-    def flatStream(self) -> "Stream[T]":
+    def flat_stream(self) -> "Stream[T]":
         """
         Returns a Stream containing the current Opt value if the value
         is not an Iterable, or a Stream containing all the values in
@@ -785,7 +791,7 @@ class Opt(Generic[T]):
             return Stream([self.__val])
         return Stream([])
 
-    def orElseThrow(self) -> T:
+    def or_else_raise(self) -> T:
         """
         Returns the value of the Opt or raise a value error
 
@@ -799,12 +805,12 @@ class Opt(Generic[T]):
             return self.__val
         raise ValueError("Object is None")
 
-    def orElseThrowFrom(self, exceptionSupplier: Callable[[], BaseException]) -> T:
+    def or_else_raise_from(self, exception_supplier: Callable[[], BaseException]) -> T:
         """
         Returns the value of the Opt or raise an exeption provided by the exception supplier
 
         Args:
-            exceptionSupplier (Callable[[], BaseException]): The exception supplier
+            exception_supplier (Callable[[], BaseException]): The exception supplier
 
         Raises:
             exception: The generated exception
@@ -814,78 +820,78 @@ class Opt(Generic[T]):
         """
         if self.__val is not None:
             return self.__val
-        raise exceptionSupplier()
+        raise exception_supplier()
 
-    def ifPresentMap(
+    def if_present_map(
         self,
-        isPresentMapper: Union[Mapper[T, V], Callable[[T], V]],
-        orElseSupplier: Callable[[], Optional[V]],
+        is_present_mapper: Union[Mapper[T, V], Callable[[T], V]],
+        or_else_supplier: Callable[[], Optional[V]],
     ) -> "Opt[V]":
         """
-        If the optional value is present, returns the value mapped by isPresentMapper wrapped in an Opt.
-        If the optional value is not present, returns the value produced by orElseSupplier
+        If the optional value is present, returns the value mapped by is_present_mapper wrapped in an Opt.
+        If the optional value is not present, returns the value produced by or_else_supplier
 
         Args:
-            isPresentMapper (Union[Mapper[T, V], Callable[[T], V]]): The presence mapper
-            orElseSupplier (Callable[[], Optional[V]]): The missing value producer
+            is_present_mapper (Union[Mapper[T, V], Callable[[T], V]]): The presence mapper
+            or_else_supplier (Callable[[], Optional[V]]): The missing value producer
 
         Returns:
             Opt[V]: An optional
         """
         if self.__val is None:
-            return Opt(orElseSupplier())
-        return Opt(mapperOf(isPresentMapper).Map(self.__val))
+            return Opt(or_else_supplier())
+        return Opt(mapper_of(is_present_mapper).map(self.__val))
 
-    def ifPresentMapWith(
+    def if_present_map_with(
         self,
-        withVal: K,
-        isPresentMapper: Union[MapperWith[T, K, V], Callable[[T, K], V]],
-        orElseSupplier: Callable[[K], Optional[V]],
+        with_val: K,
+        is_present_mapper: Union[MapperWith[T, K, V], Callable[[T, K], V]],
+        or_else_supplier: Callable[[K], Optional[V]],
     ) -> "Opt[V]":
         """
-        If the optional value is present, returns the value mapped by isPresentMapper wrapped in an Opt.
-        If the optional value is not present, returns the value produced by orElseSupplier.
-        In addition to ifPresentMap, this method also passes the withVal param to the mapper and supplier
+        If the optional value is present, returns the value mapped by is_present_mapper wrapped in an Opt.
+        If the optional value is not present, returns the value produced by or_else_supplier.
+        In addition to ifPresentMap, this method also passes the with_val param to the mapper and supplier
 
         Args:
-            withVal (K): The additional mapper value
-            isPresentMapper (Union[MapperWith[T, K, V],  Callable[[T, K], V]]): The presence mapper
-            orElseSupplier (Callable[[K], V]): The missing value producer
+            with_val (K): The additional mapper value
+            is_present_mapper (Union[MapperWith[T, K, V],  Callable[[T, K], V]]): The presence mapper
+            or_else_supplier (Callable[[K], V]): The missing value producer
 
         Returns:
             Opt[V]: An optional
         """
         if self.__val is None:
-            return Opt(orElseSupplier(withVal))
-        return Opt(mapperWithOf(isPresentMapper).Map(self.__val, withVal))
+            return Opt(or_else_supplier(with_val))
+        return Opt(mapper_with_of(is_present_mapper).map(self.__val, with_val))
 
-    def instanceOf(self, classType: type) -> "Opt[T]":
+    def instance_of(self, class_type: type) -> "Opt[T]":
         """
         Equivalent of Opt.filter(lambda val: isinstance(val, classType))
 
         Args:
-            classType (type): The class type
+            class_type (type): The class type
 
         Returns:
             Opt[T]: An optional
         """
-        if isinstance(self.__val, classType):
+        if isinstance(self.__val, class_type):
             return self
-        return self.__getNone()
+        return self.__get_none()
 
-    def cast(self, classType: type[V]) -> "Opt[V]":
+    def cast(self, class_type: type[V]) -> "Opt[V]":
         """
         Equivalent of Opt.map(lambda val: cast(classType, val))
 
         Args:
-            classType (type[V]): The class type of the new optional
+            class_type (type[V]): The class type of the new optional
 
         Returns:
             Opt[V]: An optional
         """
         return Opt(cast(V, self.__val))
 
-    def ifMatchesMap(
+    def if_matches_map(
         self,
         predicate: Union[Predicate[T], Callable[[T], bool]],
         mapper: Union[Mapper[T, Optional[V]], Callable[[T], Optional[V]]],
@@ -902,13 +908,13 @@ class Opt(Generic[T]):
         Returns:
             Opt[V]: An optional
         """
-        if self.__val is not None and predicateOf(predicate).Apply(self.__val):
-            return Opt(mapperOf(mapper).Map(self.__val))
-        return cast(Opt[V], self.__getNone())
+        if self.__val is not None and predicate_of(predicate).apply(self.__val):
+            return Opt(mapper_of(mapper).map(self.__val))
+        return cast(Opt[V], self.__get_none())
 
-    def ifMatchesMapWith(
+    def if_matches_map_with(
         self,
-        withVal: K,
+        with_val: K,
         predicate: Union[PredicateWith[T, K], Callable[[T, K], bool]],
         mapper: Union[MapperWith[T, K, Optional[V]], Callable[[T, K], Optional[V]]],
     ) -> "Opt[V]":
@@ -918,31 +924,31 @@ class Opt(Generic[T]):
         In addition to ifMatchesMap, this method also passes the withVal param to the mapper and supplier
 
         Args:
-            withVal (K): The additional mapper value
+            with_val (K): The additional mapper value
             predicate (Union[PredicateWith[T, K], Callable[[T, K], bool]]): The predicate
             mapper (Union[MapperWith[T, K, Optional[V]], Callable[[T, K], Optional[V]]]): The mapper
 
         Returns:
             Opt[V]: An optional
         """
-        if self.__val is not None and predicateWithOf(predicate).Apply(
-            self.__val, withVal
+        if self.__val is not None and predicate_with_of(predicate).apply(
+            self.__val, with_val
         ):
-            return Opt(mapperWithOf(mapper).Map(self.__val, withVal))
-        return cast(Opt[V], self.__getNone())
+            return Opt(mapper_with_of(mapper).map(self.__val, with_val))
+        return cast(Opt[V], self.__get_none())
 
 
 class ClassOps:
-    __slots__ = ("__classType",)
+    __slots__ = ("__class_type",)
 
-    def __init__(self, classType: type) -> None:
-        self.__classType = classType
+    def __init__(self, class_type: type) -> None:
+        self.__class_type = class_type
 
-    def instanceOf(self, obj: Any) -> bool:
-        return isinstance(obj, self.__classType)
+    def instance_of(self, obj: Any) -> bool:
+        return isinstance(obj, self.__class_type)
 
-    def subClassOf(self, typ: type) -> bool:
-        return issubclass(typ, self.__classType)
+    def subclass_of(self, typ: type) -> bool:
+        return issubclass(typ, self.__class_type)
 
 
 class _GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
@@ -970,9 +976,9 @@ class _FilterIterable(_GenericIterable[T]):
 
     def __next__(self) -> T:
         while True:
-            nextObj = self._iterator.__next__()
-            if self.__predicate.Apply(nextObj):
-                return nextObj
+            next_obj = self._iterator.__next__()
+            if self.__predicate.apply(next_obj):
+                return next_obj
 
 
 class _CastIterable(Generic[T, V], Iterator[T], Iterable[T]):
@@ -988,8 +994,8 @@ class _CastIterable(Generic[T, V], Iterator[T], Iterable[T]):
         return self
 
     def __next__(self) -> T:
-        nextObj = self.__iterator.__next__()
-        return cast(T, nextObj)
+        next_obj = self.__iterator.__next__()
+        return cast(T, next_obj)
 
 
 class _SkipIterable(_GenericIterable[T]):
@@ -1013,22 +1019,22 @@ class _SkipIterable(_GenericIterable[T]):
 
 
 class _LimitIterable(_GenericIterable[T]):
-    __slots__ = ("__count", "__currentCount")
+    __slots__ = ("__count", "__current_count")
 
     def __init__(self, it: Iterable[T], count: int) -> None:
         super().__init__(it)
         self.__count = count
-        self.__currentCount = 0
+        self.__current_count = 0
 
     def _prepare(self) -> None:
-        self.__currentCount = 0
+        self.__current_count = 0
 
     def __next__(self) -> T:
-        if self.__currentCount >= self.__count:
+        if self.__current_count >= self.__count:
             raise StopIteration()
 
         obj = self._iterator.__next__()
-        self.__currentCount += 1
+        self.__current_count += 1
         return obj
 
 
@@ -1048,7 +1054,7 @@ class _TakeWhileIterable(_GenericIterable[T]):
             raise StopIteration()
 
         obj = self._iterator.__next__()
-        if not self.__predicate.Apply(obj):
+        if not self.__predicate.apply(obj):
             self.__done = True
             raise StopIteration()
 
@@ -1071,7 +1077,7 @@ class _DropWhileIterable(_GenericIterable[T]):
             return self._iterator.__next__()
         while not self.__done:
             obj = self._iterator.__next__()
-            if not self.__predicate.Apply(obj):
+            if not self.__predicate.apply(obj):
                 self.__done = True
                 return obj
         raise StopIteration()
@@ -1135,7 +1141,7 @@ class _MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
         return self
 
     def __next__(self) -> V:
-        return self.__mapper.Map(self._iterator.__next__())
+        return self.__mapper.map(self._iterator.__next__())
 
 
 class Stream(Generic[T]):
@@ -1149,8 +1155,8 @@ class Stream(Generic[T]):
         return Stream(arg)
 
     @staticmethod
-    def ofNullable(arg: Iterable[Optional[T]]) -> "Stream[T]":
-        return Stream(arg).filter(isNotNone).map(lambda el: requireNotNull(el))
+    def of_nullable(arg: Iterable[Optional[T]]) -> "Stream[T]":
+        return Stream(arg).filter(is_not_none).map(lambda el: require_non_null(el))
 
     def map(self, mapper: Union[Mapper[T, V], Callable[[T], V]]) -> "Stream[V]":
         """
@@ -1161,9 +1167,9 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: The result stream
         """
-        return Stream(_MapIterable(self.__arg, mapperOf(mapper)))
+        return Stream(_MapIterable(self.__arg, mapper_of(mapper)))
 
-    def flatMap(
+    def flat_map(
         self, mapper: Union[Mapper[T, Iterable[V]], Callable[[T], Iterable[V]]]
     ) -> "Stream[V]":
         """
@@ -1175,7 +1181,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: the result stream
         """
-        return Stream(flatMap(self.__arg, mapperOf(mapper)))
+        return Stream(flat_map(self.__arg, mapper_of(mapper)))
 
     def flatten(self, typ: type[V]) -> "Stream[V]":
         """
@@ -1185,7 +1191,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: A flattened stream
         """
-        return self.flatMap(
+        return self.flat_map(
             lambda v: cast(Iterable[V], v) if isinstance(v, Iterable) else [cast(V, v)]
         )
 
@@ -1196,9 +1202,9 @@ class Stream(Generic[T]):
         Returns:
             Opt[T]: First element
         """
-        return self.findFirst(lambda e: True)
+        return self.find_first(lambda e: True)
 
-    def findFirst(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> Opt[T]:
+    def find_first(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> Opt[T]:
         """
         Finds and returns the first element matching the predicate
 
@@ -1208,7 +1214,7 @@ class Stream(Generic[T]):
         Returns:
             Opt[T]: The firs element found
         """
-        return Opt(findFirst(self.__arg, predicateOf(predicate)))
+        return Opt(find_first(self.__arg, predicate_of(predicate)))
 
     def filter(
         self, predicate: Union[Predicate[T], Callable[[T], bool]]
@@ -1223,9 +1229,9 @@ class Stream(Generic[T]):
             Stream[T]: The stream of filtered objects
         """
 
-        return Stream(_FilterIterable(self.__arg, predicateOf(predicate)))
+        return Stream(_FilterIterable(self.__arg, predicate_of(predicate)))
 
-    def cast(self, castTo: type[V]) -> "Stream[V]":
+    def cast(self, cast_to: type[V]) -> "Stream[V]":
         """
         Returns a stream of objects casted to the given type. Useful when receiving untyped data lists
         and they need to be used in a typed context.
@@ -1236,9 +1242,9 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: The stream of casted objects
         """
-        return Stream(_CastIterable(self.__arg, castTo))
+        return Stream(_CastIterable(self.__arg, cast_to))
 
-    def anyMatch(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> bool:
+    def any_match(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> bool:
         """
         Checks if any stream object matches the given predicate
 
@@ -1248,11 +1254,11 @@ class Stream(Generic[T]):
         Returns:
             bool: True if any object matches, False otherwise
         """
-        return self.filter(predicateOf(predicate)).isNotEmpty()
+        return self.filter(predicate_of(predicate)).is_not_empty()
 
-    def noneMatch(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> bool:
+    def none_match(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> bool:
         """
-        Checks if none of the stream objects matches the given predicate. This is the inverse of 'anyMatch`
+        Checks if none of the stream objects matches the given predicate. This is the inverse of 'any_match`
         CAUTION: This method will actually iterate the entire stream, so if you're using
         infinite generators, calling this method will block the execution of the program.
 
@@ -1262,9 +1268,9 @@ class Stream(Generic[T]):
         Returns:
             bool: True if no object matches, False otherwise
         """
-        return self.filter(predicateOf(predicate)).isEmpty()
+        return self.filter(predicate_of(predicate)).is_empty()
 
-    def allMatch(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> bool:
+    def all_match(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> bool:
         """
         Checks if all of the stream objects matche the given predicate.
         CAUTION: This method will actually iterate the entire stream, so if you're using
@@ -1276,11 +1282,11 @@ class Stream(Generic[T]):
         Returns:
             bool: True if all objects matche, False otherwise
         """
-        return len(self.filter(predicateOf(predicate)).toList()) == len(
+        return len(self.filter(predicate_of(predicate)).to_list()) == len(
             list(self.__arg)
         )
 
-    def isEmpty(self) -> bool:
+    def is_empty(self) -> bool:
         """
         Checks if the stream is empty
         CAUTION: This method will actually iterate the entire stream, so if you're using
@@ -1289,9 +1295,9 @@ class Stream(Generic[T]):
         Returns:
             bool: True if the stream is empty, False otherwise
         """
-        return isEmptyOrNone(self.__arg)
+        return is_empty_or_none(self.__arg)
 
-    def isNotEmpty(self) -> bool:
+    def is_not_empty(self) -> bool:
         """
         Checks if the stream is not empty
         CAUTION: This method will actually iterate the entire stream, so if you're using
@@ -1300,7 +1306,7 @@ class Stream(Generic[T]):
         Returns:
             bool: True if the stream is not empty, False otherwise
         """
-        return not isEmptyOrNone(self.__arg)
+        return not is_empty_or_none(self.__arg)
 
     def collect(self) -> Iterable[T]:
         """
@@ -1311,7 +1317,7 @@ class Stream(Generic[T]):
         """
         return self.__arg
 
-    def collectUsing(self, collector: Callable[[Iterable[T]], K]) -> K:
+    def collect_using(self, collector: Callable[[Iterable[T]], K]) -> K:
         """
         Returns a transformed version of the stream. The transformation is provided by the collector
 
@@ -1326,7 +1332,7 @@ class Stream(Generic[T]):
         """
         return collector(self.__arg)
 
-    def toList(self) -> list[T]:
+    def to_list(self) -> list[T]:
         """
         Creates a list with the contents of the stream
         CAUTION: This method will actually iterate the entire stream, so if you're using
@@ -1337,7 +1343,7 @@ class Stream(Generic[T]):
         """
         return list(self.__arg)
 
-    def toSet(self) -> set[T]:
+    def to_set(self) -> set[T]:
         """
         Creates a set with the contents of the stream
         CAUTION: This method will actually iterate the entire stream, so if you're using
@@ -1348,10 +1354,10 @@ class Stream(Generic[T]):
         """
         return set(self.__arg)
 
-    def toDict(
+    def to_dict(
         self,
-        keyMapper: Union[Mapper[T, V], Callable[[T], V]],
-        valueMapper: Union[Mapper[T, K], Callable[[T], K]],
+        key_mapper: Union[Mapper[T, V], Callable[[T], V]],
+        value_mapper: Union[Mapper[T, K], Callable[[T], K]],
     ) -> dict[V, K]:
         """
         Creates a dictionary with the contents of the stream creating keys using
@@ -1360,18 +1366,18 @@ class Stream(Generic[T]):
         infinite generators, calling this method will block the execution of the program.
 
         Args:
-            keyMapper (Union[Mapper[T, V], Callable[[T], V]]): The key mapper
-            valueMapper (Union[Mapper[T, K], Callable[[T], K]]): The value mapper
+            key_mapper (Union[Mapper[T, V], Callable[[T], V]]): The key mapper
+            value_mapper (Union[Mapper[T, K], Callable[[T], K]]): The value mapper
 
         Returns:
             dict[V, K]: The resulting dictionary
         """
-        keyMapperObj = mapperOf(keyMapper)
-        valueMapperObj = mapperOf(valueMapper)
-        return {keyMapperObj.Map(v): valueMapperObj.Map(v) for v in self.__arg}
+        key_mapper_obj = mapper_of(key_mapper)
+        value_mapper_obj = mapper_of(value_mapper)
+        return {key_mapper_obj.map(v): value_mapper_obj.map(v) for v in self.__arg}
 
-    def toDictAsValues(
-        self, keyMapper: Union[Mapper[T, V], Callable[[T], V]]
+    def to_dict_as_values(
+        self, key_mapper: Union[Mapper[T, V], Callable[[T], V]]
     ) -> dict[V, T]:
         """
         Creates a dictionary with the contents of the stream creating keys using
@@ -1380,16 +1386,16 @@ class Stream(Generic[T]):
         infinite generators, calling this method will block the execution of the program.
 
         Args:
-            keyMapper (Union[Mapper[T, V], Callable[[T], V]]): The key mapper
+            key_mapper (Union[Mapper[T, V], Callable[[T], V]]): The key mapper
 
         Returns:
             dict[V, T]: The resulting dictionary
         """
-        keyMapperObj = mapperOf(keyMapper)
-        return {keyMapperObj.Map(v): v for v in self.__arg}
+        key_mapper_obj = mapper_of(key_mapper)
+        return {key_mapper_obj.map(v): v for v in self.__arg}
 
-    def toDictAsKeys(
-        self, valueMapper: Union[Mapper[T, V], Callable[[T], V]]
+    def to_dict_as_keys(
+        self, value_mapper: Union[Mapper[T, V], Callable[[T], V]]
     ) -> dict[T, V]:
         """
         Creates a dictionary using the contents of the stream as keys and mapping
@@ -1398,13 +1404,13 @@ class Stream(Generic[T]):
         infinite generators, calling this method will block the execution of the program.
 
         Args:
-            keyMapper (Union[Mapper[T, V], Callable[[T], V]]): The value mapper
+            value_mapper (Union[Mapper[T, V], Callable[[T], V]]): The value mapper
 
         Returns:
             dict[V, T]: The resulting dictionary
         """
-        valueMapperObj = mapperOf(valueMapper)
-        return {v: valueMapperObj.Map(v) for v in self.__arg}
+        value_mapper_obj = mapper_of(value_mapper)
+        return {v: value_mapper_obj.map(v) for v in self.__arg}
 
     def each(self, action: Callable[[T], Any]) -> "Stream[T]":
         """
@@ -1418,17 +1424,17 @@ class Stream(Generic[T]):
         each(self.__arg, action)
         return self
 
-    def ofType(self, theType: type[V]) -> "Stream[V]":
+    def of_type(self, the_type: type[V]) -> "Stream[V]":
         """
         Returns all items of the given type as a stream
 
         Args:
-            theType (type[V]): The given type
+            the_type (type[V]): The given type
 
         Returns:
             Stream[V]: The result stream
         """
-        return self.filter(ClassOps(theType).instanceOf).cast(theType)
+        return self.filter(ClassOps(the_type).instance_of).cast(the_type)
 
     def skip(self, count: int) -> "Stream[T]":
         """
@@ -1454,7 +1460,7 @@ class Stream(Generic[T]):
         """
         return Stream(_LimitIterable(self.__arg, count))
 
-    def takeWhile(
+    def take_while(
         self, predicate: Union[Predicate[T], Callable[[T], bool]]
     ) -> "Stream[T]":
         """
@@ -1466,9 +1472,9 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The result stream
         """
-        return Stream(_TakeWhileIterable(self.__arg, predicateOf(predicate)))
+        return Stream(_TakeWhileIterable(self.__arg, predicate_of(predicate)))
 
-    def dropWhile(
+    def drop_while(
         self, predicate: Union[Predicate[T], Callable[[T], bool]]
     ) -> "Stream[T]":
         """
@@ -1480,7 +1486,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The result stream
         """
-        return Stream(_DropWhileIterable(self.__arg, predicateOf(predicate)))
+        return Stream(_DropWhileIterable(self.__arg, predicate_of(predicate)))
 
     def reduce(self, reducer: Union[Reducer[T], Callable[[T, T], T]]) -> Opt[T]:
         """
@@ -1497,14 +1503,14 @@ class Stream(Generic[T]):
         """
         return Opt(reduce(self.__arg, reducer))
 
-    def nonNull(self) -> "Stream[T]":
+    def non_null(self) -> "Stream[T]":
         """
         Returns a stream of non null objects from this stream
 
         Returns:
             Stream[T]: The result stream
         """
-        return self.filter(isNotNone)
+        return self.filter(is_not_none)
 
     def sort(self, comparator: Callable[[T, T], int]) -> "Stream[T]":
         """
@@ -1546,18 +1552,18 @@ class Stream(Generic[T]):
             return self
         return Stream(_DistinctIterable(self.__arg))
 
-    def concat(self, newStream: "Stream[T]") -> "Stream[T]":
+    def concat(self, new_stream: "Stream[T]") -> "Stream[T]":
         """
         Returns a stream concatenating the values from this stream with the ones
         from the given stream.
 
         Args:
-            newStream (Stream[T]): The stream to be concatenated with
+            new_stream (Stream[T]): The stream to be concatenated with
 
         Returns:
             Stream[T]: The resulting stream
         """
-        return Stream(_ConcatIterable(self.__arg, newStream.__arg))
+        return Stream(_ConcatIterable(self.__arg, new_stream.__arg))
 
 
 def stream(it: Iterable[T]) -> Stream[T]:
@@ -1586,7 +1592,7 @@ def optional(val: Optional[T]) -> Opt[T]:
     return Opt(val)
 
 
-def extractList(val: dict[K, Optional[T]], keys: Iterable[K]) -> list[Optional[T]]:
+def extract_list(val: dict[K, Optional[T]], keys: Iterable[K]) -> list[Optional[T]]:
     """
     Extract the elements for the given keys iteration from a dictionary.
     If an element does not exist in the dictionary, None will be returned for that key.
@@ -1598,10 +1604,10 @@ def extractList(val: dict[K, Optional[T]], keys: Iterable[K]) -> list[Optional[T
     Returns:
         list[Optional[T]]: The list of extracted values
     """
-    return Stream(keys).map(val.get).toList()
+    return Stream(keys).map(val.get).to_list()
 
 
-def extractNonNullList(val: dict[K, Optional[T]], keys: Iterable[K]) -> list[T]:
+def extract_non_null_list(val: dict[K, Optional[T]], keys: Iterable[K]) -> list[T]:
     """
     Extract the elements for the given keys iteration from a dictionary.
     If an element does not exist in the dictionary, a value will not be returned for that key.
@@ -1616,13 +1622,13 @@ def extractNonNullList(val: dict[K, Optional[T]], keys: Iterable[K]) -> list[T]:
     return (
         Stream(keys)
         .map(val.get)
-        .filter(isNotNone)
-        .map(lambda e: requireNotNull(e))
-        .toList()
+        .filter(is_not_none)
+        .map(lambda e: require_non_null(e))
+        .to_list()
     )
 
 
-def notNullElements(iterable: Iterable[Optional[T]]) -> Iterable[T]:
+def not_null_elements(iterable: Iterable[Optional[T]]) -> Iterable[T]:
     """
     Returns an iterable with all elements that are not None of the given iterable.
 
@@ -1632,4 +1638,9 @@ def notNullElements(iterable: Iterable[Optional[T]]) -> Iterable[T]:
     Returns:
         Iterable[T]: The iterable sans the None elements
     """
-    return Stream(iterable).filter(isNotNone).map(lambda e: requireNotNull(e)).toList()
+    return (
+        Stream(iterable)
+        .filter(is_not_none)
+        .map(lambda e: require_non_null(e))
+        .to_list()
+    )

@@ -7,8 +7,8 @@ from jstreams.ioc import injector
 from mockService3 import MockService3
 
 tc = unittest.TestCase()
-injector().scanModules(["mockService1"])
-injector().provideVar(str, "var1", "var1Value")
+injector().scan_modules(["mockService1"])
+injector().provide_var(str, "var1", "var1Value")
 ms3 = injector().find(MockService3)
 
 tc.assertIsNotNone(ms3, "Service3 should have been injected")
