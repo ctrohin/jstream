@@ -18,12 +18,12 @@ def get_user(user_id: int) -> dict[str, str]:
         return {"error": str(e), "user_id": user_id}
 
 
-@app.route("/create_user/<int:user_id>/<name>/<int:age>")
-def create_user(user_id: int, name: str, age: int) -> dict[str, str]:
+@app.route("/create_user/<name>/<int:age>")
+def create_user(name: str, age: int) -> dict[str, str]:
     try:
-        return inject(UserService).create_user(user_id, {"name": name, "age": age})
+        return inject(UserService).create_user({"name": name, "age": age})
     except ValueError as e:
-        return {"error": str(e), "user_id": user_id}
+        return {"error": str(e), "name": name, "age": age}
 
 
 @app.route("/get_all_users")

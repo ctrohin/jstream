@@ -12,9 +12,13 @@ class UserService:
     def __init__(self) -> None:
         self.users: dict[int, dict[str, Any]] = DEFAULT_USERS
 
-    def create_user(self, user_id: int, user_data: dict[str, Any]) -> dict[str, Any]:
-        if user_id in self.users:
-            raise ValueError("User already exists")
+    def get_max_user_id(self) -> int:
+        if not self.users:
+            return 0
+        return max(self.users.keys())
+
+    def create_user(self, user_data: dict[str, Any]) -> dict[str, Any]:
+        user_id = self.get_max_user_id() + 1
         self.users[user_id] = user_data
         return {"user_id": user_id, "user_data": user_data}
 
