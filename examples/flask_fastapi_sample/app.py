@@ -1,3 +1,5 @@
+# Flask API example using jstreams
+from typing import Any
 from flask import Flask
 from jstreams import InjectedDependency
 from users_view import UsersView
@@ -29,10 +31,10 @@ def create_user(name: str, age: int) -> dict[str, str]:
 
 
 @app.route("/get_all_users")
-def get_all_users() -> dict[int, dict[str, str]]:
+def get_all_users() -> list[dict[str, Any]]:
     return users_view().get_users()
 
 
 @app.route("/get_users_by_name/<name>")
-def get_users_by_name(name: str) -> dict[int, dict[str, str]]:
+def get_users_by_name(name: str) -> list[dict[str, Any]]:
     return users_view().get_users_by_name(name)
