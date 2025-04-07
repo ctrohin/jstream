@@ -857,6 +857,8 @@ def inject_args(
                         kwds[key] = _get_dep(dep)
             return func(*args, **kwds)
 
+        wrapped.__name__ = func.__name__
+        wrapped.__qualname__ = func.__qualname__
         return wrapped
 
     return wrapper
