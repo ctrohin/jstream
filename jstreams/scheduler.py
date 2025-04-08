@@ -11,6 +11,107 @@ ENFORCE_MINIMUM_PERIOD = True
 POLLING_PERIOD = 5
 
 
+class Duration:
+    """
+    Represents a duration of time with days, hours, and minutes.
+    Supports addition and subtraction operators.
+    """
+
+    def __init__(self, days: int = 0, hours: int = 0, minutes: int = 0) -> None:
+        """
+        Initializes a Duration object.
+
+        Args:
+            days: The number of days. Defaults to 0.
+            hours: The number of hours. Defaults to 0.
+            minutes: The number of minutes. Defaults to 0.
+        """
+        self._days = days
+        self._hours = hours
+        self._minutes = minutes
+
+    def to_seconds(self) -> int:
+        """
+        Instance method to compute the total number of seconds for this duration.
+
+        Returns:
+            The total number of seconds.
+        """
+        total_seconds = (
+            (self._days * 24 * 60 * 60) + (self._hours * 60 * 60) + (self._minutes * 60)
+        )
+        return total_seconds
+
+    def _normalize(self) -> None:
+        """
+        Internal method to normalize the duration values (carry over minutes to hours, etc.).
+        """
+        total_minutes = self._minutes
+        self._minutes = total_minutes % 60
+        carry_hours = total_minutes // 60
+        self._hours += carry_hours
+
+        total_hours = self._hours
+        self._hours = total_hours % 24
+        carry_days = total_hours // 24
+        self._days += carry_days
+
+    def __add__(self, other: "Duration") -> "Duration":
+        """
+        Overloads the addition operator (+) for Duration objects.
+
+        Args:
+            other: The other Duration object to add.
+
+        Returns:
+            A new Duration object representing the sum.
+        """
+        if not isinstance(other, Duration):
+            raise TypeError(
+                "Unsupported operand type for +: 'Duration' and '{}'".format(
+                    type(other).__name__
+                )
+            )
+        new_days = self._days + other._days
+        new_hours = self._hours + other._hours
+        new_minutes = self._minutes + other._minutes
+        result = Duration(new_days, new_hours, new_minutes)
+        result._normalize()
+        return result
+
+    def __sub__(self, other: "Duration") -> "Duration":
+        """
+        Overloads the subtraction operator (-) for Duration objects.
+
+        Args:
+            other: The other Duration object to subtract.
+
+        Returns:
+            A new Duration object representing the difference.
+        """
+        if not isinstance(other, Duration):
+            raise TypeError(
+                "Unsupported operand type for -: 'Duration' and '{}'".format(
+                    type(other).__name__
+                )
+            )
+
+        total_seconds_self = self.to_seconds()
+        total_seconds_other = other.to_seconds()
+        diff_seconds = total_seconds_self - total_seconds_other
+
+        if diff_seconds < 0:
+            # Always compute absolute difference
+            diff_seconds = -diff_seconds
+
+        new_days = diff_seconds // (24 * 60 * 60)
+        remaining_seconds = diff_seconds % (24 * 60 * 60)
+        new_hours = remaining_seconds // (60 * 60)
+        new_minutes = (remaining_seconds % (60 * 60)) // 60
+
+        return Duration(new_days, new_hours, new_minutes)
+
+
 class _Job:
     """
     Job class to represent a job.
@@ -195,7 +296,7 @@ def schedule_periodic(
     return decorator
 
 
-def get_timestamp_current_hour(minute: int) -> float:
+def get_timestamp_current_hour(minute: int) -> int:
     """
     Computes the Unix timestamp for a given minute within the current hour using the machine's local timezone.
 
@@ -203,7 +304,7 @@ def get_timestamp_current_hour(minute: int) -> float:
         minute: An integer representing the minute (0-59).
 
     Returns:
-        A float representing the Unix timestamp (seconds since the epoch) for the specified minute of the current hour in the machine's local timezone.
+        An int representing the Unix timestamp (seconds since the epoch) for the specified minute of the current hour in the machine's local timezone.
     """
     now_local = datetime.datetime.now()
     current_hour = now_local.hour
@@ -215,7 +316,7 @@ def get_timestamp_current_hour(minute: int) -> float:
 
     # Convert the datetime object to a timestamp in the local timezone
     timestamp = time.mktime(current_hour_at_minute.timetuple())
-    return timestamp
+    return int(timestamp)
 
 
 def get_timestamp_today(hour: int, minute: int) -> int:
@@ -311,3 +412,9 @@ def schedule_hourly(
         return func
 
     return decorator
+
+
+def schedule_duration(
+    duration: Duration,
+) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
+    return schedule_periodic(duration.to_seconds())
