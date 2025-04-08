@@ -21,7 +21,7 @@ class LoopingThread(Thread, abc.ABC, Cancellable):
         Constructor.
         """
         Thread.__init__(self)
-        self.__running = True
+        self.__running = False
 
     @abc.abstractmethod
     def loop(self) -> None:
@@ -34,8 +34,18 @@ class LoopingThread(Thread, abc.ABC, Cancellable):
         self.__running = False
 
     def run(self) -> None:
+        self.__running = True
         while self.__running:
             self.loop()
+
+    def is_running(self) -> bool:
+        """
+        Check if the thread is running.
+
+        Returns:
+            bool: True if the thread is running, False otherwise.
+        """
+        return self.__running
 
 
 class CallbackLoopingThread(LoopingThread):
