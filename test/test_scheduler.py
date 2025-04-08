@@ -1,12 +1,18 @@
 from time import sleep
 
 from baseTest import BaseTestCase
-from jstreams.scheduler import enforce_minimum_period, schedule_periodic, stop_scheduler
+from jstreams.scheduler import (
+    scheduler_enforce_minimum_period,
+    schedule_periodic,
+    scheduler_set_polling_period,
+    stop_scheduler,
+)
 
 
 class TestScheduler(BaseTestCase):
     def test_scheduler(self) -> None:
-        enforce_minimum_period(False)
+        scheduler_enforce_minimum_period(False)
+        scheduler_set_polling_period(1)
         global run_times
         run_times = 0
 
