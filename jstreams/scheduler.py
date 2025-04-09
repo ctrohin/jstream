@@ -1,14 +1,14 @@
+import os
 import datetime
+import importlib
 from time import sleep
 import time
 from typing import Any, Callable, Optional
 
 from threading import Lock, Thread
 from jstreams.thread import LoopingThread
+from jstreams.try_opt import Try
 from jstreams.utils import each
-
-ENFORCE_MINIMUM_PERIOD = True
-POLLING_PERIOD = 5
 
 
 class Duration:
@@ -29,6 +29,7 @@ class Duration:
         self._days = days
         self._hours = hours
         self._minutes = minutes
+        self._normalize()
 
     def to_seconds(self) -> int:
         """
@@ -162,17 +163,6 @@ class _Job:
         self.last_run = int(time.time())
         Thread(target=self.func).start()
 
-    def has_run(self) -> bool:
-        """
-        Check if the job has run.
-        Returns:
-            bool: True if the job has run once, False otherwise.
-        """
-        return self.last_run > 0
-        # Check if the job has run by checking if the last run time is greater than 0
-        # This is useful for jobs that need to run only once
-        # after the first run
-
 
 class _Scheduler(LoopingThread):
     """
@@ -187,6 +177,12 @@ class _Scheduler(LoopingThread):
         self.__jobs: list[_Job] = []
         self.__started = False
         self.__start_lock: Lock = Lock()
+        self.__enforce_minimum_period = (
+            Try(lambda: bool(os.environ.get("SCH_ENFORCE", True))).get().or_else(True)
+        )
+        self.__polling_period = (
+            Try(lambda: int(os.environ.get("SCH_POLLING", 10))).get().or_else(10)
+        )
 
     @staticmethod
     def get_instance() -> "_Scheduler":
@@ -224,43 +220,115 @@ class _Scheduler(LoopingThread):
             self.__jobs,
             lambda job: job.run_if_needed(),
         )
-        sleep(POLLING_PERIOD)
+        sleep(self.__polling_period)
+
+    def enforce_minimum_period(self, flag: bool) -> None:
+        """
+        Enforce a minimum period for the scheduler.
+        Args:
+            period (int): Period in seconds.
+        """
+        self.__enforce_minimum_period = flag
+
+    def set_polling_period(self, period: int) -> None:
+        """
+        Set the polling period for the scheduler
+
+        Args:
+            period (int): The new period
+        """
+        self.__polling_period = period
+
+    def stop(self) -> None:
+        """
+        Stop the scheduler.
+        """
+        if self.is_running():
+            self.cancel()
+            # Cancel the scheduler thread
+            # This will stop the loop method from running
+            # and exit the thread
+            self.join()
+            # Wait for the thread to finish
+            # This is useful to ensure that all jobs have completed before stopping the scheduler
+
+    def scan_modules(
+        self,
+        modules: list[str],
+    ) -> None:
+        for module in modules:
+            importlib.import_module(module)
+
+    def schedule_periodic(
+        self, func: Callable[[], Any], period: int, one_time: bool = False
+    ) -> "_Scheduler":
+        """
+        Schedule a function to be executed periodically.
+        Args:
+            period (int): Period in seconds.
+        """
+        if self.__enforce_minimum_period and period <= 10:
+            raise ValueError("Period must be greater than 10 seconds")
+            # Check if the period is greater than 10 seconds
+
+        self.add_job(_Job(func.__name__, period, func, one_time))
+        return self
+
+    def schedule_daily(
+        self,
+        func: Callable[[], Any],
+        hour: int,
+        minute: int,
+    ) -> "_Scheduler":
+        """
+        Schedule a function to be executed at a fixed time.
+
+        Args:
+            hour (int): Hour of the day (0-23).
+            minute (int): Minute of the hour (0-59).
+            second (int): Second of the minute (0-59).
+        """
+
+        period = 24 * 60 * 60
+        # Calculate the period in seconds
+
+        job = _Job(
+            func.__name__, period, func, False, get_timestamp_today(hour, minute)
+        )
+        self.add_job(job)
+        return self
+
+    def schedule_hourly(
+        self,
+        func: Callable[[], Any],
+        minute: int,
+    ) -> "_Scheduler":
+        """
+        Schedule a function to be executed at a fixed time.
+
+        Args:
+            minute (int): Minute of the hour (0-59).
+        """
+
+        period = 60 * 60
+        # Calculate the period in seconds
+
+        job = _Job(
+            func.__name__, period, func, False, get_timestamp_current_hour(minute)
+        )
+        self.add_job(job)
+        return self
+
+    def schedule_duration(
+        self,
+        func: Callable[[], Any],
+        duration: Duration,
+    ) -> "_Scheduler":
+        return self.schedule_periodic(func, duration.to_seconds())
 
 
-def scheduler_enforce_minimum_period(flag: bool) -> None:
-    """
-    Enforce a minimum period for the scheduler.
-    Args:
-        period (int): Period in seconds.
-    """
-    global ENFORCE_MINIMUM_PERIOD
-    ENFORCE_MINIMUM_PERIOD = flag
-
-
-def scheduler_set_polling_period(period: int) -> None:
-    """
-    Set the polling period for the scheduler
-
-    Args:
-        period (int): The new period
-    """
-    global POLLING_PERIOD
-    POLLING_PERIOD = period
-
-
-def stop_scheduler() -> None:
-    """
-    Stop the scheduler.
-    """
-    scheduler = _Scheduler.get_instance()
-    if scheduler.is_running():
-        scheduler.cancel()
-        # Cancel the scheduler thread
-        # This will stop the loop method from running
-        # and exit the thread
-        scheduler.join()
-        # Wait for the thread to finish
-        # This is useful to ensure that all jobs have completed before stopping the scheduler
+def scheduler() -> _Scheduler:
+    return _Scheduler.get_instance()
 
 
 def schedule_periodic(
@@ -283,14 +351,8 @@ def schedule_periodic(
         Callable[[Callable[[], Any]], Callable[[], Any]]: Decorated function.
     """
 
-    if ENFORCE_MINIMUM_PERIOD and period <= 10:
-        raise ValueError("Period must be greater than 10 seconds")
-        # Check if the period is greater than 10 seconds
-
     def decorator(func: Callable[[], Any]) -> Callable[[], Any]:
-        job = _Job(func.__name__, period, func, one_time)
-        scheduler = _Scheduler.get_instance()
-        scheduler.add_job(job)
+        scheduler().schedule_periodic(func, period, one_time)
         return func
 
     return decorator
@@ -364,15 +426,8 @@ def schedule_daily(
         Callable[[Callable[[], Any]], Callable[[], Any]]: Decorated function.
     """
 
-    period = 24 * 60 * 60
-    # Calculate the period in seconds
-
     def decorator(func: Callable[[], Any]) -> Callable[[], Any]:
-        job = _Job(
-            func.__name__, period, func, False, get_timestamp_today(hour, minute)
-        )
-        scheduler = _Scheduler.get_instance()
-        scheduler.add_job(job)
+        scheduler().schedule_daily(func, hour, minute)
         return func
 
     return decorator
@@ -400,15 +455,8 @@ def schedule_hourly(
         Callable[[Callable[[], Any]], Callable[[], Any]]: Decorated function.
     """
 
-    period = 60 * 60
-    # Calculate the period in seconds
-
     def decorator(func: Callable[[], Any]) -> Callable[[], Any]:
-        job = _Job(
-            func.__name__, period, func, False, get_timestamp_current_hour(minute)
-        )
-        scheduler = _Scheduler.get_instance()
-        scheduler.add_job(job)
+        scheduler().schedule_hourly(func, get_timestamp_current_hour(minute))
         return func
 
     return decorator
