@@ -15,12 +15,11 @@ class TestScheduler(BaseTestCase):
         run_times = 0
 
         class RunTest:
-            @schedule_periodic(2)
             @staticmethod
+            @schedule_periodic(2)
             def run_every_2_seconds() -> None:
                 global run_times
                 run_times += 1
-                print("Running every 2 seconds")
 
         RunTest()
 
