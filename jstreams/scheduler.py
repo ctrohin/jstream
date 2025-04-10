@@ -133,6 +133,7 @@ class _Job:
         self.period = period
         self.last_run = start_at
         self.run_once = run_once
+        self.has_ran = False
 
     def should_run(self) -> bool:
         """
@@ -144,6 +145,9 @@ class _Job:
         # Check if the job should run based on the last run time and period
         # If the last run time plus the period is less than or equal to the current time, it should run
 
+    def should_remove(self) -> bool:
+        return self.run_once and self.has_ran
+
     def run_if_needed(self) -> None:
         """
         Run the job if needed.
@@ -151,6 +155,7 @@ class _Job:
         if self.should_run():
             self.run()
             self.last_run = int(time.time())
+            self.has_ran = True
             # Update the last run time to the current time
             # This ensures that the job will not run again until the period has passed
             # after the last run
@@ -216,10 +221,15 @@ class _Scheduler(LoopingThread):
                     # Set the started flag to True
 
     def loop(self) -> None:
-        each(
-            self.__jobs,
-            lambda job: job.run_if_needed(),
-        )
+        remove_jobs: list[_Job] = []
+        for job in self.__jobs:
+            if job.should_remove():
+                remove_jobs.append(job)
+            else:
+                job.run_if_needed()
+        # Cleanup run once jobs that have already ran
+        for remove_job in remove_jobs:
+            self.__jobs.remove(remove_job)
         sleep(self.__polling_period)
 
     def enforce_minimum_period(self, flag: bool) -> None:
