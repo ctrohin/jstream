@@ -1,6 +1,8 @@
-from typing import TypeVar, Callable, Optional, Any, Generic, Protocol
+from logging import Logger
+from typing import TypeVar, Callable, Optional, Any, Generic, Protocol, Union
 
 from jstreams.stream import Opt
+from jstreams.utils import require_non_null
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -10,6 +12,9 @@ V = TypeVar("V")
 class ErrorLog(Protocol):
     def error(self, msg: Any, *args: Any, **kwargs: Any) -> Any:
         pass
+
+
+ErrorLogger = Union[ErrorLog, Logger]
 
 
 class Try(Generic[T]):
@@ -27,11 +32,11 @@ class Try(Generic[T]):
         self.__fn = fn
         self.__then_chain: list[Callable[[T], Any]] = []
         self.__on_failure: Optional[Callable[[BaseException], Any]] = None
-        self.__error_log: Optional[ErrorLog] = None
+        self.__error_log: Optional[ErrorLogger] = None
         self.__error_message: Optional[str] = None
         self.__has_failed = False
 
-    def with_logger(self, logger: ErrorLog) -> "Try[T]":
+    def with_logger(self, logger: ErrorLogger) -> "Try[T]":
         self.__error_log = logger
         return self
 
@@ -71,5 +76,13 @@ class Try(Generic[T]):
         return self.__has_failed
 
     @staticmethod
-    def of(val: K) -> "Try[K]":
-        return Try(lambda: val)
+    def of(val: Optional[K]) -> "Try[K]":
+        return Try(lambda: require_non_null(val))
+
+
+def try_(fn: Callable[[], T]) -> Try[T]:
+    return Try(fn)
+
+
+def try_of(value: Optional[T]) -> Try[T]:
+    return Try.of(value)

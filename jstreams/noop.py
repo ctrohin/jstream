@@ -2,42 +2,53 @@ from typing import Any
 
 
 class NoOpCls:
-    """No-op that can be put in lieu of almost anything.
-    Any actions on that object will be just ignored. You can
-    call it, get its atributes, use a a context, anything :)
-    Cool feature
-    ------------
-    NoOp tracks its levels of absurdity.
-    Examples
-    --------
-    >>> from no_op import NoOp as xyz
-    # Now all calls to xyz are simply ignored without any exception:
-    >>>  print(xyz.get('qwerty').wtf['dupa'].callme('tesla', model='X')[5, ...])
-    Just no-op on level 7.
-
-    Copyright
-    ---------
-    (c) 2021 Maciej J. Mikulski
-    Feel free to use it, I put NoOp in public domain.
+    """
+    A No-Operation object that does nothing when its methods are called
+    and returns itself for method chaining.
     """
 
-    def __init__(self, level: int = 0) -> None:
-        self.level = level
-
-    def __getattr__(self, attr: Any) -> Any:
-        return NoOpCls(self.level + 1)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initializes the Noop object (does nothing)."""
+        pass
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return NoOpCls(self.level + 1)
+        """Allows the Noop object to be called as a function (does nothing)."""
+        return self
 
-    def __getitem__(self, item: Any) -> Any:
-        return NoOpCls(self.level + 1)
+    def __getattr__(self, name: str) -> Any:
+        """Returns itself for any attribute access, enabling method chaining."""
+        return self
 
-    def __enter__(self) -> Any:
-        return NoOpCls(self.level + 1)
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Ignores attribute setting."""
+        pass
+
+    def __delattr__(self, name: str) -> None:
+        """Ignores attribute deletion."""
+        pass
 
     def __repr__(self) -> str:
-        return f"Just no-op on level {self.level}."
+        """Returns a string representation of the Noop object."""
+        return "<Noop>"
+
+    def __str__(self) -> str:
+        """Returns a string representation of the Noop object."""
+        return "<Noop>"
+
+    def __bool__(self) -> bool:
+        """Returns False, as a Noop object has no meaningful value."""
+        return False
+
+    def __eq__(self, other: Any) -> bool:
+        """Returns True if the other object is also a Noop, False otherwise."""
+        return isinstance(other, NoOpCls)
+
+    def __ne__(self, other: Any) -> bool:
+        """Returns True if the other object is not a Noop, False otherwise."""
+        return not isinstance(other, NoOpCls)
+
+    def __enter__(self) -> Any:
+        return self
 
 
 NoOp = NoOpCls()

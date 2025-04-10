@@ -29,6 +29,8 @@ from jstreams.stream import (
 from jstreams.try_opt import (
     Try,
     ErrorLog,
+    try_,
+    try_of,
 )
 
 from jstreams.rx import (
@@ -221,6 +223,15 @@ from jstreams.state import (
     null_state,
 )
 
+from jstreams.scheduler import (
+    scheduler,
+    schedule_daily,
+    schedule_duration,
+    schedule_hourly,
+    schedule_periodic,
+    Duration,
+)
+
 __all__ = [
     "each",
     "dict_update",
@@ -406,4 +417,12 @@ __all__ = [
     "configuration",
     "return_wired",
     "return_wired_optional",
+    "try_",
+    "try_of",
+    "scheduler",
+    "schedule_daily",
+    "schedule_duration",
+    "schedule_hourly",
+    "schedule_periodic",
+    "Duration",
 ]
