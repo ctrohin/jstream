@@ -6,6 +6,7 @@ jstreams is a Python library aiming to replicate the following:
 - a dependency injection container
 - some utility classes for threads as well as JavaScript-like timer and interval functionality
 - a simple state management API
+- a task scheduler with support for decorated functions and on-demand scheduling
 
 The library is implemented with type safety in mind.
 
