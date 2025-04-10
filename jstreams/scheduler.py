@@ -8,7 +8,6 @@ from typing import Any, Callable, Optional
 from threading import Lock, Thread
 from jstreams.thread import LoopingThread
 from jstreams.try_opt import Try
-from jstreams.utils import each
 
 
 class Duration:
@@ -16,6 +15,8 @@ class Duration:
     Represents a duration of time with days, hours, and minutes.
     Supports addition and subtraction operators.
     """
+
+    __slots__ = ["_days", "_hours", "_minutes"]
 
     def __init__(self, days: int = 0, hours: int = 0, minutes: int = 0) -> None:
         """
@@ -118,7 +119,7 @@ class _Job:
     Job class to represent a job.
     """
 
-    __slots__ = ["name", "func", "period", "last_run", "run_once"]
+    __slots__ = ["name", "func", "period", "last_run", "run_once", "has_ran"]
 
     def __init__(
         self,

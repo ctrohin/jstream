@@ -76,6 +76,22 @@ def triplet(left: T, middle: V, right: K) -> Triplet[T, V, K]:
     return Triplet(left, middle, right)
 
 
+def pair_of(values: tuple[T, V]) -> Pair[T, V]:
+    """
+    Produces a pair from a tuple
+    """
+    t_val, v_val = values
+    return pair(t_val, v_val)
+
+
+def triplet_of(values: tuple[T, V, K]) -> Triplet[T, V, K]:
+    """
+    Produces a triplet from a tuple
+    """
+    t_val, v_val, k_val = values
+    return triplet(t_val, v_val, k_val)
+
+
 def left_matches(
     predicate_arg: Union[Predicate[T], Callable[[T], bool]],
 ) -> Predicate[Pair[Any, Any]]:

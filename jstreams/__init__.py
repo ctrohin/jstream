@@ -208,6 +208,8 @@ from jstreams.tuples import (
     left_matches,
     right_matches,
     middle_matches,
+    pair_of,
+    triplet_of,
 )
 
 from jstreams.collectors import (
@@ -382,6 +384,8 @@ __all__ = [
     "left_matches",
     "right_matches",
     "middle_matches",
+    "pair_of",
+    "triplet_of",
     "is_key_in",
     "is_value_in",
     "InjectedDependency",
