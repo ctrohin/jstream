@@ -1,18 +1,21 @@
 # jstreams
 jstreams is a Python library aiming to replicate the following:
-- Java Streams and Optional functionality
-- a basic ReactiveX implementation
-- a minimal replication of Java's vavr.io Try
-- a dependency injection container
-- some utility classes for threads as well as JavaScript-like timer and interval functionality
-- a simple state management API
-- a task scheduler with support for decorated functions and on-demand scheduling
+- Java [Streams](#streams) and [Optional](#opt) functionality.
+- a basic [ReactiveX](#reactivex) implementation
+- a minimal replication of Java's vavr.io [Try](#try)
+- a [dependency injection](#dependency-injection-container) container
+- some utility classes for [threads](#threads) as well as JavaScript-like [timer](#timer) and [interval](#interval) functionality
+- a simple [state management](#state-management-api) API
+- a [task scheduler](#scheduler) with support for decorated functions and on-demand scheduling
 
 The library is implemented with type safety in mind.
 
 ## Installation
 
 Use the package manager [pip](https://pip.pypa.io/en/stable/) to install jstreams.
+
+## Examples
+If you wish to check out some example integrations you can visit the [examples](https://github.com/ctrohin/jstream/tree/master/examples) repo, or the [integration tests](https://github.com/ctrohin/jstream/tree/master/tests_integration) repo.
 
 ```bash
 pip install jstreams
@@ -24,7 +27,9 @@ Added new scheduler module with the following functionality:
 - *schedule_hourly* decorator for functions that need to be executed at a certain minute every hour
 - *schedule_daily* decorator for functions that need to be executed at a certain hour an minute every day
 - *scheduler* function to access the scheduler and explicitly (without a need for decoration) schedule task
-See the **Scheduler** section below for more details
+See the [Scheduler](#scheduler) section below for more details
+
+
 ### v2025.4.1
 #### BREAKING CHANGES
 Since version **v2025.4.1** **jstreams** has been refactored to use naming conventions in compliance with **PEP8**. As such, any projects depending on **jstreams** must be updated to use the **snake_case** naming convention for members and functions, instead of the **mixedCase** used until this version.
@@ -34,7 +39,7 @@ Since version **v2025.4.1** **jstreams** has been refactored to use naming conve
 - *Dependency* and *Variable* classes used for injecting dependencies have now the *is_optional* flag, which will use the *find* injection mechanism instead of the *get* mechanism.
 - Dependency injection profiles: you can now specify profiles for each provided component. In order to activate a profile, you can use the `injector().activate_profile(profile)` call.
 This versions adds the following features:
-- stream collectors
+- [stream collectors](#stream-collectors)
     - the *Stream* class has been enriched with the *collectUsing* method to transform/reduce a stream
     - the *Collectors* class has been added containing the following collectors:
         - to_list - produces a list of the elements of the stream
@@ -42,9 +47,9 @@ This versions adds the following features:
         - grouping_by - produces a dictionary of the stream with the grouping value as key and a list of elements as values
         - partitioning_by - produces a dictionary of the string with True/False as key (as returned by the given condition) and a list of elements as values
         - joining - produces a string from all elements of the stream by joining them with the given separator
-- argument injection via the *inject_args* decorator. See usage below in the *Attribute and argument injection* section.
+- [argument injection](#attribute-and-argument-injection) via the *inject_args* decorator.
 - the ability to retrieve all dependencies of a certain type using the *all_of_type* and *all_of_type_stream* methods. This method is useful when multiple dependecies that implement the same parent class are provided, for cases where you have multiple validators that can be dynamically provided.
-- a simple state management API
+- a simple state management API - [State management](#state-management-api)
 ```python
 class ValidatorInterface(abc.ABC):
     @abc.abstractmethod
@@ -80,7 +85,7 @@ isValid = injector().all_of_type_stream(ValidatorInterface).all_match(lambda v: 
 print(isValid) # Prints out "True" since the string passes both validations
 ```
 ### v2025.3.2
-This version adds more dependency injection options (for usage, check the Dependency injection section below):
+This version adds more [dependency injection](#dependency-injection-container) options (for usage, check the Dependency injection section below):
 - *resolve_variables* decorator - provides class level variable injection
 - *resolve_dependencies* decorator - provides class level dependency injection
 - *component* decorator - provides decoration for classes. A decorated class will be injected once its module is imported
@@ -89,12 +94,11 @@ This version adds more dependency injection options (for usage, check the Depend
 ### v2025.2.11
 Version 2025.2.11 adds the following enhancements:
 #### Pair and Triplet
-The **Pair** and **Triplet** classes are object oriented substitutions for Python tuples of 2 and 3 values. A such, they don't need to be unpacked and can be used by calling the **left**, **right** and **middle**(Triplets only) methods.
+The [Pair and triplet](#pair-and-triplet) classes are object oriented substitutions for Python tuples of 2 and 3 values. A such, they don't need to be unpacked and can be used by calling the **left**, **right** and **middle**(Triplets only) methods.
 For enhanced support with predicates and streams, **jstreams** also provides the following predicates dedicated to pairs and triplets:
 - *left_matches* - A predicate that takes another predicate as a parameter, and applies it to the **left** of a Pair/Triplet
 - *right_matches* - A predicate that takes another predicate as a parameter, and applies it to the **right** of a Pair/Triplet
 - *middle_matches* - A predicate that takes another predicate as a parameter, and applies it to the **middle** of a Triplet
-
 ```python
 p = pair("string", 0)
 pred = right_matches(isZero)
