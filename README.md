@@ -18,6 +18,13 @@ Use the package manager [pip](https://pip.pypa.io/en/stable/) to install jstream
 pip install jstreams
 ```
 ## Changelog
+### v2025.4.2
+Added new scheduler module with the following functionality:
+- *schedule_periodic* decorator for functions that need to be executed at a given time interval
+- *schedule_hourly* decorator for functions that need to be executed at a certain minute every hour
+- *schedule_daily* decorator for functions that need to be executed at a certain hour an minute every day
+- *scheduler* function to access the scheduler and explicitly (without a need for decoration) schedule task
+See the **Scheduler** section below for more details
 ### v2025.4.1
 #### BREAKING CHANGES
 Since version **v2025.4.1** **jstreams** has been refactored to use naming conventions in compliance with **PEP8**. As such, any projects depending on **jstreams** must be updated to use the **snake_case** naming convention for members and functions, instead of the **mixedCase** used until this version.
@@ -964,7 +971,7 @@ injector().scan_modules(["service"]) # Provide fully qualified name for the modu
 injector().get(Interface).doSomething() # Wil print out 'Something got done'
 ```
 
-### Providing dependencies using configuration classes using @configuration and @provide/@provideVariable
+#### Providing dependencies using configuration classes using @configuration and @provide/@provideVariable
 In order to abstract the creation of dependencies from the code that are using those dependencies, you can use configuration classes. In the following example, we will use configuration classes to define two different sets of declared dependencies that will be injected.
 
 **api_config.py**
@@ -1035,7 +1042,7 @@ myClassDifferentInstance = injector().find(MyClass, "differentName")
 myNotCalledObject = injector().find_or(MyNotCalledClass, lambda: MyNotCalledClass())
 ```
 
-# Retrieving dependencies using @autowired and @autowiredOptional decorators
+#### Retrieving dependencies using @autowired and @autowired_optional decorators
 ```python
 from jstreams import autowired, autowired_optional, return_autowired, return_autowired_optional
 
@@ -1383,7 +1390,60 @@ setState("Update no 2")
 # "New state is 'Updated no 2' old state is 'updated'"
 ```
 
+### Scheduler
+**schedule.py**
+```python
+from jstreams import schedule_periodic
 
+global two_seconds_counter
+two_seconds_counter = 0
+
+global two_seconds_class_counter
+two_seconds_class_counter = 0
+
+# Will be scheduled at 20 seconds interval
+@schedule_periodic(20)
+def run_at_two_seconds() -> None:
+    global two_seconds_counter
+    two_seconds_counter += 1
+
+
+class SchedulerStaticClass:
+    # Also scheduled at 20 seconds interval. The decorated scheduled functions
+    # need to be static and cannot depend on an instance of a class.
+    @staticmethod
+    @schedule_periodic(20)
+    def run_at_two_seconds() -> None:
+        global two_seconds_class_counter
+        two_seconds_class_counter += 1
+```
+
+**run.py**
+```python
+import unittest
+# Since the module where the scheduled functions is not imported by default,
+# the scheduler needs to be informed where the scheduled functions are located,
+# so that it can load the scheduled taks from those modules. Fully qualified names
+# need to be provided for the modules
+scheduler().scan_modules(["schedule"])
+# After the scan_modules call, the scheduled jobs are created and the scheduler started
+sleep(40)
+scheduler().stop()
+
+from schedule import two_seconds_counter, two_seconds_class_counter
+
+tc = unittest.TestCase()
+# At this point, we are guaranteed to have at least two runs
+tc.assertGreaterEqual(
+    two_seconds_counter, 2, "The function should have been called at least 2 times"
+)
+# Same for the static class
+tc.assertGreaterEqual(
+    two_seconds_class_counter,
+    2,
+    "The static function should have been called at least 2 times",
+)
+```
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
