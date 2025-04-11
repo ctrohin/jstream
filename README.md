@@ -1454,8 +1454,8 @@ scheduler().schedule_periodic(lambda: print("I just ran"), 10, True)
 
 ```
 
-The difference between the **Interval** class and a periodic scheduled job is that **Interval** is itself a thread and will be a long lived object, while a scheduled job lives in its own thread only when executed. Same for the differnce between a run once scheduled job and a **Timer**. Another difference is that both an **Interval** and **Timer** objects can be canceled, while a scheduled job can only be stopped if the scheduler is stopped.
-As an example, let's consider we need to call 10 functions at given intervals. When using **Timer** or **Interval** we start 10 threads when we create the jobs, while with the scheduler, we only have a single thread, the scheduler itself, and spawn one thread for each job whenever the job needs to run. Basically, with the scheduler we have a maximum of jobs count + 1 (one for the scheduler) while using **Timer** or **Interval** we have a minimum number of 10 threads all the time.
+The difference between the **Interval** class and a periodic scheduled job is that **Interval** is itself a thread and will be a long lived object, while a scheduled job lives in its own thread only when executed. Same for the difference between a run once scheduled job and a **Timer**. Another difference is that both an **Interval** and **Timer** objects can be canceled, while a scheduled job can only be stopped if the scheduler is stopped.
+As an example, let's consider we need to call 10 functions at given intervals. When using **Timer** or **Interval** we start 10 threads when we create the jobs, while with the scheduler, we only have a single thread, the scheduler itself, and spawn one thread for each job whenever the job needs to run. Basically, with the scheduler we have a *maximum* of jobs count + 1 (one for the scheduler) threads, while using **Timer** or **Interval** we have a *minimum* number of 10 threads all the time.
 It is a matter of application design whether to use threads or the scheduler, but, of course, they can be combined and used as needed.
  
 ## License
