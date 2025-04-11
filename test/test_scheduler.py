@@ -21,8 +21,6 @@ class TestScheduler(BaseTestCase):
                 global run_times
                 run_times += 1
 
-        RunTest()
-
         sleep(5)
         scheduler().stop()
         self.assertGreaterEqual(
