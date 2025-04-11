@@ -9,6 +9,8 @@ class CallRegister:
         self.mth2Called = False
         self.mth3Called = False
         self.mth4Called = False
+        self.mth5Called = False
+        self.mth6Called = False
         self.errorLogged = False
 
     def mth1(self, e: Any) -> None:
@@ -22,6 +24,12 @@ class CallRegister:
 
     def mth4(self, e: Any) -> None:
         self.mth4Called = True
+
+    def mth5(self, e: Any) -> None:
+        self.mth5Called = True
+
+    def mth6(self, e: Any) -> None:
+        self.mth6Called = True
 
     def error(self, msg, *args, **kwargs):
         self.errorLogged = True
@@ -85,3 +93,37 @@ class TestTry(BaseTestCase):
             .get_actual()
         )
         self.assertTrue(mock.errorLogged)
+
+    def test_try_with_error_multiple_on_fail_and_finally(self) -> None:
+        mock = CallRegister()
+        self.assertIsNone(
+            Try(self.throw)
+            .on_failure(mock.mth1)
+            .on_failure(mock.mth2)
+            .and_finally(mock.mth3)
+            .and_finally(mock.mth4)
+            .get()
+            .get_actual()
+        )
+        self.assertTrue(mock.mth1Called)
+        self.assertTrue(mock.mth2Called)
+        self.assertTrue(mock.mth3Called)
+        self.assertTrue(mock.mth4Called)
+
+    def test_try_with_no_error_multiple_on_fail_and_finally(self) -> None:
+        mock = CallRegister()
+        self.assertIsNotNone(
+            Try(self.noThrow)
+            .on_failure(mock.mth1)
+            .on_failure(mock.mth2)
+            .and_then(mock.mth3)
+            .and_finally(mock.mth4)
+            .and_finally(mock.mth5)
+            .get()
+            .get_actual()
+        )
+        self.assertFalse(mock.mth1Called)
+        self.assertFalse(mock.mth2Called)
+        self.assertTrue(mock.mth3Called)
+        self.assertTrue(mock.mth4Called)
+        self.assertTrue(mock.mth5Called)
