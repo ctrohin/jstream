@@ -450,7 +450,20 @@ def returnStr() -> str:
     return "test"
 
 # It is important to call the get method, as this method actually triggers the entire chain
-Try(throwErr).on_failure(lambda e: print(e)).get() # The onFailure is called
+Try(throwErr).on_failure(lambda e: print(e)).get() # The on_failure is called
+
+# You can also use the and_finally method to execute code regardless of the failure status of the try
+Try(throwErr).on_failure(lambda e: print(e)).and_finally(lambda val: print(f"The actual value is {val}")).get() # The on_failure is called, then the finally method is called.
+
+# Both on_failure and and_finally are defined as chains, so you can add as many methods as you want here
+(
+    Try(throwErr)
+    .on_failure(lambda e: print(e))
+    .on_failure(lambda e: print(f"Second failure handler {e}"))
+    .and_finally(lambda val: print(f"The actual value is {val}"))
+    .and_finally(lambda val: print(f"Second finally handler. The actual value is {val}"))
+    .get()
+) 
 
 Try(returnStr).and_then(lambda s: print(s)).get() # Will print out "test"
 
