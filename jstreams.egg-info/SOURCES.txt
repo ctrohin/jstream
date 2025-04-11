@@ -10,6 +10,7 @@ jstreams/noop.py
 jstreams/predicate.py
 jstreams/py.typed
 jstreams/rx.py
+jstreams/scheduler.py
 jstreams/state.py
 jstreams/stream.py
 jstreams/thread.py
@@ -25,11 +26,13 @@ test/test_complex_ioc.py
 test/test_ioc.py
 test/test_is_function.py
 test/test_match.py
+test/test_noop.py
 test/test_not.py
 test/test_opt.py
 test/test_predicate.py
 test/test_profile.py
 test/test_rx.py
+test/test_scheduler.py
 test/test_state.py
 test/test_stream.py
 test/test_timers.py
