@@ -1,7 +1,6 @@
 from typing import Callable, Generic, Optional, TypeVar, Union, cast, overload
 
 from jstreams.stream import Stream, Predicate
-from jstreams.utils import is_callable
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -52,7 +51,7 @@ class Case(Generic[T, V]):
             return match_condition.apply(value)
         if callable(match_condition):
             # If it's a callable (likely a predicate function), call it
-            return cast(Callable[[T], bool], match_condition)(value)
+            return match_condition(value)
         # Otherwise, perform direct equality check
         return value == match_condition
 
@@ -69,9 +68,9 @@ class Case(Generic[T, V]):
         # Use built-in callable()
         if callable(self.__resulting):
             # If it's a callable (supplier function), call it
-            return cast(Callable[[], V], self.__resulting)()
+            return self.__resulting()
         # Otherwise, return the direct value
-        return cast(V, self.__resulting)
+        return self.__resulting
 
 
 class DefaultCase(Case[T, V]):
