@@ -1,5 +1,6 @@
 from logging import Logger
 import logging
+from time import sleep
 from typing import Final, TypeVar, Callable, Optional, Any, Generic, Protocol, Union
 
 from jstreams.stream import Opt
@@ -41,9 +42,11 @@ def catchWith(
     try:
         return fn(with_val)
     except Exception as e:
-        logger.error(e, exc_info=True) if logger is not None else logging.getLogger(
+        logger.error(
+            "Uncaught exception", e, exc_info=True
+        ) if logger is not None else logging.getLogger(
             UNCAUGHT_EXCEPTION_LOGGER_NAME
-        ).error(e, exc_info=True)
+        ).error("Uncaught exception", e, exc_info=True)
         return None
 
 
@@ -57,9 +60,13 @@ class Try(Generic[T]):
         "__has_failed",
         "__logger",
         "__finally_chain",
+        "__failure_exception_supplier",
+        "__recovery_supplier",
+        "__retries",
+        "__retries_delay",
     )
 
-    def __init__(self, fn: Callable[[], T]):
+    def __init__(self, fn: Callable[[], T]) -> None:
         self.__fn = fn
         self.__then_chain: list[Callable[[T], Any]] = []
         self.__finally_chain: list[Callable[[Optional[T]], Any]] = []
@@ -67,6 +74,10 @@ class Try(Generic[T]):
         self.__error_log: Optional[ErrorLogger] = None
         self.__error_message: Optional[str] = None
         self.__has_failed = False
+        self.__failure_exception_supplier: Optional[Callable[[], Exception]] = None
+        self.__recovery_supplier: Optional[Callable[[], T]] = None
+        self.__retries: int = 0
+        self.__retries_delay: float = 0
 
     def with_logger(self, logger: ErrorLogger) -> "Try[T]":
         self.__error_log = logger
@@ -74,6 +85,11 @@ class Try(Generic[T]):
 
     def with_error_message(self, error_message: str) -> "Try[T]":
         self.__error_message = error_message
+        return self
+
+    def with_retries(self, retries: int, delay_between: float = 0) -> "Try[T]":
+        self.__retries = retries
+        self.__retries_delay = delay_between
         return self
 
     def and_then(self, fn: Callable[[T], Any]) -> "Try[T]":
@@ -96,12 +112,19 @@ class Try(Generic[T]):
         self.__has_failed = True
         # If we have a logger set, log the error
         if self.__error_log is not None:
-            if self.__error_message is not None:
-                self.__error_log.error(self.__error_message)
-            self.__error_log.error(e, exc_info=True)
+            self.__error_log.error(
+                self.__error_message
+                if self.__error_message is not None
+                else "Exception within Try",
+                e,
+                exc_info=True,
+            )
         # Then call all the failure chain methods
         for fail_fn in self.__on_failure_chain:
             catchWith(e, fail_fn, self.__error_log)
+
+        if self.__failure_exception_supplier is not None:
+            raise self.__failure_exception_supplier()
 
     def __finally(self, val: Optional[T]) -> None:
         for finally_fn in self.__finally_chain:
@@ -110,21 +133,44 @@ class Try(Generic[T]):
     def get(self) -> Opt[T]:
         self.__has_failed = False
         val: Optional[T] = None
-        try:
-            # Try to execute the constructor function in order to get the initial value
-            val = self.__fn()
-            # Then execut every function in the "then" chain
-            for fn in self.__then_chain:
-                fn(val)
-            # Upon success, return an optional with the constructor produced value
-            return Opt(val)
-        except Exception as e:
-            # Handle the exception
-            self.__handle_exception(e)
-        finally:
-            # And finally call all the finally chain methods
-            self.__finally(val)
-        return Opt(None)
+        retry = self.__retries - 1
+        exit = False
+        while not exit:
+            try:
+                # Try to execute the constructor function in order to get the initial value
+                val = self.__fn()
+                # Then execut every function in the "then" chain
+                for fn in self.__then_chain:
+                    fn(val)
+                # Upon success, return an optional with the constructor produced value
+                exit = True
+                return Opt(val)
+            except Exception as e:
+                if retry <= 0:
+                    exit = True
+                elif self.__retries_delay > 0:
+                    # If we have retries, sleep for the delay time
+                    sleep(self.__retries_delay)
+                # Decrement the retry count
+                retry -= 1
+                if exit:
+                    # Handle the exception
+                    self.__handle_exception(e)
+            finally:
+                if exit:
+                    # And finally call all the finally chain methods
+                    self.__finally(val)
+        return Opt(
+            self.__recovery_supplier() if self.__recovery_supplier is not None else None
+        )
+
+    def on_failure_raise(self, exception_supplier: Callable[[], Exception]) -> "Try[T]":
+        self.__failure_exception_supplier = exception_supplier
+        return self
+
+    def recover(self, recovery_supplier: Callable[[], T]) -> "Try[T]":
+        self.__recovery_supplier = recovery_supplier
+        return self
 
     def has_failed(self) -> bool:
         self.get()

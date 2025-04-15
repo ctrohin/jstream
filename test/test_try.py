@@ -72,6 +72,20 @@ class TestTry(BaseTestCase):
         self.assertFalse(mock.mth1Called)
         self.assertTrue(mock.mth2Called)
 
+    def test_try_with_error_on_init_and_onFailure_raise(self) -> None:
+        mock = CallRegister()
+        self.assertThrowsExceptionOfType(
+            Try(self.throw)
+            .and_then(mock.mth1)
+            .on_failure(mock.mth2)
+            .on_failure_raise(lambda: ValueError("Test"))
+            .get,
+            ValueError,
+            "Test",
+        )
+        self.assertFalse(mock.mth1Called)
+        self.assertTrue(mock.mth2Called)
+
     def test_try_with_error_on_chain_and_onFailure(self) -> None:
         mock = CallRegister()
         self.assertIsNone(
@@ -127,3 +141,77 @@ class TestTry(BaseTestCase):
         self.assertTrue(mock.mth3Called)
         self.assertTrue(mock.mth4Called)
         self.assertTrue(mock.mth5Called)
+
+    def test_try_recovery(self) -> None:
+        self.assertEqual(Try(self.throw).recover(lambda: "Test").get().get(), "Test")
+
+    def test_try_logger(self) -> None:
+        class MockLogger:
+            def __init__(self):
+                self.error_called = False
+                self.error_message = None
+
+            def error(self, msg, *args, **kwargs):
+                self.error_called = True
+                self.error_message = msg
+
+        mockLogger = MockLogger()
+        Try(self.throw).with_logger(mockLogger).with_error_message("Test").get()
+        self.assertTrue(mockLogger.error_called)
+        self.assertEqual(mockLogger.error_message, "Test")
+
+    def test_try_with_retries(self) -> None:
+        class Mock:
+            def __init__(self, tries: int):
+                self.tries = tries
+                self.current_try = 1
+                self.error = None
+
+            def do(self) -> None:
+                if self.current_try < self.tries:
+                    self.current_try += 1
+                    raise ValueError("Test")
+                return "TestValue"
+
+            def register_error(self, e: Exception) -> None:
+                self.error = e
+
+        mock = Mock(3)
+
+        self.assertEqual(
+            Try(mock.do)
+            .with_retries(3, 0.1)
+            .on_failure(mock.register_error)
+            .get()
+            .get(),
+            "TestValue",
+        )
+        self.assertEqual(mock.current_try, 3)
+        self.assertIsNone(mock.error)
+
+    def test_try_with_retries_error(self) -> None:
+        class Mock:
+            def __init__(self, tries: int):
+                self.tries = tries
+                self.current_try = 0
+                self.error = None
+
+            def do(self) -> None:
+                self.current_try += 1
+                raise ValueError("Test")
+
+            def register_error(self, e: Exception) -> None:
+                self.error = e
+
+        mock = Mock(3)
+
+        self.assertIsNone(
+            Try(mock.do)
+            .with_retries(3, 0.1)
+            .on_failure(mock.register_error)
+            .get()
+            .get_actual(),
+        )
+        self.assertEqual(mock.current_try, 3)
+        self.assertIsInstance(mock.error, ValueError)
+        self.assertEqual(str(mock.error), "Test")
