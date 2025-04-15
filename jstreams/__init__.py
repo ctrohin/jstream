@@ -210,6 +210,8 @@ from jstreams.tuples import (
     middle_matches,
     pair_of,
     triplet_of,
+    pair_stream,
+    triplet_stream,
 )
 
 from jstreams.collectors import (
@@ -429,4 +431,6 @@ __all__ = [
     "schedule_hourly",
     "schedule_periodic",
     "Duration",
+    "pair_stream",
+    "triplet_stream",
 ]
