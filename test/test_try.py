@@ -143,7 +143,7 @@ class TestTry(BaseTestCase):
         self.assertTrue(mock.mth5Called)
 
     def test_try_recovery(self) -> None:
-        self.assertEqual(Try(self.throw).recover(lambda: "Test").get().get(), "Test")
+        self.assertEqual(Try(self.throw).recover(lambda e: "Test").get().get(), "Test")
 
     def test_try_logger(self) -> None:
         class MockLogger:

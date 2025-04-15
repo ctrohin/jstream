@@ -75,7 +75,7 @@ class Try(Generic[T]):
         self.__error_message: Optional[str] = None
         self.__has_failed = False
         self.__failure_exception_supplier: Optional[Callable[[], Exception]] = None
-        self.__recovery_supplier: Optional[Callable[[], T]] = None
+        self.__recovery_supplier: Optional[Callable[[Optional[Exception]], T]] = None
         self.__retries: int = 0
         self.__retries_delay: float = 0
 
@@ -135,6 +135,7 @@ class Try(Generic[T]):
         val: Optional[T] = None
         retry = self.__retries - 1
         exit = False
+        exception: Optional[Exception] = None
         while not exit:
             try:
                 # Try to execute the constructor function in order to get the initial value
@@ -146,6 +147,7 @@ class Try(Generic[T]):
                 exit = True
                 return Opt(val)
             except Exception as e:
+                exception = e
                 if retry <= 0:
                     exit = True
                 elif self.__retries_delay > 0:
@@ -161,14 +163,18 @@ class Try(Generic[T]):
                     # And finally call all the finally chain methods
                     self.__finally(val)
         return Opt(
-            self.__recovery_supplier() if self.__recovery_supplier is not None else None
+            self.__recovery_supplier(exception)
+            if self.__recovery_supplier is not None
+            else None
         )
 
     def on_failure_raise(self, exception_supplier: Callable[[], Exception]) -> "Try[T]":
         self.__failure_exception_supplier = exception_supplier
         return self
 
-    def recover(self, recovery_supplier: Callable[[], T]) -> "Try[T]":
+    def recover(
+        self, recovery_supplier: Callable[[Optional[Exception]], T]
+    ) -> "Try[T]":
         self.__recovery_supplier = recovery_supplier
         return self
 
