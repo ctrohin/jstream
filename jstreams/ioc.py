@@ -563,7 +563,7 @@ def component(
     def wrap(cls: type[T]) -> type[T]:
         injector().provide(
             class_name if class_name is not None else cls,
-            cls() if strategy == Strategy.EAGER else cls,
+            cls() if strategy == Strategy.EAGER else lambda: cls(),
             qualifier,
             profiles,
         )
