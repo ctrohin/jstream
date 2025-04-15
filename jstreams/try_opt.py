@@ -75,7 +75,9 @@ class Try(Generic[T]):
         self.__error_message: Optional[str] = None
         self.__has_failed = False
         self.__failure_exception_supplier: Optional[Callable[[], Exception]] = None
-        self.__recovery_supplier: Optional[Callable[[Optional[Exception]], T]] = None
+        self.__recovery_supplier: Optional[
+            Callable[[Optional[Exception]], Optional[T]]
+        ] = None
         self.__retries: int = 0
         self.__retries_delay: float = 0
 
@@ -173,7 +175,7 @@ class Try(Generic[T]):
         return self
 
     def recover(
-        self, recovery_supplier: Callable[[Optional[Exception]], T]
+        self, recovery_supplier: Callable[[Optional[Exception]], Optional[T]]
     ) -> "Try[T]":
         self.__recovery_supplier = recovery_supplier
         return self
