@@ -867,6 +867,29 @@ def inject_args(
 def autowired(
     class_name: type[T], qualifier: Optional[str] = None
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """
+    Decorator that replaces the decorated function's body entirely.
+    When the decorated function is called, it will instead retrieve and return
+    a mandatory dependency of `class_name` with the optional `qualifier`.
+
+    Useful for creating simple getter methods or properties backed by injected dependencies.
+
+    Example:
+        class ServiceClient:
+            @property
+            @autowired(HttpClient) # Decorate the property's getter
+            def http_client(self) -> HttpClient:
+                 # This body is replaced by the injector call
+                 return return_wired(HttpClient) # Use return_wired for type hinting
+
+    Args:
+        class_name (type[T]): The type of the dependency to inject.
+        qualifier (Optional[str], optional): The qualifier name. Defaults to None.
+
+    Returns:
+        Callable[[Callable[..., T]], Callable[..., T]]: The decorator function.
+    """
+
     def wrapper(func: Callable[..., T]) -> Callable[..., T]:
         def wrapped(*args: Any, **kwds: Any) -> T:
             return injector().get(class_name, qualifier)
@@ -877,16 +900,61 @@ def autowired(
 
 
 def return_wired(class_name: type[T]) -> T:
+    """
+    Placeholder function used for type hinting within methods decorated with `@autowired`.
+    It signals that the method's return value will be provided by the injector.
+    This function's body is never actually executed when used with `@autowired`.
+
+    Args:
+        class_name (type[T]): The type that will be injected.
+
+    Returns:
+        T: A placeholder value (currently `NoOp`), primarily for type checking.
+    """
     return cast(T, NoOp)
 
 
 def return_wired_optional(class_name: type[T]) -> Optional[T]:
+    """
+    Placeholder function used for type hinting within methods decorated with `@autowired_optional`.
+    It signals that the method's return value will be provided by the injector and might be None.
+    This function's body is never actually executed when used with `@autowired_optional`.
+
+    Args:
+        class_name (type[T]): The type that will be injected.
+
+    Returns:
+        Optional[T]: A placeholder value (None), primarily for type checking.
+    """
     return None
 
 
 def autowired_optional(
     class_name: type[T], qualifier: Optional[str] = None
 ) -> Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]:
+    """
+    Decorator that replaces the decorated function's body entirely.
+    When the decorated function is called, it will instead retrieve and return
+    an optional dependency of `class_name` with the optional `qualifier`.
+
+    Useful for creating simple getter methods or properties for optional dependencies.
+
+    Example:
+        class ServiceClient:
+            @property
+            @autowired_optional(Logger, qualifier="request_logger")
+            def logger(self) -> Optional[Logger]:
+                 # This body is replaced by the injector call
+                 return return_wired_optional(Logger) # Use return_wired_optional for type hinting
+
+    Args:
+        class_name (type[T]): The type of the dependency to inject.
+        qualifier (Optional[str], optional): The qualifier name. Defaults to None.
+
+    Returns:
+        Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]: The decorator function.
+    """
+
     def wrapper(func: Callable[..., Optional[T]]) -> Callable[..., Optional[T]]:
         def wrapped(*args: Any, **kwds: Any) -> Optional[T]:
             return injector().find(class_name, qualifier)
@@ -897,42 +965,164 @@ def autowired_optional(
 
 
 class InjectedDependency(Generic[T]):
+    """
+    A wrapper that holds a request for a mandatory dependency.
+
+    The dependency is retrieved from the injector only when the wrapper instance
+    is called (`wrapper()`) or its `get()` method is called. This allows deferring
+    injection until the dependency is actually needed, useful when the dependency
+    might not be available at the time the wrapper is created.
+
+    Example:
+        class NeedsDbLater:
+            def __init__(self):
+                # Request the dependency, but don't inject yet
+                self.db_conn_provider = InjectedDependency(DatabaseConnection)
+
+            def execute_query(self, query: str):
+                # Inject the dependency when needed
+                conn = self.db_conn_provider() # or self.db_conn_provider.get()
+                conn.execute(query)
+    """
+
     __slots__ = ["__typ", "__quali"]
 
     def __init__(self, typ: type[T], qualifier: Optional[str] = None) -> None:
+        """
+        Initializes the dependency request wrapper.
+
+        Args:
+            typ (type[T]): The type of the dependency.
+            qualifier (Optional[str], optional): The qualifier name. Defaults to None.
+        """
         self.__typ = typ
         self.__quali = qualifier
 
     def get(self) -> T:
+        """
+        Retrieves the mandatory dependency from the injector.
+
+        Returns:
+            T: The dependency instance.
+
+        Raises:
+            ValueError: If the dependency is not found.
+        """
         return injector().get(self.__typ, self.__quali)
 
     def __call__(self) -> T:
+        """
+        Retrieves the mandatory dependency from the injector. Syntactic sugar for `get()`.
+
+        Returns:
+            T: The dependency instance.
+
+        Raises:
+            ValueError: If the dependency is not found.
+        """
         return self.get()
 
 
 class OptionalInjectedDependency(Generic[T]):
+    """
+    A wrapper that holds a request for an optional dependency.
+
+    The dependency is retrieved from the injector only when the wrapper instance
+    is called (`wrapper()`) or its `get()` method is called. Returns None if the
+    dependency is not found.
+
+    Example:
+        class MaybeNeedsLogger:
+            def __init__(self):
+                self.logger_provider = OptionalInjectedDependency(Logger)
+
+            def log_message(self, msg: str):
+                logger = self.logger_provider() # or self.logger_provider.get()
+                if logger:
+                    logger.info(msg)
+    """
+
     __slots__ = ["__typ", "__quali"]
 
     def __init__(self, typ: type[T], qualifier: Optional[str] = None) -> None:
+        """
+        Initializes the optional dependency request wrapper.
+
+        Args:
+            typ (type[T]): The type of the dependency.
+            qualifier (Optional[str], optional): The qualifier name. Defaults to None.
+        """
         self.__typ = typ
         self.__quali = qualifier
 
     def get(self) -> Optional[T]:
+        """
+        Retrieves the optional dependency from the injector.
+
+        Returns:
+            Optional[T]: The dependency instance if found, otherwise None.
+        """
         return injector().find(self.__typ, self.__quali)
 
     def __call__(self) -> Optional[T]:
+        """
+        Retrieves the optional dependency from the injector. Syntactic sugar for `get()`.
+
+        Returns:
+            Optional[T]: The dependency instance if found, otherwise None.
+        """
         return self.get()
 
 
 class InjectedVariable(Generic[T]):
+    """
+    A wrapper that holds a request for a mandatory configuration variable.
+
+    The variable is retrieved from the injector only when the wrapper instance
+    is called (`wrapper()`) or its `get()` method is called.
+
+    Example:
+        class ConfigReader:
+            def __init__(self):
+                self.api_key_provider = InjectedVariable(str, "api.secret_key")
+
+            def get_key(self) -> str:
+                return self.api_key_provider() # or self.api_key_provider.get()
+    """
+
     __slots__ = ["__typ", "__quali"]
 
     def __init__(self, typ: type[T], qualifier: str) -> None:
+        """
+        Initializes the variable request wrapper.
+
+        Args:
+            typ (type[T]): The expected type of the variable.
+            qualifier (str): The key (name) of the variable.
+        """
         self.__typ = typ
-        self.__quali = qualifier
+        self.__quali = qualifier  # Qualifier here means the variable key
 
     def get(self) -> T:
+        """
+        Retrieves the mandatory variable from the injector.
+
+        Returns:
+            T: The variable value.
+
+        Raises:
+            ValueError: If the variable is not found.
+        """
         return injector().get_var(self.__typ, self.__quali)
 
     def __call__(self) -> T:
+        """
+        Retrieves the mandatory variable from the injector. Syntactic sugar for `get()`.
+
+        Returns:
+            T: The variable value.
+
+        Raises:
+            ValueError: If the variable is not found.
+        """
         return self.get()

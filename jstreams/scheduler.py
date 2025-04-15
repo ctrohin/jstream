@@ -9,23 +9,39 @@ from threading import Lock, Thread
 from jstreams.thread import LoopingThread
 from jstreams.try_opt import Try
 
+"""
+Provides functionality for scheduling tasks to run periodically, daily, hourly,
+or after a specific duration. Includes a Duration class for time representation,
+a Job class for task encapsulation, and a singleton Scheduler class that manages
+and executes jobs. Decorators are provided for easy scheduling of functions.
+"""
+
 
 class Duration:
     """
-    Represents a duration of time with days, hours, and minutes.
-    Supports addition and subtraction operators.
+    Represents a duration of time specified in days, hours, and minutes.
+
+    Handles normalization (e.g., 70 minutes becomes 1 hour and 10 minutes).
+    Supports addition (+) and subtraction (-) with other Duration objects,
+    calculating the absolute difference for subtraction.
+    Can convert the duration to the total number of seconds.
+
+    Attributes:
+        _days (int): Number of days in the duration.
+        _hours (int): Number of hours in the duration (0-23 after normalization).
+        _minutes (int): Number of minutes in the duration (0-59 after normalization).
     """
 
     __slots__ = ["_days", "_hours", "_minutes"]
 
     def __init__(self, days: int = 0, hours: int = 0, minutes: int = 0) -> None:
         """
-        Initializes a Duration object.
+        Initializes a Duration object and normalizes the time units.
 
         Args:
-            days: The number of days. Defaults to 0.
-            hours: The number of hours. Defaults to 0.
-            minutes: The number of minutes. Defaults to 0.
+            days (int): The number of days. Defaults to 0.
+            hours (int): The number of hours. Defaults to 0.
+            minutes (int): The number of minutes. Defaults to 0.
         """
         self._days = days
         self._hours = hours
@@ -34,10 +50,10 @@ class Duration:
 
     def to_seconds(self) -> int:
         """
-        Instance method to compute the total number of seconds for this duration.
+        Computes the total number of seconds represented by this duration.
 
         Returns:
-            The total number of seconds.
+            int: The total number of seconds.
         """
         total_seconds = (
             (self._days * 24 * 60 * 60) + (self._hours * 60 * 60) + (self._minutes * 60)
@@ -46,7 +62,9 @@ class Duration:
 
     def _normalize(self) -> None:
         """
-        Internal method to normalize the duration values (carry over minutes to hours, etc.).
+        Internal method to normalize the duration values.
+        Converts excess minutes into hours and excess hours into days.
+        Ensures `_minutes` is < 60 and `_hours` is < 24.
         """
         total_minutes = self._minutes
         self._minutes = total_minutes % 60
@@ -63,10 +81,13 @@ class Duration:
         Overloads the addition operator (+) for Duration objects.
 
         Args:
-            other: The other Duration object to add.
+            other (Duration): The other Duration object to add.
 
         Returns:
-            A new Duration object representing the sum.
+            Duration: A new Duration object representing the sum.
+
+        Raises:
+            TypeError: If 'other' is not a Duration object.
         """
         if not isinstance(other, Duration):
             raise TypeError(
@@ -78,18 +99,22 @@ class Duration:
         new_hours = self._hours + other._hours
         new_minutes = self._minutes + other._minutes
         result = Duration(new_days, new_hours, new_minutes)
-        result._normalize()
+        # Normalization happens in the constructor of the new Duration
         return result
 
     def __sub__(self, other: "Duration") -> "Duration":
         """
         Overloads the subtraction operator (-) for Duration objects.
+        Calculates the absolute difference between the two durations.
 
         Args:
-            other: The other Duration object to subtract.
+            other (Duration): The other Duration object to subtract.
 
         Returns:
-            A new Duration object representing the difference.
+            Duration: A new Duration object representing the absolute difference.
+
+        Raises:
+            TypeError: If 'other' is not a Duration object.
         """
         if not isinstance(other, Duration):
             raise TypeError(
@@ -100,23 +125,25 @@ class Duration:
 
         total_seconds_self = self.to_seconds()
         total_seconds_other = other.to_seconds()
-        diff_seconds = total_seconds_self - total_seconds_other
-
-        if diff_seconds < 0:
-            # Always compute absolute difference
-            diff_seconds = -diff_seconds
+        diff_seconds = abs(
+            total_seconds_self - total_seconds_other
+        )  # Compute absolute difference
 
         new_days = diff_seconds // (24 * 60 * 60)
         remaining_seconds = diff_seconds % (24 * 60 * 60)
         new_hours = remaining_seconds // (60 * 60)
         new_minutes = (remaining_seconds % (60 * 60)) // 60
 
+        # No need to normalize here as calculations are based on positive diff_seconds
         return Duration(new_days, new_hours, new_minutes)
 
 
 class _Job:
     """
-    Job class to represent a job.
+    Internal class representing a scheduled job.
+
+    Encapsulates the function to be executed, its execution period,
+    the last run time, and whether it should run only once.
     """
 
     __slots__ = ["name", "func", "period", "last_run", "run_once", "has_ran"]
@@ -129,158 +156,229 @@ class _Job:
         run_once: bool = False,
         start_at: int = 0,
     ) -> None:
+        """
+        Initializes a _Job instance.
+
+        Args:
+            name (str): The name of the job (often the function name).
+            period (int): The execution period in seconds. For jobs scheduled at specific times (daily/hourly),
+                          this is the interval between those times (e.g., 24*60*60 for daily).
+            func (Callable[[], Any]): The function to execute.
+            run_once (bool): If True, the job will run only once and then be removed. Defaults to False.
+            start_at (int): The Unix timestamp when the job should first be considered for running.
+                            Used for daily/hourly jobs to align the first run. Defaults to 0 (effectively now).
+        """
         self.name = name
         self.func = func
         self.period = period
-        self.last_run = start_at
+        # Use start_at if provided and it's in the future, otherwise default to ~now for periodic jobs
+        self.last_run = start_at if start_at > 0 else int(time.time() - period)
         self.run_once = run_once
         self.has_ran = False
 
     def should_run(self) -> bool:
         """
-        Check if the job should run.
+        Checks if the job is due to run based on its last run time and period.
+
         Returns:
             bool: True if the job should run, False otherwise.
         """
-        return self.last_run + self.period <= time.time()
         # Check if the job should run based on the last run time and period
         # If the last run time plus the period is less than or equal to the current time, it should run
+        return self.last_run + self.period <= time.time()
 
     def should_remove(self) -> bool:
+        """
+        Checks if a 'run_once' job has already run and should be removed.
+
+        Returns:
+            bool: True if the job is run_once and has_ran is True.
+        """
         return self.run_once and self.has_ran
 
     def run_if_needed(self) -> None:
         """
-        Run the job if needed.
+        Executes the job if `should_run()` returns True.
+        Updates the last run time after execution.
         """
         if self.should_run():
             self.run()
-            self.last_run = int(time.time())
-            self.has_ran = True
             # Update the last run time to the current time
             # This ensures that the job will not run again until the period has passed
             # after the last run
-            # This is useful for jobs that need to run periodically
+            self.last_run = int(time.time())
+            self.has_ran = True
 
     def run(self) -> None:
         """
-        Run the job.
+        Executes the job's function in a new background thread.
+        Updates the last run time immediately before starting the thread.
         """
-        self.last_run = int(time.time())
+        self.last_run = int(time.time())  # Update last_run just before starting
+        # Run the job function in a separate thread to avoid blocking the scheduler loop
         Thread(target=self.func).start()
 
 
 class _Scheduler(LoopingThread):
     """
-    Scheduler class to manage the scheduling of jobs.
+    Singleton scheduler class that manages and executes scheduled jobs.
+
+    Inherits from LoopingThread to run its main loop in a background thread.
+    Reads optional configuration from environment variables:
+    - SCH_ENFORCE (bool, default True): Enforces a minimum period for periodic jobs.
+    - SCH_POLLING (int, default 10): The interval in seconds at which the scheduler checks for due jobs.
     """
 
     instance: Optional["_Scheduler"] = None
     instance_lock: Lock = Lock()
 
     def __init__(self) -> None:
+        """
+        Initializes the Scheduler. Reads environment variables for configuration.
+        Should not be called directly; use `scheduler()` or `_Scheduler.get_instance()`.
+        """
         super().__init__()
         self.__jobs: list[_Job] = []
         self.__started = False
         self.__start_lock: Lock = Lock()
+        # Read environment variables safely using Try/Opt
         self.__enforce_minimum_period = (
-            Try(lambda: bool(os.environ.get("SCH_ENFORCE", True))).get().or_else(True)
+            Try(lambda: bool(os.environ.get("SCH_ENFORCE", "True") == "True"))
+            .get()
+            .or_else(True)  # Ensure correct bool conversion
         )
         self.__polling_period = (
-            Try(lambda: int(os.environ.get("SCH_POLLING", 10))).get().or_else(10)
+            Try(lambda: int(os.environ.get("SCH_POLLING", "10"))).get().or_else(10)
         )
+        # Ensure polling period is at least 1 second
+        if self.__polling_period < 1:
+            self.__polling_period = 1
 
     @staticmethod
     def get_instance() -> "_Scheduler":
-        # If the instance is not initialized
+        """
+        Gets the singleton instance of the Scheduler, creating it if necessary.
+        This method is thread-safe.
+
+        Returns:
+            _Scheduler: The singleton scheduler instance.
+        """
+        # Double-checked locking for thread-safe singleton initialization
         if _Scheduler.instance is None:
-            # Lock for instantiation
             with _Scheduler.instance_lock:
-                # Check if the instance was not already initialized before acquiring the lock
                 if _Scheduler.instance is None:
-                    # Initialize
                     _Scheduler.instance = _Scheduler()
         return _Scheduler.instance
-        # Return the singleton instance
 
     def add_job(self, job: _Job) -> None:
         """
-        Add a job to the scheduler.
+        Adds a job to the scheduler's list.
+        Starts the scheduler's background thread if it hasn't been started yet.
+
         Args:
-            job (_Job): Job to add.
+            job (_Job): The job to add.
         """
         self.__jobs.append(job)
-        # Add the job to the list of jobs
+        # Start the scheduler thread automatically when the first job is added
         if not self.__started:
             with self.__start_lock:
-                # If the scheduler is not running, start it
                 if not self.__started:
-                    self.start()
-                    # Start the scheduler thread
-                    # This will start the loop method in a separate thread
+                    self.start()  # Start the LoopingThread's run() method
                     self.__started = True
-                    # Set the started flag to True
 
     def loop(self) -> None:
+        """
+        The main execution loop for the scheduler thread.
+        Periodically checks all jobs, runs due jobs, and cleans up completed 'run_once' jobs.
+        Sleeps for the configured polling period between checks.
+        """
         remove_jobs: list[_Job] = []
-        for job in self.__jobs:
+        # Iterate safely over a copy in case jobs are added/removed concurrently (though add_job is locked)
+        current_jobs = self.__jobs[:]
+        for job in current_jobs:
             if job.should_remove():
                 remove_jobs.append(job)
             else:
+                # Run the job if its time has come
                 job.run_if_needed()
-        # Cleanup run once jobs that have already ran
-        for remove_job in remove_jobs:
-            self.__jobs.remove(remove_job)
+
+        # Cleanup run_once jobs that have already run
+        if remove_jobs:
+            # Modify the original list safely
+            self.__jobs = [job for job in self.__jobs if job not in remove_jobs]
+
+        # Wait for the next polling interval
         sleep(self.__polling_period)
 
     def enforce_minimum_period(self, flag: bool) -> None:
         """
-        Enforce a minimum period for the scheduler.
+        Sets whether to enforce a minimum period (currently > 10s) for periodic jobs.
+
         Args:
-            period (int): Period in seconds.
+            flag (bool): True to enforce, False to allow any period.
         """
         self.__enforce_minimum_period = flag
 
     def set_polling_period(self, period: int) -> None:
         """
-        Set the polling period for the scheduler
+        Sets the polling period (how often the scheduler checks for due jobs).
+        Minimum period is 1 second.
 
         Args:
-            period (int): The new period
+            period (int): The new polling period in seconds.
         """
-        self.__polling_period = period
+        self.__polling_period = max(1, period)  # Ensure minimum of 1 second
 
     def stop(self) -> None:
         """
-        Stop the scheduler.
+        Stops the scheduler thread gracefully.
+        Waits for the thread to finish execution.
         """
         if self.is_running():
-            self.cancel()
-            # Cancel the scheduler thread
-            # This will stop the loop method from running
-            # and exit the thread
-            self.join()
-            # Wait for the thread to finish
-            # This is useful to ensure that all jobs have completed before stopping the scheduler
+            self.cancel()  # Signal the LoopingThread to stop
+            # Wait for the thread to complete its current loop and exit
+            # Use a timeout to prevent indefinite blocking if something goes wrong
+            self.join(timeout=self.__polling_period + 1)
+            self.__started = False  # Reset started flag
 
     def scan_modules(
         self,
         modules: list[str],
     ) -> None:
+        """
+        Imports the specified modules.
+        This is useful for discovering functions decorated with scheduling decorators.
+
+        Args:
+            modules (list[str]): A list of module names (e.g., ["mypackage.tasks", "other.jobs"]).
+        """
         for module in modules:
-            importlib.import_module(module)
+            try:
+                importlib.import_module(module)
+            except ImportError as e:
+                print(f"Warning: Could not import module '{module}' during scan: {e}")
 
     def schedule_periodic(
         self, func: Callable[[], Any], period: int, one_time: bool = False
     ) -> "_Scheduler":
         """
-        Schedule a function to be executed periodically.
+        Schedules a function to run periodically or just once after a delay.
+
         Args:
-            period (int): Period in seconds.
+            func (Callable[[], Any]): The function to schedule.
+            period (int): The period in seconds between runs, or the delay for one_time jobs.
+            one_time (bool): If True, run the job only once after the initial period. Defaults to False.
+
+        Returns:
+            _Scheduler: The scheduler instance for chaining.
+
+        Raises:
+            ValueError: If `enforce_minimum_period` is True and the period is <= 10 seconds.
         """
-        if self.__enforce_minimum_period and period <= 10:
-            raise ValueError("Period must be greater than 10 seconds")
-            # Check if the period is greater than 10 seconds
+        if self.__enforce_minimum_period and period <= 10 and not one_time:
+            raise ValueError(
+                "Period must be greater than 10 seconds when enforcement is active"
+            )
 
         self.add_job(_Job(func.__name__, period, func, one_time))
         return self
@@ -292,20 +390,24 @@ class _Scheduler(LoopingThread):
         minute: int,
     ) -> "_Scheduler":
         """
-        Schedule a function to be executed at a fixed time.
+        Schedules a function to run daily at a specific hour and minute (local time).
 
         Args:
-            hour (int): Hour of the day (0-23).
-            minute (int): Minute of the hour (0-59).
-            second (int): Second of the minute (0-59).
+            func (Callable[[], Any]): The function to schedule.
+            hour (int): The hour of the day (0-23).
+            minute (int): The minute of the hour (0-59).
+
+        Returns:
+            _Scheduler: The scheduler instance for chaining.
         """
+        period = 24 * 60 * 60  # Daily period in seconds
+        start_ts = get_timestamp_today(hour, minute)
 
-        period = 24 * 60 * 60
-        # Calculate the period in seconds
+        # If the calculated start time is in the past for today, set the first run for tomorrow
+        if start_ts < time.time():
+            start_ts += period
 
-        job = _Job(
-            func.__name__, period, func, False, get_timestamp_today(hour, minute)
-        )
+        job = _Job(func.__name__, period, func, False, start_ts)
         self.add_job(job)
         return self
 
@@ -315,18 +417,23 @@ class _Scheduler(LoopingThread):
         minute: int,
     ) -> "_Scheduler":
         """
-        Schedule a function to be executed at a fixed time.
+        Schedules a function to run hourly at a specific minute (local time).
 
         Args:
-            minute (int): Minute of the hour (0-59).
+            func (Callable[[], Any]): The function to schedule.
+            minute (int): The minute of the hour (0-59).
+
+        Returns:
+            _Scheduler: The scheduler instance for chaining.
         """
+        period = 60 * 60  # Hourly period in seconds
+        start_ts = get_timestamp_current_hour(minute)
 
-        period = 60 * 60
-        # Calculate the period in seconds
+        # If the calculated start time is in the past for this hour, set the first run for the next hour
+        if start_ts < time.time():
+            start_ts += period
 
-        job = _Job(
-            func.__name__, period, func, False, get_timestamp_current_hour(minute)
-        )
+        job = _Job(func.__name__, period, func, False, start_ts)
         self.add_job(job)
         return self
 
@@ -335,10 +442,26 @@ class _Scheduler(LoopingThread):
         func: Callable[[], Any],
         duration: Duration,
     ) -> "_Scheduler":
+        """
+        Schedules a function to run periodically based on a Duration object.
+
+        Args:
+            func (Callable[[], Any]): The function to schedule.
+            duration (Duration): The interval between runs.
+
+        Returns:
+            _Scheduler: The scheduler instance for chaining.
+        """
         return self.schedule_periodic(func, duration.to_seconds())
 
 
 def scheduler() -> _Scheduler:
+    """
+    Convenience function to get the singleton _Scheduler instance.
+
+    Returns:
+        _Scheduler: The singleton scheduler instance.
+    """
     return _Scheduler.get_instance()
 
 
@@ -347,70 +470,87 @@ def schedule_periodic(
     one_time: bool = False,
 ) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
     """
-    Decorator to schedule a function to be executed periodically.
-    Since the scheduler needs to execute the given function at specified intervals, the function must be available and not depend on a specific instance.
-    This means that the function should not rely on instance variables or methods.
-    Instead, it should be a static method or a standalone function.
-    The function should not be a lambda function, as it will not be able to access the instance variables or methods.
-    The function should not be a class method, as it will not be able to access the instance variables or methods.
-    The function should not be a generator function, as it will not be able to access the instance variables or methods.
-    The function should not be a coroutine function, as it will not be able to access the instance variables or methods.
-    The function should not be a nested function, as it will not be able to access the instance variables or methods.
+    Decorator to schedule a function to be executed periodically or once.
+
+    The decorated function will be added to the singleton scheduler.
+
+    **Important Constraints:**
+    - The decorated function must be a static method or a standalone function.
+    - It cannot be an instance method, lambda, generator, coroutine, or nested function,
+      as the scheduler executes it without an instance context.
+
     Args:
-        period (int): Period in seconds.
+        period (int): The period in seconds between runs, or the delay for one_time jobs.
+        one_time (bool): If True, run the job only once after the initial period. Defaults to False.
+
     Returns:
-        Callable[[Callable[[], Any]], Callable[[], Any]]: Decorated function.
+        Callable[[Callable[[], Any]], Callable[[], Any]]: The decorator function.
+
+    Raises:
+        ValueError: If `enforce_minimum_period` is True and the period is <= 10 seconds (for periodic jobs).
     """
 
     def decorator(func: Callable[[], Any]) -> Callable[[], Any]:
         scheduler().schedule_periodic(func, period, one_time)
-        return func
+        return func  # Return the original function
 
     return decorator
 
 
 def get_timestamp_current_hour(minute: int) -> int:
     """
-    Computes the Unix timestamp for a given minute within the current hour using the machine's local timezone.
+    Computes the Unix timestamp for a given minute within the current hour
+    using the machine's local timezone.
 
     Args:
-        minute: An integer representing the minute (0-59).
+        minute (int): An integer representing the minute (0-59).
 
     Returns:
-        An int representing the Unix timestamp (seconds since the epoch) for the specified minute of the current hour in the machine's local timezone.
+        int: The Unix timestamp (seconds since the epoch) for the specified
+             minute of the current hour in the machine's local timezone.
+
+    Raises:
+        ValueError: If minute is outside the range 0-59.
     """
+    if not 0 <= minute <= 59:
+        raise ValueError("Minute must be between 0 and 59")
+
     now_local = datetime.datetime.now()
-    current_hour = now_local.hour
-    today = now_local.date()
+    # Create a datetime object for the target time within the current hour and day
+    target_time = now_local.replace(minute=minute, second=0, microsecond=0)
 
-    current_hour_at_minute = datetime.datetime(
-        today.year, today.month, today.day, current_hour, minute
-    )
-
-    # Convert the datetime object to a timestamp in the local timezone
-    timestamp = time.mktime(current_hour_at_minute.timetuple())
+    # Convert the datetime object to a Unix timestamp
+    timestamp = time.mktime(target_time.timetuple())
     return int(timestamp)
 
 
 def get_timestamp_today(hour: int, minute: int) -> int:
     """
-    Computes the Unix timestamp for a given hour and minute for the current day in Craiova, Romania.
+    Computes the Unix timestamp for a given hour and minute for the current day
+    using the machine's local timezone.
 
     Args:
-        hour: An integer representing the hour (0-23).
-        minute: An integer representing the minute (0-59).
+        hour (int): An integer representing the hour (0-23).
+        minute (int): An integer representing the minute (0-59).
 
     Returns:
-        An int representing the Unix timestamp (seconds since the epoch) for the specified time today.
+        int: The Unix timestamp (seconds since the epoch) for the specified time today
+             in the machine's local timezone.
+
+    Raises:
+        ValueError: If hour or minute are outside their valid ranges.
     """
-    today = datetime.date.today()
-    today_at_time = datetime.datetime(today.year, today.month, today.day, hour, minute)
+    if not 0 <= hour <= 23:
+        raise ValueError("Hour must be between 0 and 23")
+    if not 0 <= minute <= 59:
+        raise ValueError("Minute must be between 0 and 59")
 
-    # However, without knowing the exact date, we can't definitively say if DST is active.
-    # For simplicity, we'll assume the local timezone of the machine running this code.
-    # For a more robust solution, you would need to explicitly handle the timezone.
+    now_local = datetime.datetime.now()
+    # Create a datetime object for the target time on the current date
+    target_time = now_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
-    timestamp = today_at_time.timestamp()
+    # Convert the datetime object to a Unix timestamp
+    timestamp = time.mktime(target_time.timetuple())
     return int(timestamp)
 
 
@@ -419,27 +559,29 @@ def schedule_daily(
     minute: int,
 ) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
     """
-    Decorator to schedule a function to be executed at a fixed time.
-    Since the scheduler needs to execute the given function at specified intervals, the function must be available and not depend on a specific instance.
-    This means that the function should not rely on instance variables or methods.
-    Instead, it should be a static method or a standalone function.
-    The function should not be a lambda function, as it will not be able to access the instance variables or methods.
-    The function should not be a class method, as it will not be able to access the instance variables or methods.
-    The function should not be a generator function, as it will not be able to access the instance variables or methods.
-    The function should not be a coroutine function, as it will not be able to access the instance variables or methods.
-    The function should not be a nested function, as it will not be able to access the instance variables or methods.
+    Decorator to schedule a function to run daily at a specific hour and minute (local time).
+
+    The decorated function will be added to the singleton scheduler.
+
+    **Important Constraints:**
+    - The decorated function must be a static method or a standalone function.
+    - See `schedule_periodic` decorator for more details on constraints.
 
     Args:
-        hour (int): Hour of the day (0-23).
-        minute (int): Minute of the hour (0-59).
-        second (int): Second of the minute (0-59).
+        hour (int): The hour of the day (0-23).
+        minute (int): The minute of the hour (0-59).
+
     Returns:
-        Callable[[Callable[[], Any]], Callable[[], Any]]: Decorated function.
+        Callable[[Callable[[], Any]], Callable[[], Any]]: The decorator function.
+
+    Raises:
+        ValueError: If hour or minute are outside their valid ranges.
     """
 
+    # Input validation happens in get_timestamp_today called by schedule_daily method
     def decorator(func: Callable[[], Any]) -> Callable[[], Any]:
         scheduler().schedule_daily(func, hour, minute)
-        return func
+        return func  # Return the original function
 
     return decorator
 
@@ -448,27 +590,29 @@ def schedule_hourly(
     minute: int,
 ) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
     """
-    Decorator to schedule a function to be executed at a fixed time.
-    Since the scheduler needs to execute the given function at specified intervals, the function must be available and not depend on a specific instance.
-    This means that the function should not rely on instance variables or methods.
-    Instead, it should be a static method or a standalone function.
-    The function should not be a lambda function, as it will not be able to access the instance variables or methods.
-    The function should not be a class method, as it will not be able to access the instance variables or methods.
-    The function should not be a generator function, as it will not be able to access the instance variables or methods.
-    The function should not be a coroutine function, as it will not be able to access the instance variables or methods.
-    The function should not be a nested function, as it will not be able to access the instance variables or methods.
+    Decorator to schedule a function to run hourly at a specific minute (local time).
+
+    The decorated function will be added to the singleton scheduler.
+
+    **Important Constraints:**
+    - The decorated function must be a static method or a standalone function.
+    - See `schedule_periodic` decorator for more details on constraints.
 
     Args:
-        hour (int): Hour of the day (0-23).
-        minute (int): Minute of the hour (0-59).
-        second (int): Second of the minute (0-59).
+        minute (int): The minute of the hour (0-59).
+
     Returns:
-        Callable[[Callable[[], Any]], Callable[[], Any]]: Decorated function.
+        Callable[[Callable[[], Any]], Callable[[], Any]]: The decorator function.
+
+    Raises:
+        ValueError: If minute is outside the range 0-59.
     """
 
+    # Input validation happens in get_timestamp_current_hour called by schedule_hourly method
     def decorator(func: Callable[[], Any]) -> Callable[[], Any]:
-        scheduler().schedule_hourly(func, get_timestamp_current_hour(minute))
-        return func
+        # Note: The original code passed a timestamp here, but the method expects minute. Correcting.
+        scheduler().schedule_hourly(func, minute)
+        return func  # Return the original function
 
     return decorator
 
@@ -476,4 +620,23 @@ def schedule_hourly(
 def schedule_duration(
     duration: Duration,
 ) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
+    """
+    Decorator to schedule a function to run periodically based on a Duration object.
+
+    The decorated function will be added to the singleton scheduler.
+
+    **Important Constraints:**
+    - The decorated function must be a static method or a standalone function.
+    - See `schedule_periodic` decorator for more details on constraints.
+
+    Args:
+        duration (Duration): The interval between runs.
+
+    Returns:
+        Callable[[Callable[[], Any]], Callable[[], Any]]: The decorator function.
+
+    Raises:
+        ValueError: If `enforce_minimum_period` is True and the duration is <= 10 seconds.
+    """
+    # Validation happens within the schedule_periodic call
     return schedule_periodic(duration.to_seconds())

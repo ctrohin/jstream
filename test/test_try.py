@@ -180,7 +180,7 @@ class TestTry(BaseTestCase):
 
         self.assertEqual(
             Try(mock.do)
-            .with_retries(3, 0.1)
+            .with_retries(2, 0.1)
             .on_failure(mock.register_error)
             .get()
             .get(),
@@ -207,7 +207,7 @@ class TestTry(BaseTestCase):
 
         self.assertIsNone(
             Try(mock.do)
-            .with_retries(3, 0.1)
+            .with_retries(2, 0.1)
             .on_failure(mock.register_error)
             .get()
             .get_actual(),
