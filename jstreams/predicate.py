@@ -511,7 +511,7 @@ def is_int(number: Optional[float]) -> bool:
     return number is not None and number == int(number)
 
 
-def is_beween(interval_start: float, interval_end: float) -> Predicate[Optional[float]]:
+def _beween(interval_start: float, interval_end: float) -> Predicate[Optional[float]]:
     """Checks if a number is strictly between start and end (start < number < end)."""
 
     def wrap(val: Optional[float]) -> bool:
@@ -520,7 +520,7 @@ def is_beween(interval_start: float, interval_end: float) -> Predicate[Optional[
     return predicate_of(wrap)
 
 
-def is_beween_closed(
+def _beween_closed(
     interval_start: float, interval_end: float
 ) -> Predicate[Optional[float]]:
     """Checks if a number is between start and end inclusive (start <= number <= end)."""
@@ -531,9 +531,30 @@ def is_beween_closed(
     return predicate_of(wrap)
 
 
-# Alias for clarity
-is_in_interval = is_beween_closed
-is_in_open_interval = is_beween
+def is_beween_closed(
+    interval_start: float, interval_end: float
+) -> Predicate[Optional[float]]:
+    """Checks if a number is between start and end inclusive (start <= number <= end)."""
+    return _beween_closed(interval_start, interval_end)
+
+
+def is_in_interval(
+    interval_start: float, interval_end: float
+) -> Predicate[Optional[float]]:
+    """Checks if a number is between start and end inclusive (start <= number <= end)."""
+    return _beween_closed(interval_start, interval_end)
+
+
+def is_beween(interval_start: float, interval_end: float) -> Predicate[Optional[float]]:
+    """Checks if a number is strictly between start and end (start < number < end)."""
+    return _beween(interval_start, interval_end)
+
+
+def is_in_open_interval(
+    interval_start: float, interval_end: float
+) -> Predicate[Optional[float]]:
+    """Checks if a number is strictly between start and end (start < number < end)."""
+    return _beween(interval_start, interval_end)
 
 
 def is_beween_closed_start(

@@ -31,6 +31,8 @@ from jstreams.try_opt import (
     ErrorLog,
     try_,
     try_of,
+    catch,
+    catch_with,
 )
 
 from jstreams.rx import (
@@ -433,4 +435,6 @@ __all__ = [
     "Duration",
     "pair_stream",
     "triplet_stream",
+    "catch",
+    "catch_with",
 ]
