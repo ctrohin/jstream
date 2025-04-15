@@ -34,7 +34,7 @@ def catch(
         return None
 
 
-def catchWith(
+def catch_with(
     with_val: T,
     fn: Callable[[T], V],
     logger: Optional[ErrorLogger] = None,
@@ -123,14 +123,14 @@ class Try(Generic[T]):
             )
         # Then call all the failure chain methods
         for fail_fn in self.__on_failure_chain:
-            catchWith(e, fail_fn, self.__error_log)
+            catch_with(e, fail_fn, self.__error_log)
 
         if self.__failure_exception_supplier is not None:
             raise self.__failure_exception_supplier()
 
     def __finally(self, val: Optional[T]) -> None:
         for finally_fn in self.__finally_chain:
-            catchWith(val, finally_fn, self.__error_log)
+            catch_with(val, finally_fn, self.__error_log)
 
     def get(self) -> Opt[T]:
         self.__has_failed = False
