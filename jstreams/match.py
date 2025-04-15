@@ -1,6 +1,7 @@
 from typing import Callable, Generic, Optional, TypeVar, Union, cast, overload
 
 from jstreams.stream import Stream, Predicate
+from jstreams.utils import require_non_null
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -82,8 +83,7 @@ class DefaultCase(Case[T, V]):
     provided to `Match.of()`.
     """
 
-    # No __slots__ needed here as it inherits from Case which has them.
-    # Adding __slots__ = () could prevent __dict__ creation if needed, but likely unnecessary.
+    __slots__ = []
 
     def __init__(
         self,
@@ -351,32 +351,30 @@ class Match(Generic[T]):
             An Optional containing the result (V) of the first matching case.
             Returns None if no case matches the stored value.
         """
-        all_cases = [
-            case1,
-            case2,
-            case3,
-            case4,
-            case5,
-            case6,
-            case7,
-            case8,
-            case9,
-            case10,
-            case11,
-            case12,
-            case13,
-            case14,
-            case15,
-            case16,
-        ]
 
-        # Optimization: Use a generator expression to filter Nones directly
-        # This avoids the non_null().map(require_non_null) chain.
-        # The core performance comes from find_first() short-circuiting.
         return (
             Stream(
-                c for c in all_cases if c is not None
-            )  # Generator expression filters Nones
+                [
+                    case1,
+                    case2,
+                    case3,
+                    case4,
+                    case5,
+                    case6,
+                    case7,
+                    case8,
+                    case9,
+                    case10,
+                    case11,
+                    case12,
+                    case13,
+                    case14,
+                    case15,
+                    case16,
+                ]
+            )
+            .non_null()
+            .map(require_non_null)
             .find_first(lambda c: c.matches(self.__value))  # Short-circuits
             .map(lambda c: c.result())  # Get result only for the matched case
             .get_actual()  # Return Optional[V]
