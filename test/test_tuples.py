@@ -1,6 +1,16 @@
 from baseTest import BaseTestCase
 from jstreams.predicate import not_, contains, is_in_interval, is_zero
-from jstreams.tuples import left_matches, middle_matches, pair, right_matches, triplet
+from jstreams.tuples import (
+    Pair,
+    Triplet,
+    left_matches,
+    middle_matches,
+    pair,
+    pair_stream,
+    right_matches,
+    triplet,
+    triplet_stream,
+)
 
 
 class TestTuples(BaseTestCase):
@@ -41,4 +51,79 @@ class TestTuples(BaseTestCase):
         )
         self.assertFalse(
             right_matches(is_in_interval(1.6, 2))(v), "Right should not match predicate"
+        )
+
+    def test_pair_stream(self) -> None:
+        list1 = ["A", "B", "C"]
+        list2 = [0, 1, 2]
+
+        expected = [Pair("A", 0), Pair("B", 1), Pair("C", 2)]
+
+        self.assertListEqual(
+            pair_stream(list1, list2).to_list(),
+            expected,
+            "Pairs should be produced as expected",
+        )
+
+    def test_pair_stream_uneven_first(self) -> None:
+        list1 = ["A", "B", "C", "D"]
+        list2 = [0, 1, 2]
+
+        expected = [Pair("A", 0), Pair("B", 1), Pair("C", 2)]
+
+        self.assertListEqual(
+            pair_stream(list1, list2).to_list(),
+            expected,
+            "Pairs should be produced as expected. Last pair should not exist since it is incomplete",
+        )
+
+    def test_pair_stream_uneven_second(self) -> None:
+        list1 = ["A", "B", "C"]
+        list2 = [0, 1, 2, 3]
+
+        expected = [Pair("A", 0), Pair("B", 1), Pair("C", 2)]
+
+        self.assertListEqual(
+            pair_stream(list1, list2).to_list(),
+            expected,
+            "Pairs should be produced as expected. Last pair should not exist since it is incomplete",
+        )
+
+    def test_triplet_stream(self) -> None:
+        list1 = ["A", "B", "C"]
+        list2 = [0, 1, 2]
+        list3 = [0.5, 1.2, 1.3]
+
+        expected = [Triplet("A", 0, 0.5), Triplet("B", 1, 1.2), Triplet("C", 2, 1.3)]
+
+        self.assertListEqual(
+            triplet_stream(list1, list2, list3).to_list(),
+            expected,
+            "Triplets should be produced as expected",
+        )
+
+    def test_triplet_stream_uneven_left(self) -> None:
+        list1 = ["A", "B", "C", "D"]
+        list2 = [0, 1, 2]
+        list3 = [0.5, 1.2, 1.3]
+
+        expected = [Triplet("A", 0, 0.5), Triplet("B", 1, 1.2), Triplet("C", 2, 1.3)]
+
+        self.assertListEqual(
+            triplet_stream(list1, list2, list3).to_list(),
+            expected,
+            "Triplets should be produced as expected",
+        )
+
+    def test_triplet_stream_uneven_right(self) -> None:
+        list1 = ["A", "B", "C"]
+        list2 = [0, 1, 2]
+        list3 = [0.5, 1.2, 1.3, 5]
+
+        expected = [Triplet("A", 0, 0.5), Triplet("B", 1, 1.2), Triplet("C", 2, 1.3)]
+
+        self.assertListEqual(
+            triplet_stream(list1, list2, list3).to_list(),
+            expected,
+            "Triplets should be produced as expected",
         )
