@@ -465,8 +465,8 @@ class _Injector:
         self, dependencies: dict[type, Any], profiles: Optional[list[str]] = None
     ) -> "_Injector":
         for component_class in dependencies:
-            service = dependencies[component_class]
-            self.provide(component_class, service, profiles=profiles)
+            svc = dependencies[component_class]
+            self.provide(component_class, svc, profiles=profiles)
         return self
 
     def provide_variables(
@@ -563,7 +563,7 @@ def component(
     def wrap(cls: type[T]) -> type[T]:
         injector().provide(
             class_name if class_name is not None else cls,
-            cls() if strategy == Strategy.EAGER else lambda: cls(),
+            cls() if strategy == Strategy.EAGER else cls,
             qualifier,
             profiles,
         )
