@@ -1,13 +1,12 @@
 from enum import Enum
 import importlib
-from random import choice
-from string import ascii_letters, digits
+import inspect
 from threading import Lock, RLock
 from typing import Any, Callable, Generic, Optional, TypeVar, Union, cast
 
 from jstreams.noop import NoOp, NoOpCls
 from jstreams.stream import Opt, Stream
-from jstreams.utils import is_callable, require_non_null
+from jstreams.utils import is_mth_or_fn, require_non_null
 
 
 class Strategy(Enum):
@@ -136,12 +135,8 @@ class _Injector:
     def __init__(self) -> None:
         self.__components: dict[type, _ContainerDependency] = {}
         self.__variables: dict[type, _VariableDependency] = {}
-        self.__default_qualifier: str = "".join(
-            choice(digits + ascii_letters) for i in range(64)
-        )
-        self.__default_profile = "".join(
-            choice(digits + ascii_letters) for i in range(16)
-        )
+        self.__default_qualifier: str = "__DEFAULT_QUALIFIER__"
+        self.__default_profile: str = "__DEFAULT_PROFILE__"
         self.__profile: Optional[str] = None
         self.__modules_to_scan: list[str] = []
         self.__modules_scanned = False
@@ -403,7 +398,7 @@ class _Injector:
             None,
         )
 
-        if is_callable(found_component):
+        if is_mth_or_fn(found_component):
             comp = found_component()
             # Remove the old dependency
             container_dep.qualified_dependencies[full_qualifier] = self.__init_meta(
@@ -432,7 +427,7 @@ class _Injector:
             return None
 
         # We've got a lazy component
-        if is_callable(found_component):
+        if is_mth_or_fn(found_component):
             # We need to lock in the instantiation, so it will only happen once.
             with container_dep.lock:
                 # Once we've got the lock, get the component again, and make sure no other thread has already instatiated it
@@ -610,7 +605,7 @@ def configuration(profiles: Optional[list[str]] = None) -> Callable[[type[T]], t
         (
             Stream(dir(obj))
             .filter(lambda s: not s.startswith("_"))
-            .filter(lambda s: is_callable(getattr(obj, s)))
+            .filter(lambda s: is_mth_or_fn(getattr(obj, s)))
             .each(lambda s: run_bean(obj, s))
         )
         return cls
@@ -798,70 +793,175 @@ def inject_args(
     dependencies: dict[str, Union[type, Dependency, Variable]],
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
-    Injects dependencies to a function, method or constructor using args and kwargs.
+    Injects dependencies/variables into function/method arguments if they are not already provided by the caller.
+
+    This decorator inspects the function signature and the arguments passed during the call.
+    For each argument name specified in the `dependencies` dictionary, if that argument
+    was *not* provided by the caller (either positionally or by keyword), the corresponding
+    dependency or variable is resolved from the injector and passed as a keyword argument.
+
     Example:
+        injector().provide(str, "default_string")
+        injector().provide(int, 100, qualifier="special_int")
+        injector().provide_var(float, "some.float.key", 3.14)
 
-    IMPORTANT: For constructors, kw arg overriding is not available. When overriding arguments, all arguments must be specified, and their order must be exact (see below TestArgInjection)
+        @inject_args({
+            "arg1": str,
+            "arg2": Dependency(int, qualifier="special_int"),
+            "arg3": Variable(float, "some.float.key")
+        })
+        def my_function(arg1: str, arg2: int, arg3: float, arg4: bool = True):
+            print(f"{arg1=}, {arg2=}, {arg3=}, {arg4=}")
 
-    # Example 1:
-    injector().provide(str, "test")
-    injector().provide(int, 10)
-    injector().provide_var(str, "var1", "var1Value")
+        # Variable("some.float.key") resolves to 3.14
+        my_function(arg4=False)
+        # Output: arg1='default_string', arg2=100, arg3=3.14, arg4=False
 
-    @inject_args({"param1": str, "param2": int})
-    def fn(param1: str, param2: int) -> None:
-        print(param1 + "_" + param2)
+        my_function("explicit_string", arg4=False)
+        # Output: arg1='explicit_string', arg2=100, arg3=3.14, arg4=False
 
-    fn() # will print out "test_10"
-    fn(param1="test2") # will print out "test2_10" as param1 is overriden by the actual call
-    fn(param1="test2", param2=1) # will print out "test2_1" as both param1 and param2 are overriden by the actual call
-    fn(param2=1) # will print out "test_1" as only param2 is overriden by the actual call
+        my_function("explicit_string", 50, arg4=False) # arg3 still injected
+        # Output: arg1='explicit_string', arg2=50, arg3=3.14, arg4=False
 
-    # CAUTION: It is possible to also call decorated functions with positional arguments, but in
-    # this case, all parameters must be provided.
-    fn("test2", 1) # will print out "test2_1" as both param1 and param2 are provided by the actual call
-    fn("test2") # will result in an ERROR as not all params are provided by the positional arguments
+        my_function("explicit", 50, 9.99, False) # Nothing injected
+        # Output: arg1='explicit', arg2=50, arg3=9.99, arg4=False
 
-    class TestArgInjection:
-        @inject_args({"a": str, "b": int, "c": StrVariable("var1)})
-        def __init__(self, a: str, b: int, c: str) -> None:
-            self.a = a
-            self.b = b
-            self.c = c
-
-        def print(self) -> None:
-            print(a + str(b) + c)
-
-    TestArgInjection().print() # Will print out "test10var1Value" as all three arguments are injected into the constructor
-    TestArgInjection("other", 5).print() # Will print out "other5" as all args are overriden
-
-        Args:
-        dependencies (dict[str, Union[type, Dependency, Variable]]): A dictionary of dependecies that specify the argument name and the dependency or variable mapping.
+    Args:
+        dependencies (dict[str, Union[type, Dependency, Variable]]):
+            A dictionary mapping argument names to their corresponding dependency type,
+            Dependency object, or Variable object.
 
     Returns:
-        Callable[[Callable[..., T]], Callable[..., T]]: The decorated function or method
+        Callable[[Callable[..., T]], Callable[..., T]]: The decorated function or method.
+
+    Raises:
+        ValueError: If a required dependency/variable cannot be resolved by the injector.
+        TypeError: If the arguments passed during the call are fundamentally incompatible
+                    with the function signature (e.g., too many positional arguments).
     """
-    validate_dependencies(dependencies)
+    validate_dependencies(dependencies)  # Keep validation
 
     def wrapper(func: Callable[..., T]) -> Callable[..., T]:
-        def wrapped(*args: Any, **kwds: Any) -> T:
-            if func.__name__ == "__init__":
-                # We are dealing with a constructor, and must provide positional arguments
-                for key in dependencies:
-                    dep = dependencies[key]
-                    args = args + (_get_dep(dep),)
-            elif len(args) == 0:
-                for key in dependencies:
-                    if kwds.get(key) is None:
-                        dep = dependencies[key]
-                        kwds[key] = _get_dep(dep)
-            return func(*args, **kwds)
+        sig = inspect.signature(func)
 
+        def wrapped(*args: Any, **kwds: Any) -> T:
+            try:
+                # Bind provided arguments to see what's missing
+                # Use bind_partial as not all args might be provided yet (we inject the rest)
+                bound_args = sig.bind_partial(*args, **kwds)
+                # Consider arguments with defaults as "provided" for injection purposes
+                bound_args.apply_defaults()
+            except TypeError as e:
+                # Reraise if basic binding fails (e.g., too many positional args)
+                raise TypeError(
+                    f"Error binding arguments for {func.__qualname__}: {e}"
+                ) from e
+
+            # Prepare keyword arguments for injection
+            injected_kwds = {}
+            for param_name, dep_info in dependencies.items():
+                # Check if the argument was already provided by the caller or has a default
+                if param_name not in bound_args.arguments:
+                    try:
+                        # Resolve the dependency/variable
+                        resolved_dep = _get_dep(dep_info)
+                        injected_kwds[param_name] = resolved_dep
+                    except ValueError as e:
+                        # Dependency not found - re-raise with more context
+                        raise ValueError(
+                            f"Failed to inject argument '{param_name}' for {func.__qualname__}: {e}"
+                        ) from e
+                    except Exception as e:
+                        # Catch other potential errors during resolution
+                        raise RuntimeError(
+                            f"Unexpected error injecting argument '{param_name}' for {func.__qualname__}: {e}"
+                        ) from e
+
+            # Combine original kwds and injected kwds.
+            # Caller's explicit kwds take precedence over injected ones.
+            final_kwds = {**injected_kwds, **kwds}
+
+            # Call the original function with original args and combined kwds
+            return func(*args, **final_kwds)
+
+        # Preserve original function metadata for introspection and debugging
         wrapped.__name__ = func.__name__
         wrapped.__qualname__ = func.__qualname__
+        wrapped.__doc__ = func.__doc__
+
         return wrapped
 
     return wrapper
+
+
+# def inject_args(
+#     dependencies: dict[str, Union[type, Dependency, Variable]],
+# ) -> Callable[[Callable[..., T]], Callable[..., T]]:
+#     """
+#     Injects dependencies to a function, method or constructor using args and kwargs.
+#     Example:
+
+#     IMPORTANT: For constructors, kw arg overriding is not available. When overriding arguments, all arguments must be specified, and their order must be exact (see below TestArgInjection)
+
+#     # Example 1:
+#     injector().provide(str, "test")
+#     injector().provide(int, 10)
+#     injector().provide_var(str, "var1", "var1Value")
+
+#     @inject_args({"param1": str, "param2": int})
+#     def fn(param1: str, param2: int) -> None:
+#         print(param1 + "_" + param2)
+
+#     fn() # will print out "test_10"
+#     fn(param1="test2") # will print out "test2_10" as param1 is overriden by the actual call
+#     fn(param1="test2", param2=1) # will print out "test2_1" as both param1 and param2 are overriden by the actual call
+#     fn(param2=1) # will print out "test_1" as only param2 is overriden by the actual call
+
+#     # CAUTION: It is possible to also call decorated functions with positional arguments, but in
+#     # this case, all parameters must be provided.
+#     fn("test2", 1) # will print out "test2_1" as both param1 and param2 are provided by the actual call
+#     fn("test2") # will result in an ERROR as not all params are provided by the positional arguments
+
+#     class TestArgInjection:
+#         @inject_args({"a": str, "b": int, "c": StrVariable("var1)})
+#         def __init__(self, a: str, b: int, c: str) -> None:
+#             self.a = a
+#             self.b = b
+#             self.c = c
+
+#         def print(self) -> None:
+#             print(a + str(b) + c)
+
+#     TestArgInjection().print() # Will print out "test10var1Value" as all three arguments are injected into the constructor
+#     TestArgInjection("other", 5).print() # Will print out "other5" as all args are overriden
+
+#         Args:
+#         dependencies (dict[str, Union[type, Dependency, Variable]]): A dictionary of dependecies that specify the argument name and the dependency or variable mapping.
+
+#     Returns:
+#         Callable[[Callable[..., T]], Callable[..., T]]: The decorated function or method
+#     """
+#     validate_dependencies(dependencies)
+
+#     def wrapper(func: Callable[..., T]) -> Callable[..., T]:
+#         def wrapped(*args: Any, **kwds: Any) -> T:
+#             if func.__name__ == "__init__":
+#                 # We are dealing with a constructor, and must provide positional arguments
+#                 for key in dependencies:
+#                     dep = dependencies[key]
+#                     args = args + (_get_dep(dep),)
+#             elif len(args) == 0:
+#                 for key in dependencies:
+#                     if kwds.get(key) is None:
+#                         dep = dependencies[key]
+#                         kwds[key] = _get_dep(dep)
+#             return func(*args, **kwds)
+
+#         wrapped.__name__ = func.__name__
+#         wrapped.__qualname__ = func.__qualname__
+#         return wrapped
+
+#     return wrapper
 
 
 def autowired(

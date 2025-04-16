@@ -11,6 +11,7 @@ from typing import (
     cast,
 )
 
+from types import FunctionType, MethodType
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -18,20 +19,7 @@ C = TypeVar("C")
 V = TypeVar("V")
 
 
-def _f() -> None:
-    pass
-
-
-class _F:
-    def mth(self) -> None:
-        pass
-
-
-FnType = type(_f)
-MthType = type(_F().mth)
-
-
-def is_callable(var: Any) -> bool:
+def is_mth_or_fn(var: Any) -> bool:
     """
     Checks if the given argument is either a function or a method in a class.
 
@@ -42,7 +30,7 @@ def is_callable(var: Any) -> bool:
         bool: True if var is a function or method, False otherwise
     """
     var_type = type(var)
-    return var_type is FnType or var_type is MthType
+    return var_type is FunctionType or var_type is MethodType
 
 
 def require_non_null(obj: Optional[T], message: Optional[str] = None) -> T:
@@ -66,17 +54,18 @@ def require_non_null(obj: Optional[T], message: Optional[str] = None) -> T:
 
 
 def is_number(any_val: Any) -> bool:
-    """Checks if the value provided is a number
+    """Checks if the value provided is a float number or a string representing a valid float number
+    Since int is a subset of float, all int numbers will pass the condition.
 
     Args:
         any_val (any): the value
 
     Returns:
-        bool: True if anyVal is a number, False otherwise
+        bool: True if anyVal is a float, False otherwise
     """
     try:
-        _: float = float(any_val) + 1
-    except Exception:
+        float(any_val)
+    except (ValueError, TypeError):
         return False
     return True
 
@@ -92,7 +81,7 @@ def to_int(val: Any) -> int:
     Returns:
         int: The int representation
     """
-    return int(str(val))
+    return int(val)
 
 
 def to_float(val: Any) -> float:
@@ -106,7 +95,7 @@ def to_float(val: Any) -> float:
     Returns:
         float: The float representation
     """
-    return float(str(val))
+    return float(val)
 
 
 def as_list(dct: dict[Any, T]) -> list[T]:
@@ -119,7 +108,7 @@ def as_list(dct: dict[Any, T]) -> list[T]:
     Returns:
         list[T]: The list of values
     """
-    return [v for _, v in dct.items()]
+    return list(dct.values())
 
 
 def keys_as_list(dct: dict[T, Any]) -> list[T]:
@@ -132,7 +121,7 @@ def keys_as_list(dct: dict[T, Any]) -> list[T]:
     Returns:
         list[T]: The list of keys
     """
-    return [k for k, _ in dct.items()]
+    return list(dct.keys())
 
 
 def load_json(
@@ -146,7 +135,7 @@ def load_json_ex(
 ) -> Optional[Union[list[Any], dict[Any, Any]]]:
     try:
         return json.loads(s)  # type: ignore[no-any-return]
-    except Exception as ex:
+    except json.JSONDecodeError as ex:
         if handler is not None:
             handler(ex)
     return None
@@ -184,7 +173,7 @@ def extract(
         return default_value
 
     if len(keys) == 0:
-        return cast(typ, val) if val is not None else default_value  # type: ignore[valid-type]
+        return cast(T, val) if val is not None else default_value
 
     if isinstance(val, list):
         if len(val) < keys[0]:
@@ -195,7 +184,7 @@ def extract(
         return extract(typ, val.get(keys[0], None), keys[1:], default_value)
 
     if hasattr(val, keys[0]):
-        return extract(typ, getattr(val, keys[0]), keys[:1], default_value)
+        return extract(typ, getattr(val, keys[0]), keys[1:], default_value)
     return default_value
 
 
@@ -229,13 +218,13 @@ def is_empty_or_none(
     if obj is None:
         return True
 
+    if isinstance(obj, Sized):
+        return len(obj) == 0
+
     if isinstance(obj, Iterable):
         for _ in obj:
             return False
         return True
-
-    if isinstance(obj, Sized):
-        return len(obj) == 0
 
     return False
 
