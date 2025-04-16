@@ -103,9 +103,10 @@ class Try(Generic[T]):
         "__recovery_supplier",
         "__retries",
         "__retries_delay",
+        "__is_resource",
     )
 
-    def __init__(self, fn: Callable[[], T]) -> None:
+    def __init__(self, fn: Callable[[], T], is_resource: bool = False) -> None:
         """
         Initializes a Try operation.
 
@@ -113,6 +114,7 @@ class Try(Generic[T]):
             fn: The primary function to execute, which might raise an Exception.
         """
         self.__fn = fn
+        self.__is_resource = is_resource
         self.__then_chain: list[Callable[[T], Any]] = []
         self.__finally_chain: list[Callable[[Optional[T]], Any]] = []
         self.__on_failure_chain: list[Callable[[Exception], Any]] = []
@@ -220,6 +222,9 @@ class Try(Generic[T]):
             try:
                 # Execute the primary function
                 val = self.__fn()
+                if self.__is_resource:
+                    val = val.__enter__()
+
                 # Execute chained 'then' functions
                 for then_fn in self.__then_chain:
                     # Exceptions in 'then' functions will be caught by the outer try-except
@@ -238,6 +243,9 @@ class Try(Generic[T]):
                     # No more retries left, handle the final exception
                     self.__handle_exception(e)
                     # Note: __handle_exception might raise if __failure_exception_supplier is set
+            finally:
+                if self.__is_resource and val is not None:
+                    catch(val.__exit__, self.__error_log)
 
         # --- After the loop (either break on success or finish on failure) ---
         # Execute the finally chain once, passing the result if successful
@@ -298,7 +306,7 @@ class Try(Generic[T]):
         Note:
             - This method triggers the full execution defined by the Try object via `get()`.
             - It reflects whether the initial operation path encountered an unretried failure,
-              not necessarily whether `get()` ultimately returned an empty `Opt`.
+            not necessarily whether `get()` ultimately returned an empty `Opt`.
         """
         self.get()  # Trigger execution
         return self.__has_failed
@@ -318,6 +326,10 @@ class Try(Generic[T]):
         # Use require_non_null to raise ValueError if val is None
         return Try(lambda: require_non_null(val))
 
+    @staticmethod
+    def with_resource(fn: Callable[[], T]) -> "Try[T]":
+        return Try(fn, True)
+
 
 def try_(fn: Callable[[], T]) -> Try[T]:
     """
@@ -331,6 +343,10 @@ def try_(fn: Callable[[], T]) -> Try[T]:
         Try[T]: A new Try instance.
     """
     return Try(fn)
+
+
+def try_with_resource(fn: Callable[[], T]) -> Try[T]:
+    return Try.with_resource(fn)
 
 
 def try_of(value: Optional[T]) -> Try[T]:

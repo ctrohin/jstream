@@ -215,3 +215,52 @@ class TestTry(BaseTestCase):
         self.assertEqual(mock.current_try, 3)
         self.assertIsInstance(mock.error, ValueError)
         self.assertEqual(str(mock.error), "Test")
+
+    def __callback_test_try_with_resource(self, content) -> None:
+        self.__callback_test_try_with_resource_content = content
+
+    def test_try_with_resource(self) -> None:
+        path = "/tmp/test_file"
+        Try.with_resource(lambda: open(path, "w")).and_then(
+            lambda f: f.write("Test")
+        ).get()
+        Try.with_resource(lambda: open(path, "r")).and_then(
+            lambda f: self.__callback_test_try_with_resource(f.read())
+        ).get()
+        self.assertEqual(self.__callback_test_try_with_resource_content, "Test")
+
+    def test_try_with_resource_controlled(self) -> None:
+        class FakeResource:
+            def __init__(self):
+                self.enter_called = False
+                self.exit_called = False
+
+            def __enter__(self):
+                self.enter_called = True
+                return self
+
+            def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+                self.exit_called = True
+
+        res = FakeResource()
+        Try.with_resource(lambda: res).get()
+        self.assertTrue(res.enter_called)
+        self.assertTrue(res.exit_called)
+
+    def test_try_with_resource_controlled_exception(self) -> None:
+        class FakeResource:
+            def __init__(self):
+                self.enter_called = False
+                self.exit_called = False
+
+            def __enter__(self):
+                self.enter_called = True
+                return self
+
+            def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+                self.exit_called = True
+
+        res = FakeResource()
+        Try.with_resource(lambda: res).and_then(lambda _: self.throw()).get()
+        self.assertTrue(res.enter_called)
+        self.assertTrue(res.exit_called)

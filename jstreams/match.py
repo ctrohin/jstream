@@ -27,11 +27,11 @@ class Case(Generic[T, V]):
 
         Args:
             matching: The value, predicate function, or Predicate object to match against.
-                      - If a value, it's compared using equality (==).
-                      - If a callable/Predicate, it's called with the input value.
+                        - If a value, it's compared using equality (==).
+                        - If a callable/Predicate, it's called with the input value.
             resulting: The result value or a supplier function to generate the result.
-                       - If a value, it's returned directly.
-                       - If a callable, it's invoked to produce the result.
+                        - If a value, it's returned directly.
+                        - If a callable, it's invoked to produce the result.
         """
         self.__matching = matching
         self.__resulting = resulting
@@ -94,8 +94,8 @@ class DefaultCase(Case[T, V]):
 
         Args:
             resulting: The result value or a supplier function for the default case.
-                       - If a value, it's returned directly.
-                       - If a callable, it's invoked to produce the result.
+                        - If a value, it's returned directly.
+                        - If a callable, it's invoked to produce the result.
         """
         # The matching condition is a lambda that always returns True
         super().__init__(lambda _: True, resulting)
@@ -351,28 +351,44 @@ class Match(Generic[T]):
             An Optional containing the result (V) of the first matching case.
             Returns None if no case matches the stored value.
         """
+        return self.of_list(
+            [
+                case1,
+                case2,
+                case3,
+                case4,
+                case5,
+                case6,
+                case7,
+                case8,
+                case9,
+                case10,
+                case11,
+                case12,
+                case13,
+                case14,
+                case15,
+                case16,
+            ]
+        )
 
+    def of_list(self, cases: list[Optional[Case[T, V]]]) -> Optional[V]:
+        """
+        Evaluates the provided cases against the stored value and returns the result
+        of the first matching case.
+
+        The cases are evaluated in the order they are provided. The evaluation stops
+        as soon as a matching case is found (short-circuiting).
+
+        Args:
+            cases: The list of cases
+
+        Returns:
+            An Optional containing the result (V) of the first matching case.
+            Returns None if no case matches the stored value.
+        """
         return (
-            Stream(
-                [
-                    case1,
-                    case2,
-                    case3,
-                    case4,
-                    case5,
-                    case6,
-                    case7,
-                    case8,
-                    case9,
-                    case10,
-                    case11,
-                    case12,
-                    case13,
-                    case14,
-                    case15,
-                    case16,
-                ]
-            )
+            Stream(cases)
             .non_null()
             .map(require_non_null)
             .find_first(lambda c: c.matches(self.__value))  # Short-circuits

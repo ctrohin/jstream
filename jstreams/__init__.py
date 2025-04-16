@@ -33,6 +33,7 @@ from jstreams.try_opt import (
     try_of,
     catch,
     catch_with,
+    try_with_resource,
 )
 
 from jstreams.rx import (
@@ -437,4 +438,5 @@ __all__ = [
     "triplet_stream",
     "catch",
     "catch_with",
+    "try_with_resource",
 ]
