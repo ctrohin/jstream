@@ -1,7 +1,17 @@
 import logging
 from logging import Logger
 from time import sleep
-from typing import Any, Callable, Final, Generic, Optional, Protocol, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Final,
+    Generic,
+    Optional,
+    Protocol,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from jstreams.stream import Opt
 from jstreams.utils import require_non_null
@@ -223,7 +233,7 @@ class Try(Generic[T]):
                 # Execute the primary function
                 val = self.__fn()
                 if self.__is_resource:
-                    val = val.__enter__()
+                    val = cast(T, val.__enter__())  # type: ignore[attr-defined]
 
                 # Execute chained 'then' functions
                 for then_fn in self.__then_chain:
@@ -245,7 +255,7 @@ class Try(Generic[T]):
                     # Note: __handle_exception might raise if __failure_exception_supplier is set
             finally:
                 if self.__is_resource and val is not None:
-                    catch(val.__exit__, self.__error_log)
+                    catch(val.__exit__, self.__error_log)  # type: ignore[attr-defined]
 
         # --- After the loop (either break on success or finish on failure) ---
         # Execute the finally chain once, passing the result if successful
