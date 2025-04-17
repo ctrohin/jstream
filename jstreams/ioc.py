@@ -700,7 +700,7 @@ def resolve_dependencies(
     Returns:
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
-    return resolve(dependencies)
+    return resolve(cast(dict[str, Union[type, Dependency, Variable]], dependencies))
 
 
 def resolve(
@@ -770,32 +770,7 @@ def resolve_variables(
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
 
-    validate_dependencies(variables)
-
-    def wrap(cls: type[T]) -> type[T]:
-        original_get_attribute = cls.__getattribute__
-
-        def __getattribute__(self, attr_name: str) -> Any:  # type: ignore[no-untyped-def]
-            if attr_name in variables:
-                variable = variables.get(attr_name)
-                if variable is None:
-                    return original_get_attribute(self, attr_name)
-                dep = _get_dep(variable)
-                if dep is not None:
-                    # If a variable has been resolved, set it as an attribute of the class
-                    setattr(cls, attr_name, dep)
-                    # The remove it from the dependencies map
-                    variables.pop(attr_name)
-
-                return dep
-            return original_get_attribute(
-                self, attr_name
-            )  # Call the original __getattribute__
-
-        cls.__getattribute__ = __getattribute__  # type: ignore[method-assign]
-        return cls
-
-    return wrap
+    return resolve(cast(dict[str, Union[type, Dependency, Variable]], variables))
 
 
 def _get_dep(dep: Union[type, Dependency, Variable]) -> Any:
