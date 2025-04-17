@@ -695,7 +695,32 @@ def resolve_dependencies(
     Will inject the dependency associated with 'ClassName' into the 'test_field' member
 
     Args:
-        dependencies (Union[type, Dependency]]): A map of dependencies
+        dependencies (dict[str, Union[type, Dependency]]): A map of dependencies
+
+    Returns:
+        Callable[[type[T]], type[T]]: The decorated class constructor
+    """
+    return resolve(dependencies)
+
+
+def resolve(
+    dependencies: dict[str, Union[type, Dependency, Variable]],
+) -> Callable[[type[T]], type[T]]:
+    """
+    Resolve dependencies decorator.
+    Allows class decoration for parameter injection.
+    Example:
+
+    @dependencies({"test_field": ClassName, "str_value": Variable(str, "strQualifier", True)})
+    class TestClass:
+        test_field: Optional[ClassName]
+        str_value: Optional[str]
+
+    Will inject the dependency associated with 'ClassName' into the 'test_field' member,
+    and the variable associated with 'strQualifier' into the 'str_value' member
+
+    Args:
+        dependencies (dict[str, Union[type, Dependency, Variable]]): A map of dependencies
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class constructor
@@ -739,7 +764,7 @@ def resolve_variables(
     Will inject the value associated with 'strQualifier' of type 'str' into the 'str_value' member
 
     Args:
-        variables: dict[str, dict[str, Variable]]: A map of variable names to type and key tuple
+        variables: dict[str, Variable]: A map of variable names to Variable definition
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class constructor
@@ -1098,7 +1123,7 @@ class InjectedDependency(Generic[T]):
                 conn.execute(query)
     """
 
-    __slots__ = ["__typ", "__quali"]
+    __slots__ = ["__typ", "__quali", "__actual_value"]
 
     def __init__(self, typ: type[T], qualifier: Optional[str] = None) -> None:
         """
@@ -1110,6 +1135,7 @@ class InjectedDependency(Generic[T]):
         """
         self.__typ = typ
         self.__quali = qualifier
+        self.__actual_value: Optional[T] = None
 
     def get(self) -> T:
         """
@@ -1121,7 +1147,11 @@ class InjectedDependency(Generic[T]):
         Raises:
             ValueError: If the dependency is not found.
         """
-        return injector().get(self.__typ, self.__quali)
+        if self.__actual_value is not None:
+            return self.__actual_value
+        # Cache the value
+        self.__actual_value = injector().get(self.__typ, self.__quali)
+        return self.__actual_value
 
     def __call__(self) -> T:
         """
@@ -1155,7 +1185,7 @@ class OptionalInjectedDependency(Generic[T]):
                     logger.info(msg)
     """
 
-    __slots__ = ["__typ", "__quali"]
+    __slots__ = ["__typ", "__quali", "__actual_value"]
 
     def __init__(self, typ: type[T], qualifier: Optional[str] = None) -> None:
         """
@@ -1167,6 +1197,7 @@ class OptionalInjectedDependency(Generic[T]):
         """
         self.__typ = typ
         self.__quali = qualifier
+        self.__actual_value: Optional[T] = None
 
     def get(self) -> Optional[T]:
         """
@@ -1175,7 +1206,11 @@ class OptionalInjectedDependency(Generic[T]):
         Returns:
             Optional[T]: The dependency instance if found, otherwise None.
         """
-        return injector().find(self.__typ, self.__quali)
+        if self.__actual_value is not None:
+            return self.__actual_value
+        # Cache the value
+        self.__actual_value = injector().find(self.__typ, self.__quali)
+        return self.__actual_value
 
     def __call__(self) -> Optional[T]:
         """
@@ -1203,7 +1238,7 @@ class InjectedVariable(Generic[T]):
                 return self.api_key_provider() # or self.api_key_provider.get()
     """
 
-    __slots__ = ["__typ", "__quali"]
+    __slots__ = ["__typ", "__quali", "__actual_value"]
 
     def __init__(self, typ: type[T], qualifier: str) -> None:
         """
@@ -1215,6 +1250,7 @@ class InjectedVariable(Generic[T]):
         """
         self.__typ = typ
         self.__quali = qualifier  # Qualifier here means the variable key
+        self.__actual_value: Optional[T] = None
 
     def get(self) -> T:
         """
@@ -1226,7 +1262,11 @@ class InjectedVariable(Generic[T]):
         Raises:
             ValueError: If the variable is not found.
         """
-        return injector().get_var(self.__typ, self.__quali)
+        if self.__actual_value is not None:
+            return self.__actual_value
+        # Cache the value
+        self.__actual_value = injector().get_var(self.__typ, self.__quali)
+        return self.__actual_value
 
     def __call__(self) -> T:
         """
