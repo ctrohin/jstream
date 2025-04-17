@@ -709,7 +709,13 @@ def resolve_dependencies(
         def __getattribute__(self, attr_name: str) -> Any:  # type: ignore[no-untyped-def]
             if attr_name in dependencies:
                 quali = dependencies.get(attr_name, NoOpCls)
-                return _get_dep(quali)
+                dep = _get_dep(quali)
+                if dep is not None:
+                    # If a dependency has been resolved, set it as an attribute of the class
+                    setattr(cls, attr_name, dep)
+                    # The remove it from the dependencies map
+                    dependencies.pop(attr_name)
+                return dep
             return original_get_attribute(self, attr_name)
 
         cls.__getattribute__ = __getattribute__  # type: ignore[method-assign]
@@ -749,7 +755,14 @@ def resolve_variables(
                 variable = variables.get(attr_name)
                 if variable is None:
                     return original_get_attribute(self, attr_name)
-                return _get_dep(variable)
+                dep = _get_dep(variable)
+                if dep is not None:
+                    # If a variable has been resolved, set it as an attribute of the class
+                    setattr(cls, attr_name, dep)
+                    # The remove it from the dependencies map
+                    variables.pop(attr_name)
+
+                return dep
             return original_get_attribute(
                 self, attr_name
             )  # Call the original __getattribute__
