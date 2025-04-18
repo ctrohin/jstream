@@ -96,6 +96,7 @@ from jstreams.ioc import (
     var,
     InjectedDependency,
     OptionalInjectedDependency,
+    resolve,
     resolve_dependencies,
     resolve_variables,
     component,
@@ -238,6 +239,8 @@ from jstreams.scheduler import (
     schedule_periodic,
     Duration,
 )
+
+from jstreams.eventing import events
 
 __all__ = [
     "each",
@@ -439,4 +442,6 @@ __all__ = [
     "catch",
     "catch_with",
     "try_with_resource",
+    "resolve",
+    "events",
 ]
