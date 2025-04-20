@@ -291,8 +291,8 @@ class _EventBroadcaster:
         if event_type not in self._subjects:
             self._subjects[event_type] = {}
         if event_name not in self._subjects[event_type]:
-            self._subjects[event_type][event_name] = Event(SingleValueSubject(None))  # type: ignore[assignment]
-        return self._subjects[event_type][event_name]  # type: ignore[return-value]
+            self._subjects[event_type][event_name] = Event(SingleValueSubject(None))
+        return self._subjects[event_type][event_name]
 
     @staticmethod
     def get_instance() -> "_EventBroadcaster":
