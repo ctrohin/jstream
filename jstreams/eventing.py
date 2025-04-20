@@ -250,20 +250,23 @@ class Event(Generic[T]):
         )
         return PipeObservable(self.__subject, Pipe(T, Any, op_list))  # type: ignore
 
+    def _destroy(self) -> None:
+        self.__subject.dispose()
+
 
 class _EventBroadcaster:
     _instance: Optional["_EventBroadcaster"] = None
     _instance_lock = Lock()
 
     def __init__(self) -> None:
-        self._subjects: dict[type, dict[str, SingleValueSubject[Any]]] = {}
+        self._subjects: dict[type, dict[str, Event[Any]]] = {}
 
     def clear(self) -> "_EventBroadcaster":
         """
         Clear all events.
         """
         Stream(self._subjects.values()).each(
-            lambda s: Stream(s.values()).each(lambda s: s.dispose())
+            lambda s: Stream(s.values()).each(lambda s: s._destroy())
         )
         self._subjects.clear()
         return self
@@ -278,7 +281,7 @@ class _EventBroadcaster:
         (
             Opt(self._subjects.pop(event_type))
             .map(lambda d: Stream(d.values()))
-            .if_present(lambda s: s.each(lambda s: s.dispose()))
+            .if_present(lambda s: s.each(lambda s: s._destroy()))
         )
         return self
 
