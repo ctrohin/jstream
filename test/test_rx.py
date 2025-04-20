@@ -16,6 +16,7 @@ from jstreams import (
     rx_drop_until,
     rx_drop,
 )
+from jstreams.eventing import event, events
 
 
 class TestRx(BaseTestCase):
@@ -261,3 +262,35 @@ class TestRx(BaseTestCase):
         chainedPipe.dispose()
         self.assertListEqual(self.val, [2, 4, 6, 8])
         self.assertListEqual(self.val2, [2, 4, 6, 8])
+
+    def test_event(self) -> None:
+        global vals
+        global valsub
+        vals = []
+        valsub = []
+
+        def addval(val: str) -> None:
+            global vals
+            vals.append(val)
+
+        def addvalsub(val: int) -> None:
+            global valsub
+            valsub.append(val)
+
+        subpipe = event(int).pipe(rx_map(lambda i: str(i))).subscribe(addval)
+        subval = event(int).subscribe(addvalsub)
+
+        self.assertIsNotNone(subpipe)
+        self.assertIsNotNone(subval)
+
+        event(int).publish(1)
+        event(int).publish(2)
+        subpipe.cancel()
+        subval.cancel()
+        subpipe.dispose()
+        subval.dispose()
+
+        event(int).publish(3)
+
+        self.assertListEqual(vals, ["1", "2"])
+        self.assertListEqual(valsub, [1, 2])

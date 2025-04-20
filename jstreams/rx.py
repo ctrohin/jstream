@@ -136,10 +136,10 @@ class ObservableSubscription(Generic[T]):
 
 
 class _ObservableParent(Generic[T]):
-    def push(self) -> None:
+    def _push(self) -> None:
         pass
 
-    def push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
+    def _push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
         pass
 
 
@@ -154,7 +154,206 @@ class _OnNext(Generic[T]):
         pass
 
 
-class _ObservableBase(Generic[T]):
+class Subscribable(abc.ABC, Generic[T]):
+    @abc.abstractmethod
+    def subscribe(
+        self,
+        on_next: NextHandler[T],
+        on_error: ErrorHandler = None,
+        on_completed: CompletedHandler[T] = None,
+        on_dispose: DisposeHandler = None,
+    ) -> ObservableSubscription[Any]:
+        pass
+
+
+class Piped(abc.ABC, Generic[T, V]):
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: RxOperator[A, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: RxOperator[A, B],
+        op3: RxOperator[B, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: RxOperator[A, B],
+        op3: RxOperator[B, C],
+        op4: RxOperator[C, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: RxOperator[A, B],
+        op3: RxOperator[B, C],
+        op4: RxOperator[C, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: RxOperator[A, B],
+        op3: RxOperator[B, C],
+        op4: RxOperator[C, D],
+        op5: RxOperator[D, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: RxOperator[A, B],
+        op3: RxOperator[B, C],
+        op4: RxOperator[C, D],
+        op5: RxOperator[D, E],
+        op6: RxOperator[E, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: RxOperator[A, B],
+        op3: RxOperator[B, C],
+        op4: RxOperator[C, D],
+        op5: RxOperator[D, E],
+        op6: RxOperator[E, F],
+        op7: RxOperator[F, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: RxOperator[A, B],
+        op3: RxOperator[B, C],
+        op4: RxOperator[C, D],
+        op5: RxOperator[D, E],
+        op6: RxOperator[E, F],
+        op7: RxOperator[F, G],
+        op8: RxOperator[G, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: RxOperator[A, B],
+        op3: RxOperator[B, C],
+        op4: RxOperator[C, D],
+        op5: RxOperator[D, E],
+        op6: RxOperator[E, F],
+        op7: RxOperator[F, G],
+        op8: RxOperator[G, H],
+        op9: RxOperator[H, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: RxOperator[A, B],
+        op3: RxOperator[B, C],
+        op4: RxOperator[C, D],
+        op5: RxOperator[D, E],
+        op6: RxOperator[E, F],
+        op7: RxOperator[F, G],
+        op8: RxOperator[G, H],
+        op9: RxOperator[H, N],
+        op10: RxOperator[N, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: RxOperator[A, B],
+        op3: RxOperator[B, C],
+        op4: RxOperator[C, D],
+        op5: RxOperator[D, E],
+        op6: RxOperator[E, F],
+        op7: RxOperator[F, G],
+        op8: RxOperator[G, H],
+        op9: RxOperator[H, N],
+        op10: RxOperator[N, J],
+        op11: RxOperator[J, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: RxOperator[A, B],
+        op3: RxOperator[B, C],
+        op4: RxOperator[C, D],
+        op5: RxOperator[D, E],
+        op6: RxOperator[E, F],
+        op7: RxOperator[F, G],
+        op8: RxOperator[G, H],
+        op9: RxOperator[H, N],
+        op10: RxOperator[N, J],
+        op11: RxOperator[J, K],
+        op12: RxOperator[K, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @overload
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: RxOperator[A, B],
+        op3: RxOperator[B, C],
+        op4: RxOperator[C, D],
+        op5: RxOperator[D, E],
+        op6: RxOperator[E, F],
+        op7: RxOperator[F, G],
+        op8: RxOperator[G, H],
+        op9: RxOperator[H, N],
+        op10: RxOperator[N, J],
+        op11: RxOperator[J, K],
+        op12: RxOperator[K, L],
+        op13: RxOperator[L, V],
+    ) -> "PipeObservable[T, V]": ...
+
+    @abc.abstractmethod
+    def pipe(
+        self,
+        op1: RxOperator[T, A],
+        op2: Optional[RxOperator[A, B]] = None,
+        op3: Optional[RxOperator[B, C]] = None,
+        op4: Optional[RxOperator[C, D]] = None,
+        op5: Optional[RxOperator[D, E]] = None,
+        op6: Optional[RxOperator[E, F]] = None,
+        op7: Optional[RxOperator[F, G]] = None,
+        op8: Optional[RxOperator[G, H]] = None,
+        op9: Optional[RxOperator[H, N]] = None,
+        op10: Optional[RxOperator[N, J]] = None,
+        op11: Optional[RxOperator[J, K]] = None,
+        op12: Optional[RxOperator[K, L]] = None,
+        op13: Optional[RxOperator[L, M]] = None,
+        op14: Optional[RxOperator[M, V]] = None,
+    ) -> "PipeObservable[T, V]":
+        pass
+
+
+class _ObservableBase(Subscribable[T]):
     __slots__ = ("__subscriptions", "_parent", "_last_val")
 
     def __init__(self) -> None:
@@ -167,9 +366,9 @@ class _ObservableBase(Generic[T]):
 
         if self.__subscriptions is not None:
             for sub in self.__subscriptions:
-                self.push_to_subscription(sub, val)
+                self._push_to_subscription(sub, val)
 
-    def push_to_subscription(self, sub: ObservableSubscription[Any], val: T) -> None:
+    def _push_to_subscription(self, sub: ObservableSubscription[Any], val: T) -> None:
         if not sub.is_paused():
             try:
                 sub.on_next(val)
@@ -187,7 +386,7 @@ class _ObservableBase(Generic[T]):
         sub = ObservableSubscription(self, on_next, on_error, on_completed, on_dispose)
         self.__subscriptions.append(sub)
         if self._parent is not None:
-            self._parent.push_to_sub_on_subscribe(sub)
+            self._parent._push_to_sub_on_subscribe(sub)
         return sub
 
     def cancel(self, sub: ObservableSubscription[Any]) -> None:
@@ -239,7 +438,7 @@ class _Observable(_ObservableBase[T], _ObservableParent[T]):
         super().__init__()
 
 
-class _PipeObservable(Generic[T, V], _Observable[V]):
+class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
     __slots__ = ("__pipe", "__parent")
 
     def __init__(self, parent: _Observable[T], pipe: Pipe[T, V]) -> None:
@@ -253,7 +452,7 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[V] = None,
         on_dispose: DisposeHandler = None,
-    ) -> ObservableSubscription[Any]:
+    ) -> ObservableSubscription[V]:
         """
         Subscribe to this pipe
 
@@ -296,171 +495,6 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
     def pause(self, sub: ObservableSubscription[Any]) -> None:
         self.__parent.pause(sub)
 
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, V],
-    ) -> "_PipeObservable[T, V]": ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, V],
-    ) -> "_PipeObservable[T, V]": ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, B],
-        op3: RxOperator[B, V],
-    ) -> "_PipeObservable[T, V]": ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, B],
-        op3: RxOperator[B, C],
-        op4: RxOperator[C, V],
-    ) -> "_PipeObservable[T, V]": ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, B],
-        op3: RxOperator[B, C],
-        op4: RxOperator[C, V],
-    ) -> "_PipeObservable[T, V]": ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, B],
-        op3: RxOperator[B, C],
-        op4: RxOperator[C, D],
-        op5: RxOperator[D, V],
-    ) -> "_PipeObservable[T, V]": ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, B],
-        op3: RxOperator[B, C],
-        op4: RxOperator[C, D],
-        op5: RxOperator[D, E],
-        op6: RxOperator[E, V],
-    ) -> "_PipeObservable[T, V]": ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, B],
-        op3: RxOperator[B, C],
-        op4: RxOperator[C, D],
-        op5: RxOperator[D, E],
-        op6: RxOperator[E, F],
-        op7: RxOperator[F, V],
-    ) -> "_PipeObservable[T, V]": ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, B],
-        op3: RxOperator[B, C],
-        op4: RxOperator[C, D],
-        op5: RxOperator[D, E],
-        op6: RxOperator[E, F],
-        op7: RxOperator[F, G],
-        op8: RxOperator[G, V],
-    ) -> "_PipeObservable[T, V]": ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, B],
-        op3: RxOperator[B, C],
-        op4: RxOperator[C, D],
-        op5: RxOperator[D, E],
-        op6: RxOperator[E, F],
-        op7: RxOperator[F, G],
-        op8: RxOperator[G, H],
-        op9: RxOperator[H, V],
-    ) -> "_PipeObservable[T, V]": ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, B],
-        op3: RxOperator[B, C],
-        op4: RxOperator[C, D],
-        op5: RxOperator[D, E],
-        op6: RxOperator[E, F],
-        op7: RxOperator[F, G],
-        op8: RxOperator[G, H],
-        op9: RxOperator[H, N],
-        op10: RxOperator[N, V],
-    ) -> "_PipeObservable[T, V]": ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, B],
-        op3: RxOperator[B, C],
-        op4: RxOperator[C, D],
-        op5: RxOperator[D, E],
-        op6: RxOperator[E, F],
-        op7: RxOperator[F, G],
-        op8: RxOperator[G, H],
-        op9: RxOperator[H, N],
-        op10: RxOperator[N, J],
-        op11: RxOperator[J, V],
-    ) -> "_PipeObservable[T, V]": ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, B],
-        op3: RxOperator[B, C],
-        op4: RxOperator[C, D],
-        op5: RxOperator[D, E],
-        op6: RxOperator[E, F],
-        op7: RxOperator[F, G],
-        op8: RxOperator[G, H],
-        op9: RxOperator[H, N],
-        op10: RxOperator[N, J],
-        op11: RxOperator[J, K],
-        op12: RxOperator[K, V],
-    ) -> "_PipeObservable[T, V]": ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, B],
-        op3: RxOperator[B, C],
-        op4: RxOperator[C, D],
-        op5: RxOperator[D, E],
-        op6: RxOperator[E, F],
-        op7: RxOperator[F, G],
-        op8: RxOperator[G, H],
-        op9: RxOperator[H, N],
-        op10: RxOperator[N, J],
-        op11: RxOperator[J, K],
-        op12: RxOperator[K, L],
-        op13: RxOperator[L, V],
-    ) -> "_PipeObservable[T, V]": ...
-
     def pipe(
         self,
         op1: RxOperator[T, A],
@@ -477,7 +511,7 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
         op12: Optional[RxOperator[K, L]] = None,
         op13: Optional[RxOperator[L, M]] = None,
         op14: Optional[RxOperator[M, V]] = None,
-    ) -> "_PipeObservable[T, V]":
+    ) -> "PipeObservable[T, V]":
         op_list = (
             Stream(
                 [
@@ -500,7 +534,7 @@ class _PipeObservable(Generic[T, V], _Observable[V]):
             .non_null()
             .to_list()
         )
-        return _PipeObservable(self, Pipe(T, V, op_list))  # type: ignore
+        return PipeObservable(self, Pipe(T, V, op_list))  # type: ignore
 
 
 class Observable(_Observable[T]):
@@ -511,14 +545,14 @@ class Observable(_Observable[T]):
     def pipe(
         self,
         op1: RxOperator[T, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
         self,
         op1: RxOperator[T, A],
         op2: RxOperator[A, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -526,7 +560,7 @@ class Observable(_Observable[T]):
         op1: RxOperator[T, A],
         op2: RxOperator[A, B],
         op3: RxOperator[B, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -535,7 +569,7 @@ class Observable(_Observable[T]):
         op2: RxOperator[A, B],
         op3: RxOperator[B, C],
         op4: RxOperator[C, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -544,7 +578,7 @@ class Observable(_Observable[T]):
         op2: RxOperator[A, B],
         op3: RxOperator[B, C],
         op4: RxOperator[C, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -554,7 +588,7 @@ class Observable(_Observable[T]):
         op3: RxOperator[B, C],
         op4: RxOperator[C, D],
         op5: RxOperator[D, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -565,7 +599,7 @@ class Observable(_Observable[T]):
         op4: RxOperator[C, D],
         op5: RxOperator[D, E],
         op6: RxOperator[E, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -577,7 +611,7 @@ class Observable(_Observable[T]):
         op5: RxOperator[D, E],
         op6: RxOperator[E, F],
         op7: RxOperator[F, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -590,7 +624,7 @@ class Observable(_Observable[T]):
         op6: RxOperator[E, F],
         op7: RxOperator[F, G],
         op8: RxOperator[G, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -604,7 +638,7 @@ class Observable(_Observable[T]):
         op7: RxOperator[F, G],
         op8: RxOperator[G, H],
         op9: RxOperator[H, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -619,7 +653,7 @@ class Observable(_Observable[T]):
         op8: RxOperator[G, H],
         op9: RxOperator[H, N],
         op10: RxOperator[N, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -635,7 +669,7 @@ class Observable(_Observable[T]):
         op9: RxOperator[H, N],
         op10: RxOperator[N, J],
         op11: RxOperator[J, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -652,7 +686,7 @@ class Observable(_Observable[T]):
         op10: RxOperator[N, J],
         op11: RxOperator[J, K],
         op12: RxOperator[K, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -670,7 +704,7 @@ class Observable(_Observable[T]):
         op11: RxOperator[J, K],
         op12: RxOperator[K, L],
         op13: RxOperator[L, V],
-    ) -> _PipeObservable[T, V]: ...
+    ) -> PipeObservable[T, V]: ...
 
     def pipe(
         self,
@@ -688,7 +722,7 @@ class Observable(_Observable[T]):
         op12: Optional[RxOperator[K, L]] = None,
         op13: Optional[RxOperator[L, M]] = None,
         op14: Optional[RxOperator[M, V]] = None,
-    ) -> _PipeObservable[T, V]:
+    ) -> PipeObservable[T, V]:
         op_list = (
             Stream(
                 [
@@ -711,7 +745,7 @@ class Observable(_Observable[T]):
             .non_null()
             .to_list()
         )
-        return _PipeObservable(self, Pipe(T, Any, op_list))  # type: ignore
+        return PipeObservable(self, Pipe(T, Any, op_list))  # type: ignore
 
 
 class Flowable(Observable[T]):
@@ -722,13 +756,13 @@ class Flowable(Observable[T]):
         self._values = values
         self._parent = self
 
-    def push(self) -> None:
+    def _push(self) -> None:
         for v in self._values:
             self._notify_all_subs(v)
 
-    def push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
+    def _push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
         for v in self._values:
-            self.push_to_subscription(sub, v)
+            self._push_to_subscription(sub, v)
 
     def first(self) -> Observable[T]:
         return Single(Stream(self._values).first().get_actual())
@@ -742,7 +776,7 @@ class Single(Flowable[T]):
         super().__init__([value] if value is not None else [])
 
 
-class _SingleValueSubject(Single[T], _OnNext[T]):
+class SingleValueSubject(Single[T], _OnNext[T]):
     def __init__(self, value: Optional[T]) -> None:
         super().__init__(value)
 
@@ -752,21 +786,21 @@ class _SingleValueSubject(Single[T], _OnNext[T]):
             self._notify_all_subs(val)
 
 
-class BehaviorSubject(_SingleValueSubject[T]):
+class BehaviorSubject(SingleValueSubject[T]):
     def __init__(self, value: T) -> None:
         super().__init__(value)
 
 
-class PublishSubject(_SingleValueSubject[T]):
+class PublishSubject(SingleValueSubject[T]):
     def __init__(self, typ: type[T]) -> None:
         super().__init__(None)
 
-    def push(self) -> None:
+    def _push(self) -> None:
         """
         Publish subject should not emmit anything on subscribe
         """
 
-    def push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
+    def _push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
         """
         Publish subject should not emmit anything on subscribe
         """
@@ -784,16 +818,16 @@ class ReplaySubject(Flowable[T], _OnNext[T]):
             self.__value_list.append(val)
             self._notify_all_subs(val)
 
-    def push(self) -> None:
-        super().push()
+    def _push(self) -> None:
+        super()._push()
         for v in self.__value_list:
             self._notify_all_subs(v)
 
-    def push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
+    def _push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
         for v in self._values:
-            self.push_to_subscription(sub, v)
+            self._push_to_subscription(sub, v)
         for v in self.__value_list:
-            self.push_to_subscription(sub, v)
+            self._push_to_subscription(sub, v)
 
 
 class BaseFilteringOperator(RxOperator[T, T]):

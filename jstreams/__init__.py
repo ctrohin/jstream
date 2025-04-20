@@ -240,7 +240,7 @@ from jstreams.scheduler import (
     Duration,
 )
 
-from jstreams.eventing import events
+from jstreams.eventing import events, event
 
 __all__ = [
     "each",
@@ -444,4 +444,5 @@ __all__ = [
     "try_with_resource",
     "resolve",
     "events",
+    "event",
 ]

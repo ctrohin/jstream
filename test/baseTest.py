@@ -2,11 +2,13 @@ from typing import Any, Callable, Optional
 import unittest
 
 from jstreams.ioc import injector
+from jstreams.eventing import events
 
 
 class BaseTestCase(unittest.TestCase):
     def setUp(self):
         injector().clear()
+        events().clear()
 
     def assertThrowsException(
         self, fn: Callable[[], Any], message: Optional[str] = None
