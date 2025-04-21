@@ -291,3 +291,16 @@ def sort(target: list[T], comparator: Callable[[T, T], int]) -> list[T]:
     """
 
     return sorted(target, key=cmp_to_key(comparator))
+
+
+class Value(Generic[T]):
+    __slots__ = ["__value"]
+
+    def __init__(self, value: Optional[T]) -> None:
+        self.__value = value
+
+    def set(self, value: Optional[T]) -> None:
+        self.__value = value
+
+    def get(self) -> Optional[T]:
+        return self.__value
