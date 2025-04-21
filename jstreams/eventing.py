@@ -2,6 +2,7 @@ from threading import Lock
 from typing import Any, Callable, Generic, Optional, TypeVar, overload
 
 from jstreams.rx import (
+    DisposeHandler,
     ObservableSubscription,
     Pipe,
     PipeObservable,
@@ -29,7 +30,7 @@ V = TypeVar("V")
 __DEFAULT_EVENT_NAME__ = "__default__"
 
 
-class Event(Generic[T]):
+class _Event(Generic[T]):
     __slots__ = ["__subject"]
 
     def __init__(self, subject: SingleValueSubject[T]) -> None:
@@ -41,8 +42,9 @@ class Event(Generic[T]):
     def subscribe(
         self,
         on_publish: Callable[[T], Any],
+        on_dispose: DisposeHandler = None,
     ) -> ObservableSubscription[T]:
-        return self.__subject.subscribe(on_publish)
+        return self.__subject.subscribe(on_publish, on_dispose=on_dispose)
 
     @overload
     def pipe(
@@ -259,7 +261,7 @@ class _EventBroadcaster:
     _instance_lock = Lock()
 
     def __init__(self) -> None:
-        self._subjects: dict[type, dict[str, Event[Any]]] = {}
+        self._subjects: dict[type, dict[str, _Event[Any]]] = {}
 
     def clear(self) -> "_EventBroadcaster":
         """
@@ -287,11 +289,11 @@ class _EventBroadcaster:
 
     def get_event(
         self, event_type: type[T], event_name: str = __DEFAULT_EVENT_NAME__
-    ) -> Event[T]:
+    ) -> _Event[T]:
         if event_type not in self._subjects:
             self._subjects[event_type] = {}
         if event_name not in self._subjects[event_type]:
-            self._subjects[event_type][event_name] = Event(SingleValueSubject(None))
+            self._subjects[event_type][event_name] = _Event(SingleValueSubject(None))
         return self._subjects[event_type][event_name]
 
     @staticmethod
@@ -310,5 +312,5 @@ def events() -> _EventBroadcaster:
     return _EventBroadcaster.get_instance()
 
 
-def event(event_type: type[T], event_name: str = __DEFAULT_EVENT_NAME__) -> Event[T]:
+def event(event_type: type[T], event_name: str = __DEFAULT_EVENT_NAME__) -> _Event[T]:
     return _EventBroadcaster.get_instance().get_event(event_type, event_name)

@@ -1,4 +1,6 @@
 from typing import Any
+
+from sympy import true
 from baseTest import BaseTestCase
 from jstreams import (
     BehaviorSubject,
@@ -263,9 +265,21 @@ class TestRx(BaseTestCase):
         self.assertListEqual(self.val, [2, 4, 6, 8])
         self.assertListEqual(self.val2, [2, 4, 6, 8])
 
-    def test_event(self) -> None:
+    def test_event_cancelling_subs(self) -> None:
+        self.__test_event(True)
+
+    def test_event_cancelling_events(self) -> None:
+        self.__test_event(False)
+
+    def __test_event(self, subs: bool) -> None:
         global vals
         global valsub
+        global disposed_val
+        global disposed_valsub
+
+        disposed_val = False
+        disposed_valsub = False
+
         vals = []
         valsub = []
 
@@ -277,20 +291,38 @@ class TestRx(BaseTestCase):
             global valsub
             valsub.append(val)
 
-        subpipe = event(int).pipe(rx_map(lambda i: str(i))).subscribe(addval)
-        subval = event(int).subscribe(addvalsub)
+        def disposeval() -> None:
+            global disposed_val
+            disposed_val = True
+
+        def disposevalsub() -> None:
+            global disposed_valsub
+            disposed_valsub = True
+
+        subpipe = (
+            event(int)
+            .pipe(rx_map(lambda i: str(i)))
+            .subscribe(addval, on_dispose=disposeval)
+        )
+        subval = event(int).subscribe(addvalsub, disposevalsub)
 
         self.assertIsNotNone(subpipe)
         self.assertIsNotNone(subval)
 
         event(int).publish(1)
         event(int).publish(2)
-        subpipe.cancel()
-        subval.cancel()
-        subpipe.dispose()
-        subval.dispose()
+
+        if subs:
+            subpipe.cancel()
+            subval.cancel()
+            subpipe.dispose()
+            subval.dispose()
+        else:
+            events().clear_event(int)
 
         event(int).publish(3)
 
         self.assertListEqual(vals, ["1", "2"])
         self.assertListEqual(valsub, [1, 2])
+        self.assertTrue(disposed_val)
+        self.assertTrue(disposed_valsub)
