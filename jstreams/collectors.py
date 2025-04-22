@@ -15,12 +15,12 @@ def grouping_by(group_by: Callable[[T], K], elements: Iterable[T]) -> dict[K, li
 
     Args:
         group_by (Callable[[T], K]): The function to classify elements into groups.
-                                      It takes an element and returns a key.
+                                    It takes an element and returns a key.
         elements (Iterable[T]): The iterable containing elements to be grouped.
 
     Returns:
         dict[K, list[T]]: A dictionary where keys are the results of the `group_by`
-                          function and values are lists of elements belonging to that group.
+                        function and values are lists of elements belonging to that group.
     """
     values: dict[K, list[T]] = {}
     for element in elements:

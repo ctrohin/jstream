@@ -37,6 +37,12 @@ class _Event(Generic[T]):
         self.__subject = subject
 
     def publish(self, event: T) -> None:
+        """
+        Publishes an event of type T to all current subscribers of this channel.
+
+        Args:
+            event (T): The event object to publish.
+        """
         self.__subject.on_next(event)
 
     def subscribe(
@@ -44,6 +50,19 @@ class _Event(Generic[T]):
         on_publish: Callable[[T], Any],
         on_dispose: DisposeHandler = None,
     ) -> ObservableSubscription[T]:
+        """
+        Subscribes to events published on this channel.
+
+        Args:
+            on_publish (Callable[[T], Any]): The function to call whenever an event is published.
+                                            It receives the published event object as its argument.
+            on_dispose (DisposeHandler, optional): A function to call when the subscription is disposed.
+                                                Defaults to None.
+
+        Returns:
+            ObservableSubscription[T]: An object representing the subscription, which can be used
+                                    to cancel the subscription later (`.cancel()`).
+        """
         return self.__subject.subscribe(on_publish, on_dispose=on_dispose)
 
     @overload
@@ -315,6 +334,10 @@ class _EventBroadcaster:
 
 
 class EventBroadcaster:
+    """
+    Public interface for event broadcaster
+    """
+
     _instance: Optional["EventBroadcaster"] = None
     _instance_lock = Lock()
 
@@ -352,4 +375,69 @@ def events() -> EventBroadcaster:
 
 
 def event(event_type: type[T], event_name: str = __DEFAULT_EVENT_NAME__) -> _Event[T]:
+    """
+    Retrieves or creates a specific event channel based on type and name.
+
+    This function acts as the main entry point for accessing event streams managed
+    by the global `_EventBroadcaster`. It returns an `_Event` object which allows
+    publishing events of the specified `event_type` and subscribing to receive them.
+
+    If an event channel for the given `event_type` and `event_name` does not
+    exist, it will be created automatically, backed by a `SingleValueSubject`.
+    Subsequent calls with the same type and name will return the *same* channel instance.
+
+    Args:
+        event_type (type[T]): The class/type of the event objects that will be
+                                published and received on this channel (e.g., `str`,
+                                `int`, a custom data class).
+        event_name (str, optional): A name to distinguish between multiple event
+                                    channels that might use the same `event_type`.
+                                    Useful for creating separate streams for the same
+                                    kind of data. Defaults to `__DEFAULT_EVENT_NAME__`
+                                    (which is "__default__").
+
+    Returns:
+        _Event[T]: An object representing the specific event channel. This object
+                    provides methods for:
+                    - Publishing events: `.publish(event_instance)`
+                    - Subscribing to events: `.subscribe(on_next_callback, ...)`
+                    - Piping events through Rx operators: `.pipe(operator1, ...)`
+                    - Getting the latest published event (if any): `.latest()`
+
+                    Note: Since the underlying mechanism uses a `SingleValueSubject`,
+                    new subscribers do *not* receive the most recently published event
+                    upon subscription. However, that value can be retrieved using the `latest`
+                    function on the event itself.
+
+    Example:
+        >>> from jstreams import event, rx_map
+
+        >>> # Get the default event channel for strings
+        >>> string_event = event(str)
+
+        >>> # Subscribe to receive string events
+        >>> def handle_string(s: str):
+        ...     print(f"Received string: {s}")
+        >>> subscription = string_event.subscribe(handle_string)
+
+        >>> # Publish a string event
+        >>> string_event.publish("Hello")
+        Received string: Hello
+
+        >>> # Get a named event channel for integers
+        >>> counter_event = event(int, event_name="counter")
+
+        >>> # Subscribe to the counter event via a pipe
+        >>> def handle_doubled_count(c: int):
+        ...     print(f"Doubled count: {c}")
+        >>> counter_pipe_sub = counter_event.pipe(rx_map(lambda x: x * 2)).subscribe(handle_doubled_count)
+
+        >>> # Publish to the counter event
+        >>> counter_event.publish(5)
+        Doubled count: 10
+
+        >>> # Clean up subscriptions (optional but good practice)
+        >>> subscription.cancel()
+        >>> counter_pipe_sub.cancel()
+    """
     return _EventBroadcaster.get_instance().get_event(event_type, event_name)
