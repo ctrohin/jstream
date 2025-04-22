@@ -255,6 +255,9 @@ class _Event(Generic[T]):
     def _destroy(self) -> None:
         self.__subject.dispose()
 
+    def latest(self) -> Optional[T]:
+        return self.__subject.latest()
+
 
 class _EventBroadcaster:
     _instance: Optional["_EventBroadcaster"] = None

@@ -287,6 +287,7 @@ class TestRx(BaseTestCase):
             events().clear_event(int)
 
         event(int).publish(3)
+        self.assertEqual(event(int).latest(), 3)
 
         self.assertListEqual(vals, ["1", "2"])
         self.assertListEqual(valsub, [1, 2])

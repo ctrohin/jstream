@@ -14,6 +14,8 @@ from copy import deepcopy
 from jstreams.stream import Stream
 import abc
 
+from jstreams.utils import is_empty_or_none
+
 T = TypeVar("T")
 A = TypeVar("A")
 B = TypeVar("B")
@@ -785,6 +787,11 @@ class SingleValueSubject(Single[T], _OnNext[T]):
             self._values = [val]
             self._notify_all_subs(val)
 
+    def latest(self) -> Optional[T]:
+        if is_empty_or_none(self._values):
+            return None
+        return self._values.__iter__().__next__()
+
 
 class BehaviorSubject(SingleValueSubject[T]):
     def __init__(self, value: T) -> None:
@@ -886,7 +893,7 @@ def rx_reduce(reducer: Callable[[T, T], T]) -> RxOperator[T, T]:
         reducer (Callable[[T, T], T]): The reducer function
 
     Returns:
-        RxOperator[T, T]: A reduce operator
+        RxOperator[T, T]: A Reduce operator
     """
     return Reduce(reducer)
 
@@ -910,7 +917,7 @@ def rx_filter(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
         predicate (Callable[[T], bool]): The predicate
 
     Returns:
-        RxOperator[T, T]: A filter operator
+        RxOperator[T, T]: A Filter operator
     """
     return Filter(predicate)
 
@@ -934,7 +941,7 @@ def rx_map(mapper: Callable[[T], V]) -> RxOperator[T, V]:
         mapper (Callable[[T], V]): The mapper function
 
     Returns:
-        RxOperator[T, V]: A map operator
+        RxOperator[T, V]: A Map operator
     """
     return Map(mapper)
 
@@ -971,7 +978,7 @@ def rx_take(typ: type[T], count: int) -> RxOperator[T, T]:
         count (int): The number of values that will pass through
 
     Returns:
-        RxOperator[T, T]: A take operator
+        RxOperator[T, T]: A Take operator
     """
     return Take(typ, count)
 
@@ -1008,7 +1015,7 @@ def rx_take_while(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
         predicate (Callable[[T], bool]): The predicate
 
     Returns:
-        RxOperator[T, T]: A takeWhile operator
+        RxOperator[T, T]: A TakeWhile operator
     """
     return TakeWhile(predicate)
 
@@ -1045,7 +1052,7 @@ def rx_take_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
         predicate (Callable[[T], bool]): The predicate
 
     Returns:
-        RxOperator[T, T]: A takeUntil operator
+        RxOperator[T, T]: A TakeUntil operator
     """
     return TakeUntil(predicate)
 
@@ -1082,7 +1089,7 @@ def rx_drop(typ: type[T], count: int) -> RxOperator[T, T]:
         count (int): The number of values to pass through
 
     Returns:
-        RxOperator[T, T]: A drop operator
+        RxOperator[T, T]: A Drop operator
     """
     return Drop(typ, count)
 
@@ -1120,7 +1127,7 @@ def rx_drop_while(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
         predicate (Callable[[T], bool]): The predicate
 
     Returns:
-        RxOperator[T, T]: A dropWhile operator
+        RxOperator[T, T]: A DropWhile operator
     """
     return DropWhile(predicate)
 
@@ -1158,6 +1165,6 @@ def rx_drop_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
         predicate (Callable[[T], bool]): The given predicate
 
     Returns:
-        RxOperator[T, T]: A dropUntil operator
+        RxOperator[T, T]: A DropUntil operator
     """
     return DropUntil(predicate)
