@@ -56,18 +56,23 @@ class TestTry(BaseTestCase):
 
     def test_try_with_error_on_initial(self) -> None:
         mock = CallRegister()
-        self.assertIsNone(Try(self.throw).and_then(mock.mth1).get().get_actual())
+        self.assertIsNone(Try(self.throw).mute().and_then(mock.mth1).get().get_actual())
         self.assertFalse(mock.mth1Called)
 
     def test_try_with_error_on_chain(self) -> None:
         self.assertIsNone(
-            Try(self.noThrow).and_then(self.processThrow).get().get_actual()
+            Try(self.noThrow).mute().and_then(self.processThrow).get().get_actual()
         )
 
     def test_try_with_error_on_init_and_onFailure(self) -> None:
         mock = CallRegister()
         self.assertIsNone(
-            Try(self.throw).and_then(mock.mth1).on_failure(mock.mth2).get().get_actual()
+            Try(self.throw)
+            .mute()
+            .and_then(mock.mth1)
+            .on_failure(mock.mth2)
+            .get()
+            .get_actual()
         )
         self.assertFalse(mock.mth1Called)
         self.assertTrue(mock.mth2Called)
@@ -76,6 +81,7 @@ class TestTry(BaseTestCase):
         mock = CallRegister()
         self.assertThrowsExceptionOfType(
             Try(self.throw)
+            .mute()
             .and_then(mock.mth1)
             .on_failure(mock.mth2)
             .on_failure_raise(lambda: ValueError("Test"))
@@ -90,6 +96,7 @@ class TestTry(BaseTestCase):
         mock = CallRegister()
         self.assertIsNone(
             Try(self.noThrow)
+            .mute()
             .and_then(self.processThrow)
             .on_failure(mock.mth1)
             .get()
@@ -101,6 +108,7 @@ class TestTry(BaseTestCase):
         mock = CallRegister()
         self.assertIsNone(
             Try(self.noThrow)
+            .mute()
             .and_then(self.processThrow)
             .on_failure_log("Test", mock)
             .get()
@@ -112,6 +120,7 @@ class TestTry(BaseTestCase):
         mock = CallRegister()
         self.assertIsNone(
             Try(self.throw)
+            .mute()
             .on_failure(mock.mth1)
             .on_failure(mock.mth2)
             .and_finally(mock.mth3)
@@ -143,7 +152,9 @@ class TestTry(BaseTestCase):
         self.assertTrue(mock.mth5Called)
 
     def test_try_recovery(self) -> None:
-        self.assertEqual(Try(self.throw).recover(lambda e: "Test").get().get(), "Test")
+        self.assertEqual(
+            Try(self.throw).mute().recover(lambda e: "Test").get().get(), "Test"
+        )
 
     def test_try_logger(self) -> None:
         class MockLogger:
@@ -207,6 +218,7 @@ class TestTry(BaseTestCase):
 
         self.assertIsNone(
             Try(mock.do)
+            .mute()
             .with_retries(2, 0.1)
             .on_failure(mock.register_error)
             .get()
@@ -261,6 +273,6 @@ class TestTry(BaseTestCase):
                 self.exit_called = True
 
         res = FakeResource()
-        Try.with_resource(lambda: res).and_then(lambda _: self.throw()).get()
+        Try.with_resource(lambda: res).mute().and_then(lambda _: self.throw()).get()
         self.assertTrue(res.enter_called)
         self.assertTrue(res.exit_called)

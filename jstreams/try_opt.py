@@ -13,6 +13,7 @@ from typing import (
     cast,
 )
 
+from jstreams.noop import noop
 from jstreams.stream import Opt
 from jstreams.utils import require_non_null
 
@@ -137,6 +138,9 @@ class Try(Generic[T]):
         ] = None
         self.__retries: int = 0
         self.__retries_delay: float = 0.0
+
+    def mute(self) -> "Try[T]":
+        return self.with_logger(noop())
 
     def with_logger(self, logger: ErrorLogger) -> "Try[T]":
         """Sets a specific logger for handling errors within this Try block."""

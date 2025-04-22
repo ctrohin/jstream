@@ -259,6 +259,7 @@ class _Event(Generic[T]):
 class _EventBroadcaster:
     _instance: Optional["_EventBroadcaster"] = None
     _instance_lock = Lock()
+    _event_lock = Lock()
 
     def __init__(self) -> None:
         self._subjects: dict[type, dict[str, _Event[Any]]] = {}
@@ -267,10 +268,11 @@ class _EventBroadcaster:
         """
         Clear all events.
         """
-        Stream(self._subjects.values()).each(
-            lambda s: Stream(s.values()).each(lambda s: s._destroy())
-        )
-        self._subjects.clear()
+        with self._event_lock:
+            Stream(self._subjects.values()).each(
+                lambda s: Stream(s.values()).each(lambda s: s._destroy())
+            )
+            self._subjects.clear()
         return self
 
     def clear_event(self, event_type: type) -> "_EventBroadcaster":
@@ -280,21 +282,25 @@ class _EventBroadcaster:
         Args:
             event_type (type): The event type
         """
-        (
-            Opt(self._subjects.pop(event_type))
-            .map(lambda d: Stream(d.values()))
-            .if_present(lambda s: s.each(lambda s: s._destroy()))
-        )
+        with self._event_lock:
+            (
+                Opt(self._subjects.pop(event_type))
+                .map(lambda d: Stream(d.values()))
+                .if_present(lambda s: s.each(lambda s: s._destroy()))
+            )
         return self
 
     def get_event(
         self, event_type: type[T], event_name: str = __DEFAULT_EVENT_NAME__
     ) -> _Event[T]:
-        if event_type not in self._subjects:
-            self._subjects[event_type] = {}
-        if event_name not in self._subjects[event_type]:
-            self._subjects[event_type][event_name] = _Event(SingleValueSubject(None))
-        return self._subjects[event_type][event_name]
+        with self._event_lock:
+            if event_type not in self._subjects:
+                self._subjects[event_type] = {}
+            if event_name not in self._subjects[event_type]:
+                self._subjects[event_type][event_name] = _Event(
+                    SingleValueSubject(None)
+                )
+            return self._subjects[event_type][event_name]
 
     @staticmethod
     def get_instance() -> "_EventBroadcaster":
@@ -305,11 +311,41 @@ class _EventBroadcaster:
         return _EventBroadcaster._instance
 
 
-def events() -> _EventBroadcaster:
+class EventBroadcaster:
+    _instance: Optional["EventBroadcaster"] = None
+    _instance_lock = Lock()
+
+    @staticmethod
+    def get_instance() -> "EventBroadcaster":
+        if EventBroadcaster._instance is None:
+            with EventBroadcaster._instance_lock:
+                if EventBroadcaster._instance is None:
+                    EventBroadcaster._instance = EventBroadcaster()
+        return EventBroadcaster._instance
+
+    def clear_event(self, event_type: type) -> "EventBroadcaster":
+        """
+        Clear a specific event.
+
+        Args:
+            event_type (type): The event type
+        """
+        _EventBroadcaster.get_instance().clear_event(event_type)
+        return self
+
+    def clear(self) -> "EventBroadcaster":
+        """
+        Clear all events.
+        """
+        _EventBroadcaster.get_instance().clear()
+        return self
+
+
+def events() -> EventBroadcaster:
     """
     Get the event broadcaster instance.
     """
-    return _EventBroadcaster.get_instance()
+    return EventBroadcaster.get_instance()
 
 
 def event(event_type: type[T], event_name: str = __DEFAULT_EVENT_NAME__) -> _Event[T]:
