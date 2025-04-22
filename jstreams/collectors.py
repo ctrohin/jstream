@@ -167,9 +167,4 @@ class Collectors:
             and returns a dictionary partitioned by the condition.
         """
 
-        def transform(elements: Iterable[T]) -> dict[bool, list[T]]:
-            """Partitions elements based on the provided condition."""
-            # Uses the grouping_by logic where the key is the boolean result of the condition
-            return grouping_by(condition, elements)
-
-        return transform
+        return Collectors.grouping_by(condition)
