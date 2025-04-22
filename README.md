@@ -733,7 +733,6 @@ subject.on_next(9)
 from jstreams import ReplaySubject, rx_drop_while
 
 subject = ReplaySubject([1, 7, 20, 5, 100, 40])
-self.val = []
 pipe1 = subject.pipe(
     rx_drop_while(lambda v: v < 100)
 )
@@ -748,13 +747,13 @@ subject.on_next(9)
 from jstreams import ReplaySubject, rx_drop_until
 
 subject = ReplaySubject([1, 7, 20, 5, 100, 40])
-self.val = []
+val = []
 pipe1 = subject.pipe(
     rx_drop_until(lambda v: v > 20)
 )
 # Will print out 100, 40, skipping the rest of the values until the first one 
 # that fulfills the condition appears
-pipe1.subscribe(self.addVal)
+pipe1.subscribe(val.append)
 # Will print out 9, since the condition is already fulfilled and all remaining values will
 # flow through
 subject.on_next(9)
