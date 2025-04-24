@@ -1,6 +1,5 @@
 from typing import Optional
 
-from numpy import float_
 from baseTest import BaseTestCase
 from jstreams import Dependency, injector
 from jstreams.ioc import (
