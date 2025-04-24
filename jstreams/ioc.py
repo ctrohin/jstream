@@ -711,7 +711,7 @@ def resolve(
     Allows class decoration for parameter injection.
     Example:
 
-    @dependencies({"test_field": ClassName, "str_value": Variable(str, "strQualifier", True)})
+    @resolve({"test_field": ClassName, "str_value": Variable(str, "strQualifier", True)})
     class TestClass:
         test_field: Optional[ClassName]
         str_value: Optional[str]
@@ -992,8 +992,8 @@ def autowired(
             @property
             @autowired(HttpClient) # Decorate the property's getter
             def http_client(self) -> HttpClient:
-                 # This body is replaced by the injector call
-                 return return_wired(HttpClient) # Use return_wired for type hinting
+                # This body is replaced by the injector call
+                return return_wired(HttpClient) # Use return_wired for type hinting
 
     Args:
         class_name (type[T]): The type of the dependency to inject.
@@ -1057,8 +1057,8 @@ def autowired_optional(
             @property
             @autowired_optional(Logger, qualifier="request_logger")
             def logger(self) -> Optional[Logger]:
-                 # This body is replaced by the injector call
-                 return return_wired_optional(Logger) # Use return_wired_optional for type hinting
+                # This body is replaced by the injector call
+                return return_wired_optional(Logger) # Use return_wired_optional for type hinting
 
     Args:
         class_name (type[T]): The type of the dependency to inject.
@@ -1254,3 +1254,87 @@ class InjectedVariable(Generic[T]):
             ValueError: If the variable is not found.
         """
         return self.get()
+
+
+class _InspectedElement:
+    def __init__(
+        self, element_name: str, element_type: type, is_optional: bool
+    ) -> None:
+        self.element_name = element_name
+        self.element_type = element_type
+        self.is_optional = is_optional
+
+
+def _get_class_attributes(cls: type) -> list[_InspectedElement]:
+    boring = dir(type("dummy", (object,), {}))
+    return_members: list[_InspectedElement] = []
+    member_list = [item for item in inspect.getmembers(cls) if item[0] not in boring]
+    for member in member_list:
+        if not isinstance(member[1], dict):
+            continue
+        member_dict: dict[str, Any] = member[1]
+
+        for var_name, var_type in member_dict.items():
+            inspected_element: Optional[_InspectedElement] = None
+            if isinstance(var_type, type):
+                inspected_element = _InspectedElement(var_name, var_type, False)
+            elif str(var_type).startswith("typing.Optional"):
+                inspected_element = _InspectedElement(
+                    var_name, var_type.__args__[0], True
+                )
+            else:
+                continue
+            return_members.append(inspected_element)
+    return return_members
+
+
+def resolve_all() -> Callable[[type[T]], type[T]]:
+    """
+    Resolve all dependencies decorator.
+    Allows class decoration for parameter injection.
+    This decorator will attempt to inject all defined class dependencies by inspecting the type hint annotations.
+    It is important to note, that all the fields that need to be injected must declared in the class with either
+    a type annotation or an Optional annotation. Fields without type annotations will be ignored by the injection
+    mechanusm
+    Example:
+
+    @resolve_all()
+    class TestClass:
+        test_field: Optional[ClassName]
+        str_value: Optional[str]
+        int_value = 7
+
+    Will inject the dependency associated with 'ClassName' into the 'test_field' member,
+    and the dependency associated with 'str' into the 'str_value' member, while 'int_value' will be left as is.
+
+    Returns:
+        Callable[[type[T]], type[T]]: The decorated class constructor
+    """
+
+    def wrap(cls: type[T]) -> type[T]:
+        original_get_attribute = cls.__getattribute__
+        dependencies_list = _get_class_attributes(cls)
+        dependencies: dict[str, Union[type, Dependency, Variable]] = {}
+        for element in dependencies_list:
+            dependencies[element.element_name] = (
+                element.element_type
+                if not element.is_optional
+                else OptionalDependency(element.element_type)
+            )
+
+        def __getattribute__(self, attr_name: str) -> Any:  # type: ignore[no-untyped-def]
+            if attr_name in dependencies:
+                quali = dependencies.get(attr_name, NoOpCls)
+                dep = _get_dep(quali)
+                if dep is not None:
+                    # If a dependency has been resolved, set it as an attribute of the class
+                    setattr(cls, attr_name, dep)
+                    # The remove it from the dependencies map
+                    dependencies.pop(attr_name)
+                return dep
+            return original_get_attribute(self, attr_name)
+
+        cls.__getattribute__ = __getattribute__  # type: ignore[method-assign]
+        return cls
+
+    return wrap

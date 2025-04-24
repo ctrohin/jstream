@@ -99,6 +99,7 @@ from jstreams.ioc import (
     resolve,
     resolve_dependencies,
     resolve_variables,
+    resolve_all,
     component,
     service,
     Variable,
@@ -138,6 +139,9 @@ from jstreams.utils import (
     each,
     dict_update,
     sort,
+    Value,
+    extract,
+    identity,
 )
 
 from jstreams.predicate import (
@@ -445,4 +449,8 @@ __all__ = [
     "resolve",
     "events",
     "event",
+    "resolve_all",
+    "Value",
+    "extract",
+    "identity",
 ]

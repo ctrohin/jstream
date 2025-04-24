@@ -1,10 +1,13 @@
 from typing import Optional
+
+from numpy import float_
 from baseTest import BaseTestCase
 from jstreams import Dependency, injector
 from jstreams.ioc import (
     InjectedDependency,
     StrVariable,
     inject_args,
+    resolve_all,
     resolve_dependencies,
     resolve_variables,
 )
@@ -194,3 +197,20 @@ class TestIOC(BaseTestCase):
         self.assertEqual(fn(a=10, b="other"), "10_other")
         self.assertEqual(fn(b="other"), "1_other")
         self.assertEqual(fn(10, "other"), "10_other")
+
+    def test_resolve_all(self) -> None:
+        @resolve_all()
+        class Test:
+            str_val: Optional[str]
+            int_val: int
+            float_val: float = 7.0
+            uncontrolled_float = 6.0
+
+        injector().provide(str, "test")
+        injector().provide(int, 1)
+        injector().provide(float, 2.0)
+        test = Test()
+        self.assertEqual(test.str_val, "test")
+        self.assertEqual(test.int_val, 1)
+        self.assertEqual(test.float_val, 2.0)
+        self.assertEqual(test.uncontrolled_float, 6.0)
