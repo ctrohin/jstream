@@ -204,12 +204,18 @@ class TestIOC(BaseTestCase):
             int_val: int
             float_val: float = 7.0
             uncontrolled_float = 6.0
+            __bool_val: bool = False
+
+            def get_bool_val(self) -> bool:
+                return self.__bool_val
 
         injector().provide(str, "test")
         injector().provide(int, 1)
         injector().provide(float, 2.0)
+        injector().provide(bool, True)
         test = Test()
         self.assertEqual(test.str_val, "test")
         self.assertEqual(test.int_val, 1)
         self.assertEqual(test.float_val, 2.0)
         self.assertEqual(test.uncontrolled_float, 6.0)
+        self.assertTrue(test.get_bool_val())

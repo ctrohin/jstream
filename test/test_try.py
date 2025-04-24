@@ -156,6 +156,28 @@ class TestTry(BaseTestCase):
             Try(self.throw).mute().recover(lambda e: "Test").get().get(), "Test"
         )
 
+    def test_try_recover_from(self) -> None:
+        self.assertEqual(
+            Try(self.throw)
+            .mute()
+            .recover_from(ValueError, lambda _: "Test1")
+            .recover(lambda e: "Test")
+            .get()
+            .get(),
+            "Test1",
+        )
+
+    def test_try_recover_from_default(self) -> None:
+        self.assertEqual(
+            Try(self.throw)
+            .mute()
+            .recover_from(RuntimeError, lambda _: "Test1")
+            .recover(lambda e: "Test")
+            .get()
+            .get(),
+            "Test",
+        )
+
     def test_try_logger(self) -> None:
         class MockLogger:
             def __init__(self):

@@ -20,6 +20,7 @@ from jstreams.utils import require_non_null
 T = TypeVar("T")
 K = TypeVar("K")
 V = TypeVar("V")
+EX_TYPE = TypeVar("EX_TYPE")
 
 UNCAUGHT_EXCEPTION_LOGGER_NAME: Final[str] = "uncaught_exception_logger"
 
@@ -115,6 +116,7 @@ class Try(Generic[T]):
         "__retries",
         "__retries_delay",
         "__is_resource",
+        "__recovery_suppliers",
     )
 
     def __init__(self, fn: Callable[[], T], is_resource: bool = False) -> None:
@@ -136,6 +138,7 @@ class Try(Generic[T]):
         self.__recovery_supplier: Optional[
             Callable[[Optional[Exception]], Optional[T]]
         ] = None
+        self.__recovery_suppliers: dict[type, Callable[[Any], T]] = {}
         self.__retries: int = 0
         self.__retries_delay: float = 0.0
 
@@ -270,14 +273,14 @@ class Try(Generic[T]):
             return Opt(val)
         else:
             # Operation failed after retries
-            if self.__recovery_supplier is not None:
-                # Attempt recovery
+            return self.__recover(last_exception)
+
+    def __recover(self, last_exception: Exception) -> Opt[T]:
+        # First try to recover for typed suppliers
+        for ex_type, supplier in self.__recovery_suppliers.items():
+            if isinstance(last_exception, ex_type):
                 try:
-                    # The recovery function itself might fail
-                    recovered_val = self.__recovery_supplier(last_exception)
-                    # If recovery succeeds, __has_failed remains True (as the original op failed),
-                    # but we return the recovered value.
-                    return Opt(recovered_val)
+                    return Opt(supplier(last_exception))
                 except Exception as recovery_exception:
                     # Log the recovery failure
                     _log_exception(
@@ -287,9 +290,25 @@ class Try(Generic[T]):
                     )
                     # Recovery failed, return empty Opt
                     return Opt(None)
-            else:
-                # No recovery defined, return empty Opt
+
+        if self.__recovery_supplier is not None:
+            # Attempt recovery
+            try:
+                # The recovery function itself might fail
+                recovered_val = self.__recovery_supplier(last_exception)
+                # If recovery succeeds, __has_failed remains True (as the original op failed),
+                # but we return the recovered value.
+                return Opt(recovered_val)
+            except Exception as recovery_exception:
+                # Log the recovery failure
+                _log_exception(
+                    recovery_exception,
+                    self.__error_log,
+                    "Exception during Try recovery",
+                )
+                # Recovery failed, return empty Opt
                 return Opt(None)
+        return Opt(None)
 
     def on_failure_raise(self, exception_supplier: Callable[[], Exception]) -> "Try[T]":
         """
@@ -308,6 +327,12 @@ class Try(Generic[T]):
         If recovery succeeds, get() will return an Opt containing the recovered value.
         """
         self.__recovery_supplier = recovery_supplier
+        return self
+
+    def recover_from(
+        self, exception_type: type[EX_TYPE], recovery_supplier: Callable[[EX_TYPE], T]
+    ) -> "Try[T]":
+        self.__recovery_suppliers[exception_type] = recovery_supplier
         return self
 
     def has_failed(self) -> bool:
