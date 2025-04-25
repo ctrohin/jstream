@@ -246,7 +246,14 @@ from jstreams.scheduler import (
 
 from jstreams.eventing import events, event
 
-from jstreams.annotations import builder, getter, setter, locked, synchronized
+from jstreams.annotations import (
+    builder,
+    getter,
+    setter,
+    locked,
+    static_synchronized,
+    synchronized,
+)
 
 __all__ = [
     "each",
@@ -459,5 +466,6 @@ __all__ = [
     "getter",
     "setter",
     "locked",
+    "static_synchronized",
     "synchronized",
 ]

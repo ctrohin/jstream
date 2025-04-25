@@ -294,9 +294,9 @@ def _get_or_create_lock(func: Callable[..., Any], lock_name: Optional[str]) -> R
         return _lock_registry[final_lock_name]
 
 
-def synchronized(lock_name: Optional[str] = None) -> Callable[[F], F]:
+def static_synchronized(lock_name: Optional[str] = None) -> Callable[[F], F]:
     """
-    Decorator to synchronize access to a function or method using a reentrant lock.
+    Decorator to synchronize access to a function or method using a static reentrant lock.
 
     Ensures that only one thread can execute the decorated function (or any other
     function sharing the same lock name) at a time. Uses threading.RLock for
@@ -358,4 +358,107 @@ def synchronized(lock_name: Optional[str] = None) -> Callable[[F], F]:
         return cast(F, wrapper)
 
     # Return the actual decorator function
+    return decorator
+
+
+# Global lock ONLY for protecting the lazy creation of lock attributes on instances
+_instance_lock_creation_lock = Lock()
+
+# Default attribute name if none is specified by the user
+DEFAULT_INSTANCE_LOCK_ATTR = "_default_instance_sync_lock"
+
+
+def synchronized(
+    lock_attribute_name: Optional[str] = None,
+) -> Callable[[F], F]:
+    """
+    Decorator to synchronize access to an instance method using an instance-specific reentrant lock.
+
+    Ensures that only one thread can execute the decorated method *on the same instance*
+    (or any other method on that instance sharing the same lock attribute name) at a time.
+    Uses threading.RLock for reentrancy.
+
+    This differs from `@synchronized` in that the lock is tied to the object instance (`self`),
+    not the class method definition or a global name. Calls to the same method on *different*
+    instances can execute concurrently.
+
+    Args:
+        lock_attribute_name (Optional[str]): An optional name for the attribute on the instance
+            that will hold the lock.
+            - If provided (e.g., `@instance_synchronized("_my_resource_lock")`), this specific
+                attribute name will be used to store the RLock on the instance. All methods
+                on the *same instance* decorated with the *same* `lock_attribute_name` will
+                share that instance's lock. Choose a name unlikely to clash with existing attributes.
+            - If None (default, e.g., `@instance_synchronized()`), a default attribute name
+              (`_default_instance_sync_lock`) is used. All methods on the *same instance*
+                decorated with the default name will share that instance's default lock.
+            - Using different `lock_attribute_name` values allows for multiple independent
+                instance-level locks within the same object (e.g., one for reading, one for writing).
+
+    Returns:
+        Callable[[F], F]: A decorator that wraps the input method `F`, returning
+                        a new method with the same signature but added instance-level locking.
+
+    Raises:
+        TypeError: If the decorator is applied to something that doesn't look like an
+                instance method (i.e., doesn't receive `self` as the first argument)
+                or if the lock attribute cannot be set (e.g., due to `__slots__`
+                without including the lock attribute name).
+    """
+    # Determine the actual attribute name to use ONCE during decoration
+    attr_name = (
+        lock_attribute_name
+        if lock_attribute_name is not None
+        else DEFAULT_INSTANCE_LOCK_ATTR
+    )
+
+    def decorator(func: F) -> F:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            """
+            The replacement method that acquires the instance-specific lock, executes
+            the original method, and ensures the lock is released.
+            """
+            # 1. Check if used on an instance method and get the instance ('self')
+            if not args:
+                raise TypeError(
+                    f"@{synchronized.__name__} requires 'self' (instance) argument. "
+                    f"Decorator applied to '{func.__qualname__}' which seems to be a non-method function or static/class method."
+                )
+            instance = args[0]
+            # A more robust check might involve inspect.isclass(type(instance)),
+            # but let's rely on convention for 'self' being the first arg.
+
+            # 2. Try to get the instance-specific lock attribute
+            lock: Optional[RLock] = getattr(instance, attr_name, None)
+
+            # 3. Lazy, thread-safe lock creation if it doesn't exist on the instance yet
+            if lock is None:
+                # Acquire global lock *only* for the creation phase
+                with _instance_lock_creation_lock:
+                    # Double-check if another thread created it while waiting for the lock
+                    lock = getattr(instance, attr_name, None)
+                    if lock is None:
+                        # Create a new RLock for this instance and this lock name
+                        lock = RLock()
+                        try:
+                            # Store the lock on the instance using the determined attribute name
+                            setattr(instance, attr_name, lock)
+                        except AttributeError as e:
+                            # Handle cases where attribute setting might fail (e.g., __slots__)
+                            raise TypeError(
+                                f"Could not set lock attribute '{attr_name}' on instance of {type(instance).__name__}. "
+                                f"Does the class use __slots__ without including '{attr_name}'?"
+                            ) from e
+
+            # 4. Execute original function under the instance lock
+            # 'lock' is now guaranteed to be a valid RLock for this instance
+            with lock:
+                result = func(*args, **kwargs)
+            return result
+
+        # Optional: Attach introspection info to the wrapper
+        setattr(wrapper, "_instance_synchronized_lock_attr", attr_name)
+
+        return cast(F, wrapper)
+
     return decorator
