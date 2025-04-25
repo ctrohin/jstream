@@ -4,14 +4,14 @@ from jstreams.annotations import getter, setter, builder
 
 class TestAnnotations(BaseTestCase):
     def test_getter(self) -> None:
-        @getter
+        @getter()
         class Test:
             var1: str
             var2: int
             var3: str
             _var_private: int = 1
 
-        @getter
+        @getter()
         class OtherTest:
             other_var: str
             other_var2: float
@@ -36,14 +36,14 @@ class TestAnnotations(BaseTestCase):
         self.assertRaises(AttributeError, lambda: test_instance.get__var_private())
 
     def test_setter(self) -> None:
-        @setter
+        @setter()
         class Test:
             var1: str
             var2: int
             var3: str
             _var_private: int = 1
 
-        @setter
+        @setter()
         class OtherTest:
             other_var: str
             other_var2: float
@@ -67,14 +67,14 @@ class TestAnnotations(BaseTestCase):
         self.assertRaises(AttributeError, lambda: test_instance.set__var_private(1))
 
     def test_builder(self) -> None:
-        @builder
+        @builder()
         class Test:
             var1: str
             var2: int
             var3: str
             _var_private: int = 1
 
-        @builder
+        @builder()
         class OtherTest:
             other_var: str
             other_var2: float

@@ -3,7 +3,7 @@ from typing import Any, Callable, TypeVar, get_type_hints
 T = TypeVar("T")
 
 
-def builder(cls: type[T]) -> type[T]:
+def builder() -> Callable[[type[T]], type[T]]:
     """
     A decorator that adds builder methods to a class.
 
@@ -14,49 +14,52 @@ def builder(cls: type[T]) -> type[T]:
         The decorated class.
     """
 
-    class Builder:
-        def __init__(self) -> None:
-            self._instance = cls.__new__(cls)
-            self._fields: dict[str, Any] = {}
+    def decorator(cls: type[T]) -> type[T]:
+        class Builder:
+            def __init__(self) -> None:
+                self._instance = cls.__new__(cls)
+                self._fields: dict[str, Any] = {}
 
-        def build(self) -> T:
-            """
-            Builds the object.
+            def build(self) -> T:
+                """
+                Builds the object.
 
-            Returns:
-                The built object.
-            """
-            for name, value in self._fields.items():
-                setattr(self._instance, name, value)
-            return self._instance
+                Returns:
+                    The built object.
+                """
+                for name, value in self._fields.items():
+                    setattr(self._instance, name, value)
+                return self._instance
 
-        def __getattr__(self, name: str) -> Callable[[Any], "Builder"]:
-            if name.startswith("with_"):
-                field_name = name[5:]
-                if field_name.startswith("_"):
-                    raise AttributeError(
-                        f"'{cls.__name__}.{type(self).__name__}' cannot access private field '{field_name}'"
-                    )
-                if field_name in get_type_hints(cls):
+            def __getattr__(self, name: str) -> Callable[[Any], "Builder"]:
+                if name.startswith("with_"):
+                    field_name = name[5:]
+                    if field_name.startswith("_"):
+                        raise AttributeError(
+                            f"'{cls.__name__}.{type(self).__name__}' cannot access private field '{field_name}'"
+                        )
+                    if field_name in get_type_hints(cls):
 
-                    def setter(value: Any) -> "Builder":
-                        self._fields[field_name] = value
-                        return self
+                        def setter(value: Any) -> "Builder":
+                            self._fields[field_name] = value
+                            return self
 
-                    return setter
+                        return setter
 
-            raise AttributeError(
-                f"'{cls.__name__}.{type(self).__name__}' object has no attribute '{name}'"
-            )
+                raise AttributeError(
+                    f"'{cls.__name__}.{type(self).__name__}' object has no attribute '{name}'"
+                )
 
-    def get_builder() -> Builder:
-        return Builder()
+        def get_builder() -> Builder:
+            return Builder()
 
-    setattr(cls, "builder", staticmethod(get_builder))
-    return cls
+        setattr(cls, "builder", staticmethod(get_builder))
+        return cls
+
+    return decorator
 
 
-def getter(cls: type[T]) -> type[T]:
+def getter() -> Callable[[type[T]], type[T]]:
     """
     A decorator that adds getter methods directly to a class.
 
@@ -66,18 +69,22 @@ def getter(cls: type[T]) -> type[T]:
     Returns:
         The decorated class.
     """
-    for field_name, field_type in get_type_hints(cls).items():
-        if not field_name.startswith("_"):
 
-            def getter_method(self: Any, name: str = field_name) -> Any:
-                return getattr(self, name)
+    def decorator(cls: type[T]) -> type[T]:
+        for field_name, field_type in get_type_hints(cls).items():
+            if not field_name.startswith("_"):
 
-            setattr(cls, f"get_{field_name}", getter_method)
+                def getter_method(self: Any, name: str = field_name) -> Any:
+                    return getattr(self, name)
 
-    return cls
+                setattr(cls, f"get_{field_name}", getter_method)
+
+        return cls
+
+    return decorator
 
 
-def setter(cls: type[T]) -> type[T]:
+def setter() -> Callable[[type[T]], type[T]]:
     """
     A decorator that adds setter methods directly to a class.
 
@@ -87,12 +94,18 @@ def setter(cls: type[T]) -> type[T]:
     Returns:
         The decorated class.
     """
-    for field_name, field_type in get_type_hints(cls).items():
-        if not field_name.startswith("_"):
 
-            def setter_method(self: Any, value: Any, name: str = field_name) -> None:
-                setattr(self, name, value)
+    def decorator(cls: type[T]) -> type[T]:
+        for field_name, field_type in get_type_hints(cls).items():
+            if not field_name.startswith("_"):
 
-            setattr(cls, f"set_{field_name}", setter_method)
+                def setter_method(
+                    self: Any, value: Any, name: str = field_name
+                ) -> None:
+                    setattr(self, name, value)
 
-    return cls
+                setattr(cls, f"set_{field_name}", setter_method)
+
+        return cls
+
+    return decorator
