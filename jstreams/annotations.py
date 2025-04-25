@@ -15,9 +15,9 @@ def builder(cls: type[T]) -> type[T]:
     """
 
     class Builder:
-        def __init__(self):
+        def __init__(self) -> None:
             self._instance = cls.__new__(cls)
-            self._fields = {}
+            self._fields: dict[str, Any] = {}
 
         def build(self) -> T:
             """
@@ -69,8 +69,8 @@ def getter(cls: type[T]) -> type[T]:
     for field_name, field_type in get_type_hints(cls).items():
         if not field_name.startswith("_"):
 
-            def getter_method(self, field_name=field_name) -> Any:
-                return getattr(self, field_name)
+            def getter_method(self: Any, name: str = field_name) -> Any:
+                return getattr(self, name)
 
             setattr(cls, f"get_{field_name}", getter_method)
 
@@ -90,8 +90,8 @@ def setter(cls: type[T]) -> type[T]:
     for field_name, field_type in get_type_hints(cls).items():
         if not field_name.startswith("_"):
 
-            def setter_method(self, value: Any, field_name=field_name) -> None:
-                setattr(self, field_name, value)
+            def setter_method(self: Any, value: Any, name: str = field_name) -> None:
+                setattr(self, name, value)
 
             setattr(cls, f"set_{field_name}", setter_method)
 
