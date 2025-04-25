@@ -1,6 +1,6 @@
 import inspect
-from threading import RLock
-from typing import Any, Callable, TypeVar, cast, get_type_hints
+from threading import Lock, RLock
+from typing import Any, Callable, Optional, TypeVar, cast, get_type_hints
 
 T = TypeVar("T")
 
@@ -241,9 +241,121 @@ def locked() -> Callable[[type[T]], type[T]]:
         # Preserve original class name and docstring if possible
         ThreadSafeWrapper.__name__ = f"ThreadSafe{cls.__name__}"
         ThreadSafeWrapper.__doc__ = f"Thread-safe wrapper around {cls.__name__}.\n\nOriginal docstring:\n{cls.__doc__}"
-
         # Return the wrapper class, effectively replacing the original class definition
         # Use cast to satisfy the type checker about the return type
         return cast(type[T], ThreadSafeWrapper)
 
+    return decorator
+
+
+# Type variable for the decorated function, bound to Callable
+F = TypeVar("F", bound=Callable[..., Any])
+
+# --- Lock Management ---
+
+# --- Synchronized Decorator ---
+
+# Global registry for named locks (maps lock name string to RLock)
+# Now holds both explicitly named locks and default generated named locks.
+_lock_registry: dict[str, RLock] = {}
+# Lock to protect access to the registry during lock creation/retrieval
+_registry_access_lock = Lock()
+
+
+def _get_or_create_lock(func: Callable[..., Any], lock_name: Optional[str]) -> RLock:
+    """
+    Retrieves or creates the appropriate RLock for the given function and lock name.
+
+    Uses a global registry, protected by a lock for thread-safe creation.
+    If lock_name is None, a default name is generated based on the function's
+    module and qualified name.
+
+    Args:
+        func: The function object being decorated (used to generate default lock name).
+        lock_name: The optional name specified for the lock.
+
+    Returns:
+        The threading.RLock instance to use for synchronization.
+    """
+    final_lock_name: str
+    if lock_name is not None:
+        final_lock_name = lock_name
+    else:
+        # Generate default lock name based on function's context
+        # Example: my_module.MyClass.my_method or my_module.my_function
+        final_lock_name = f"{func.__module__}.{func.__qualname__}"
+
+    # Use the single registry for all locks
+    with _registry_access_lock:
+        # Check if lock exists, create if not
+        if final_lock_name not in _lock_registry:
+            _lock_registry[final_lock_name] = RLock()
+        # Return the existing or newly created lock
+        return _lock_registry[final_lock_name]
+
+
+def synchronized(lock_name: Optional[str] = None) -> Callable[[F], F]:
+    """
+    Decorator to synchronize access to a function or method using a reentrant lock.
+
+    Ensures that only one thread can execute the decorated function (or any other
+    function sharing the same lock name) at a time. Uses threading.RLock for
+    reentrancy, allowing a thread that already holds the lock to acquire it again
+    without deadlocking (e.g., if a synchronized method calls another synchronized
+    method using the same lock).
+
+    Args:
+        lock_name (Optional[str]): An optional name for the lock.
+            - If provided (e.g., `@synchronized("my_resource_lock")`), all functions
+                decorated with the *same* `lock_name` string will share the same
+                underlying RLock. This synchronizes access across all those functions,
+                treating them as a critical section for a shared resource.
+            - If None (default, e.g., `@synchronized()`), a default lock name is
+                generated based on the function's module and qualified name
+                (e.g., "my_module.MyClass.my_method"). This lock is shared across
+                all calls to functions/methods that generate the *same* default name.
+                For instance methods, this means all instances of the class will share
+                the same lock for that specific method.
+
+    Returns:
+        Callable[[F], F]: A decorator that wraps the input function `F`, returning
+                        a new function with the same signature but added locking.
+    """
+
+    def decorator(func: F) -> F:
+        # Determine and retrieve/create the lock *once* when the function is decorated.
+        # This lock instance will be captured by the 'wrapper' closure below.
+        lock = _get_or_create_lock(func, lock_name)
+        # Store the determined lock name for potential introspection
+        actual_lock_name = (
+            lock_name
+            if lock_name is not None
+            else f"{func.__module__}.{func.__qualname__}"
+        )
+
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            """
+            The replacement function that acquires the lock, executes the original
+            function, and ensures the lock is released.
+            """
+            # The 'with' statement elegantly handles lock acquisition and release,
+            # even if the original function raises an exception.
+            with lock:
+                # Execute the original function with its arguments
+                result = func(*args, **kwargs)
+            # Return the result obtained from the original function
+            return result
+
+        # Optional: Attach the lock information to the wrapper for introspection/debugging
+        setattr(wrapper, "_synchronized_lock", lock)
+        setattr(wrapper, "_synchronized_lock_name", actual_lock_name)
+
+        # Cast is necessary because the type checker doesn't automatically infer
+        # that 'wrapper' has the same signature as 'func' even after using @functools.wraps.
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        wrapper.__module__ = func.__module__
+        return cast(F, wrapper)
+
+    # Return the actual decorator function
     return decorator
