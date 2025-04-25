@@ -385,6 +385,16 @@ def try_(fn: Callable[[], T]) -> Try[T]:
 
 
 def try_with_resource(fn: Callable[[], T]) -> Try[T]:
+    """
+    Factory function to create a Try instance from a callable producing a closeable resource.
+    Syntactic sugar for `Try(fn, True)`.
+
+    Args:
+        fn: The function to wrap in a Try.
+
+    Returns:
+        Try[T]: A new Try instance.
+    """
     return Try.with_resource(fn)
 
 

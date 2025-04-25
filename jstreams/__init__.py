@@ -246,6 +246,8 @@ from jstreams.scheduler import (
 
 from jstreams.eventing import events, event
 
+from jstreams.annotations import builder, getter, setter
+
 __all__ = [
     "each",
     "dict_update",
@@ -453,4 +455,7 @@ __all__ = [
     "Value",
     "extract",
     "identity",
+    "builder",
+    "getter",
+    "setter",
 ]
