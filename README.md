@@ -25,6 +25,7 @@ pip install jstreams
 ### v2025.5.1
 - Added [eventing](#eventing) framework
 - Added [annotations](#annotations) biolerplate code reduction decorators
+- Added `resolve_all` and `resolve` decorators for the injection mechanism, which will try to inject all type hinted fields of a class.
 ### v2025.4.2
 Added new scheduler module with the following functionality:
 - *schedule_periodic* decorator for functions that need to be executed at a given time interval
@@ -1110,9 +1111,14 @@ injector().get(ServiceInterface, "service")
 ##### Attribute injection
 Attributes can be injected by providing the dependency classes or variable definitions.
 ```python
-@resove_dependencies({
+@resolve_dependencies({
     "myAttribute": AttributeClassName
 })
+class MyDependentComponent:
+    myAttribute: AttributeClassName
+
+# Alternative usage
+@resolve_all()
 class MyDependentComponent:
     myAttribute: AttributeClassName
 
@@ -1129,10 +1135,23 @@ myDepComp.myAttribute # Will have the value provided
 class MyVariableNeededComponent:
     myVariable: str
 
+@resolve({
+    "myAttribute": AttributeClassName,
+    "myVariable": StrVariable("myVar"),
+})
+class MyComponent:
+    myAttribute: AttributeClassName
+    myVariable: str
+
 injector().provide_var(str, "myVariable", "myVariableValue")
 
 myVarNeededComp = MyVariableNeededComponent() # Value gets injected when the constructor is called
 print(myVarNeededComp.myVariable) # Will print out 'myVariableValue'
+
+myComponent = MyComponent()
+# At instantiation, both `myAttribute` and `myVariable` are injected
+print(myComponent.myAttribute) # will print out the value provided
+print(myComponent.myVariable) # will print out 'myVariableValue'
 ```
 
 ##### Argument injection
