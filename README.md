@@ -7,7 +7,8 @@ jstreams is a Python library aiming to replicate the following:
 - some utility classes for [threads](#threads) as well as JavaScript-like [timer](#timer) and [interval](#interval) functionality
 - a simple [state management](#state-management-api) API
 - a [task scheduler](#scheduler) with support for decorated functions and on-demand scheduling
-
+- an [eventing](#eventing) framework that supports event publishing an subscribing
+- [annotations](#annotations) for reducing boilerplate code. 
 The library is implemented with type safety in mind.
 
 ## Installation
@@ -21,6 +22,9 @@ If you wish to check out some example integrations you can visit the [examples](
 pip install jstreams
 ```
 ## Changelog
+### v2025.5.1
+- Added [eventing](#eventing) framework
+- Added [annotations](#annotations) biolerplate code reduction decorators
 ### v2025.4.2
 Added new scheduler module with the following functionality:
 - *schedule_periodic* decorator for functions that need to be executed at a given time interval
@@ -864,6 +868,7 @@ class MyInterfaceMock(MyInterface):
 mock = MyInterfaceMock()
 injector().provide(MyInterface, mock)
 ## execute test code
+injector().get(MyInterface).doSomething()
 # then check if the execution happened
 assertTrue(mock.methodCalled)
 ```
@@ -1461,6 +1466,269 @@ The difference between the **Interval** class and a periodic scheduled job is th
 As an example, let's consider we need to call 10 functions at given intervals. When using **Timer** or **Interval** we start 10 threads when we create the jobs, while with the scheduler, we only have a single thread, the scheduler itself, and spawn one thread for each job whenever the job needs to run. Basically, with the scheduler we have a *maximum* of jobs count + 1 (one for the scheduler) threads, while using **Timer** or **Interval** we have a *minimum* number of 10 threads all the time.
 It is a matter of application design whether to use threads or the scheduler, but, of course, they can be combined and used as needed.
  
+### Eventing
+The `eventing` module provides a simple, global event bus built on top of the Rx primitives (`PublishSubject`). It allows different parts of an application to communicate asynchronously without having direct dependencies on each other. Components can publish events, and other components can subscribe to specific event types to react accordingly.
+
+```python
+from jstreams import event, events, rx_map, rx_filter, ObservableSubscription
+from typing import Any, Optional, Callable
+import time
+
+# Define event types (can be any class or built-in type)
+class UserLoggedInEvent:
+    def __init__(self, username: str):
+        self.username = username
+    def __repr__(self):
+        return f"UserLoggedInEvent(username='{self.username}')"
+
+class SystemMessageEvent:
+    def __init__(self, message: str, level: str = "INFO"):
+        self.message = message
+        self.level = level
+    def __repr__(self):
+        return f"SystemMessageEvent(message='{self.message}', level='{self.level}')"
+
+# --- Publisher Side ---
+def login_user(username: str):
+    print(f"\nAttempting login for {username}...")
+    # ... perform login logic ...
+    print(f"Login successful for {username}")
+    # Publish an event using the event type as the identifier
+    event(UserLoggedInEvent).publish(UserLoggedInEvent(username))
+    event(SystemMessageEvent).publish(SystemMessageEvent(f"User '{username}' logged in."))
+
+# --- Subscriber Side ---
+
+# 1. Simple subscription to an event type
+def welcome_user(evt: UserLoggedInEvent):
+    print(f"EVENT HANDLER [Welcome]: Welcome, {evt.username}! Sending welcome email...")
+
+# Subscribe the handler to the UserLoggedInEvent type
+login_subscription: ObservableSubscription[UserLoggedInEvent] = event(UserLoggedInEvent).subscribe(welcome_user)
+print(f"Subscribed 'welcome_user' to {UserLoggedInEvent.__name__}")
+
+# 2. Subscription with filtering and mapping (using pipe)
+def log_errors(evt: SystemMessageEvent):
+    # This handler only receives ERROR level messages due to the filter below
+    print(f"EVENT HANDLER [Error Log]: ERROR DETECTED - {evt.message}")
+
+# Subscribe to SystemMessageEvent, but only process ERROR level messages
+error_log_subscription: ObservableSubscription[SystemMessageEvent] = event(SystemMessageEvent).pipe(
+    rx_filter(lambda e: e.level == "ERROR")
+).subscribe(log_errors)
+print(f"Subscribed 'log_errors' to {SystemMessageEvent.__name__} (filtered for level='ERROR')")
+
+
+# 3. Using a named event channel (for the same event type)
+# Useful if you need separate streams for the same data type
+status_update_channel = event(str, event_name="status_updates")
+
+def display_status(status: str):
+    print(f"EVENT HANDLER [Status Display]: Status Update -> {status}")
+
+status_subscription: ObservableSubscription[str] = status_update_channel.subscribe(display_status)
+print(f"Subscribed 'display_status' to event type 'str' with name 'status_updates'")
+
+
+# --- Triggering Events ---
+print("\n--- Triggering Events ---")
+login_user("Alice")
+# Output should show the "Welcome" handler running
+
+event(SystemMessageEvent).publish(SystemMessageEvent("Disk space low!", level="ERROR"))
+# Output should show the "Error Log" handler running
+
+event(SystemMessageEvent).publish(SystemMessageEvent("Service started.", level="INFO"))
+# Output should *not* show the "Error Log" handler running (filtered out)
+
+status_update_channel.publish("System Initialized")
+# Output should show the "Status Display" handler running
+
+# --- Getting Latest Event ---
+# Note: event() uses PublishSubject internally, so new subscribers don't get past events.
+# Use .latest() to retrieve the most recently published event on a specific channel, if needed.
+latest_status: Optional[str] = event(str, event_name="status_updates").latest()
+print(f"\nLatest status retrieved via .latest(): {latest_status}") # Output: System Initialized
+
+latest_login: Optional[UserLoggedInEvent] = event(UserLoggedInEvent).latest()
+print(f"Latest login event retrieved via .latest(): {latest_login}") # Output: UserLoggedInEvent(username='Alice')
+
+# --- Cleanup ---
+print("\n--- Cleaning Up Subscriptions ---")
+
+# Cancel individual subscriptions when no longer needed
+print("Cancelling 'login_subscription'...")
+login_subscription.cancel()
+login_user("Bob") # The "Welcome" handler should NOT run now
+
+# Or clear all subscriptions and history for a specific event type (across all its names)
+print(f"\nClearing all subscriptions for {SystemMessageEvent.__name__}...")
+events().clear_event(SystemMessageEvent)
+event(SystemMessageEvent).publish(SystemMessageEvent("Another critical error!", level="ERROR")) # "Error Log" handler should NOT run
+
+# Or clear all event channels and subscriptions entirely
+print("\nClearing ALL events...")
+events().clear()
+status_update_channel.publish("System Shutdown") # "Status Display" handler should NOT run
+print("Eventing system cleared.")
+```
+
+### Annotations 
+`@builder`, `@getter`, `@setter`, `@locked`, `@synchronized`, `@synchronized_static`
+
+The `jstreams.annotations` module provides several class and method decorators to reduce boilerplate code and implement common patterns like the builder pattern or thread synchronization.
+
+```python
+from jstreams import builder, getter, setter, locked, synchronized, synchronized_static
+from typing import Optional
+import threading
+import time
+import abc # For the example
+
+# --- @builder, @getter, @setter ---
+# These decorators work together to simplify class creation and access.
+
+@builder() # Adds a static Config.builder() method
+@getter()  # Adds get_host(), get_port() methods
+@setter()  # Adds set_host(v), set_port(v) methods
+class Config:
+    # Public attributes are targeted by the decorators
+    host: str
+    port: int
+    timeout: Optional[int] = None # Optional attributes work too
+
+    # Private attributes (starting with _) are ignored
+    _api_key: str = "default_key"
+
+    def __repr__(self):
+        return f"Config(host='{self.host}', port={self.port}, timeout={self.timeout})"
+
+# Use the builder pattern provided by @builder
+config_instance = Config.builder() \
+    .with_host("localhost") \
+    .with_port(8080) \
+    .with_timeout(5000) \
+    .build() # Creates the Config instance
+
+print(f"Config built: {config_instance}")
+
+# Use methods generated by @getter
+print(f"Host from getter: {config_instance.get_host()}") # Output: localhost
+
+# Use methods generated by @setter
+config_instance.set_port(9090)
+print(f"Port after setter: {config_instance.get_port()}") # Output: 9090
+
+# Attempting to access builder/getter/setter for private attributes fails
+# config_instance.get__api_key() -> AttributeError
+# Config.builder().with__api_key("...") -> AttributeError
+
+
+# --- @locked ---
+# Makes instances of the decorated class thread-safe by wrapping attribute
+# access (get/set/del) and method calls with an instance-specific RLock.
+
+@locked()
+class ThreadSafeCounter:
+    def __init__(self):
+        self.count = 0
+
+    def increment(self):
+        # This operation is now atomic per instance due to @locked
+        current_count = self.count
+        time.sleep(0.01) # Simulate work / potential race condition point
+        self.count = current_count + 1
+
+    def get_count(self):
+        # Attribute access is also locked
+        return self.count
+
+safe_counter = ThreadSafeCounter()
+threads = []
+for _ in range(10):
+    t = threading.Thread(target=safe_counter.increment)
+    threads.append(t)
+    t.start()
+
+for t in threads:
+    t.join()
+
+print(f"\nLocked Counter final value: {safe_counter.get_count()}") # Should reliably be 10
+
+
+# --- @synchronized (Instance Lock) ---
+# Decorator for *instance methods*. Ensures only one thread can execute
+# the decorated method *on the same instance* at a time. Uses an
+# instance-specific RLock.
+
+class Worker:
+    def __init__(self, id_num: int):
+        self.id = id_num
+        # @synchronized will create a lock attribute if needed,
+        # or you can specify one: @synchronized(lock_attribute_name='_my_lock')
+
+    @synchronized()
+    def do_work(self, duration: float):
+        print(f"Worker {self.id} starting work (Thread: {threading.current_thread().name})")
+        time.sleep(duration)
+        print(f"Worker {self.id} finished work (Thread: {threading.current_thread().name})")
+
+worker1 = Worker(1)
+worker2 = Worker(2)
+
+# Threads targeting the *same* instance (worker1) will be serialized by @synchronized
+t1 = threading.Thread(target=worker1.do_work, args=(0.2,))
+t2 = threading.Thread(target=worker1.do_work, args=(0.2,))
+
+# Thread targeting a *different* instance (worker2) can run concurrently
+t3 = threading.Thread(target=worker2.do_work, args=(0.2,))
+
+print("\nStarting @synchronized demo:")
+t1.start(); t2.start(); t3.start()
+t1.join(); t2.join(); t3.join()
+print("@synchronized demo finished.")
+# Observe that worker1's "starting" and "finished" messages appear sequentially,
+# while worker2 might interleave with worker1.
+
+
+# --- @synchronized_static (Static/Global Lock) ---
+# Decorator for *functions or methods*. Ensures only one thread can execute
+# *any* function/method decorated with this decorator (or sharing the same
+# `lock_name`) *globally* at a time. Uses a static RLock.
+
+shared_resource = []
+log_lock = threading.Lock() # For printing cleanly in demo
+
+@synchronized_static("resource_access_lock") # Shared lock name
+def add_to_resource(item):
+     with log_lock: print(f"Acquired lock to ADD {item} (Thread: {threading.current_thread().name})")
+     time.sleep(0.1)
+     shared_resource.append(item)
+     with log_lock: print(f"Released lock after ADDING {item}")
+
+@synchronized_static("resource_access_lock") # Same shared lock name
+def check_resource_status():
+     with log_lock: print(f"Acquired lock to CHECK status (Thread: {threading.current_thread().name})")
+     time.sleep(0.1)
+     status = len(shared_resource) > 0
+     with log_lock: print(f"Released lock after CHECKING status (Result: {status})")
+     return status
+
+threads_static = []
+for i in range(3):
+    threads_static.append(threading.Thread(target=add_to_resource, args=(i,)))
+threads_static.append(threading.Thread(target=check_resource_status))
+
+print("\nStarting @synchronized_static demo:")
+for t in threads_static: t.start()
+for t in threads_static: t.join()
+print("@synchronized_static demo finished.")
+print(f"Final shared resource: {shared_resource}")
+# Observe that all "Acquired lock..." / "Released lock..." messages appear
+# sequentially, regardless of which function was called, due to the shared static lock.
+```
+
+
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)

@@ -6,7 +6,7 @@ from typing import Callable, List, Any
 
 # Assuming the synchronized decorator is in 'jstreams.annotations'
 # Adjust the import path if necessary
-from jstreams.annotations import static_synchronized, _lock_registry
+from jstreams.annotations import synchronized_static, _lock_registry
 
 # Helper shared state for tests - still needed for cross-thread communication
 counter = 0
@@ -51,10 +51,10 @@ class TestSynchronizedDecorator(unittest.TestCase):
             thread.join()
 
     def test_default_lock_prevents_race_condition(self) -> None:
-        """Tests that @synchronized() prevents race conditions on the same function."""
+        """Tests that @synchronized_static() prevents race conditions on the same function."""
 
         # --- Inline Function Definition ---
-        @static_synchronized()
+        @synchronized_static()
         def local_increment_counter(amount: int = 1, delay: float = 0.01) -> None:
             """Increments the global counter with default lock."""
             global counter
@@ -87,10 +87,10 @@ class TestSynchronizedDecorator(unittest.TestCase):
         self.assertEqual(counter, num_threads * increments_per_thread)
 
     def test_named_lock_prevents_race_condition_across_functions(self) -> None:
-        """Tests that @synchronized('name') prevents races across different functions."""
+        """Tests that @synchronized_static('name') prevents races across different functions."""
 
         # --- Inline Function Definitions ---
-        @static_synchronized("test_lock")
+        @synchronized_static("test_lock")
         def local_increment_counter_named(amount: int = 1, delay: float = 0.01) -> None:
             """Increments the global counter with named lock 'test_lock'."""
             global counter
@@ -106,7 +106,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
                     f"{threading.current_thread().name}: named_inc_end"
                 )
 
-        @static_synchronized("test_lock")
+        @synchronized_static("test_lock")
         def local_decrement_counter_named(amount: int = 1, delay: float = 0.01) -> None:
             """Decrements the global counter with named lock 'test_lock'."""
             global counter
@@ -162,7 +162,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
         local_reentrant_depth = 0
 
         # --- Inline Function Definition ---
-        @static_synchronized()
+        @synchronized_static()
         def local_reentrant_recursive(max_depth: int = 2) -> None:
             """Tests reentrancy by calling itself."""
             nonlocal local_reentrant_flag, local_reentrant_depth  # Use nonlocal to modify outer scope vars
@@ -198,7 +198,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
         global reentrant_flag  # Keep global flag for this test case
 
         # --- Inline Function Definitions ---
-        @static_synchronized("reentrant_lock")
+        @synchronized_static("reentrant_lock")
         def local_reentrant_inner_named() -> None:
             global reentrant_flag
             with log_lock:
@@ -207,7 +207,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
                 )
             reentrant_flag = True
 
-        @static_synchronized("reentrant_lock")
+        @synchronized_static("reentrant_lock")
         def local_reentrant_outer_named() -> None:
             with log_lock:
                 execution_log.append(
@@ -233,7 +233,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
         """Tests that functions with different default locks can run concurrently."""
 
         # --- Inline Function Definitions ---
-        @static_synchronized()
+        @synchronized_static()
         def local_task_c_default(delay: float = 0.05) -> None:
             """Task using its own default lock."""
             with log_lock:
@@ -242,7 +242,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
             with log_lock:
                 execution_log.append(f"{threading.current_thread().name}: task_c_end")
 
-        @static_synchronized()
+        @synchronized_static()
         def local_task_d_default(delay: float = 0.05) -> None:
             """Task using its own, different default lock."""
             with log_lock:
@@ -285,7 +285,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
         """Tests that functions with different named locks can run concurrently."""
 
         # --- Inline Function Definitions ---
-        @static_synchronized("lock_a")
+        @synchronized_static("lock_a")
         def local_task_a_named(delay: float = 0.05) -> None:
             """Task using named lock 'lock_a'."""
             with log_lock:
@@ -294,7 +294,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
             with log_lock:
                 execution_log.append(f"{threading.current_thread().name}: task_a_end")
 
-        @static_synchronized("lock_b")
+        @synchronized_static("lock_b")
         def local_task_b_named(delay: float = 0.05) -> None:
             """Task using named lock 'lock_b'."""
             with log_lock:
@@ -339,7 +339,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
         """Tests that functions with named vs default locks can run concurrently."""
 
         # --- Inline Function Definitions ---
-        @static_synchronized("lock_a")
+        @synchronized_static("lock_a")
         def local_task_a_named(delay: float = 0.05) -> None:
             """Task using named lock 'lock_a'."""
             with log_lock:
@@ -348,7 +348,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
             with log_lock:
                 execution_log.append(f"{threading.current_thread().name}: task_a_end")
 
-        @static_synchronized()
+        @synchronized_static()
         def local_task_c_default(delay: float = 0.05) -> None:
             """Task using its own default lock."""
             with log_lock:
@@ -392,7 +392,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
         """Tests that the decorator returns the original function's value."""
 
         # --- Inline Function Definition ---
-        @static_synchronized()
+        @synchronized_static()
         def local_return_value_func(value: Any) -> Any:
             """Returns the given value."""
             with log_lock:
@@ -419,7 +419,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
         """Tests that exceptions raised by the decorated function are propagated."""
 
         # --- Inline Function Definition ---
-        @static_synchronized()
+        @synchronized_static()
         def local_raise_exception_func(message: str) -> None:
             """Raises a ValueError."""
             with log_lock:
@@ -439,7 +439,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
         """Tests that *args and **kwargs are passed correctly."""
 
         # --- Inline Function Definition ---
-        @static_synchronized()
+        @synchronized_static()
         def local_arg_passing_func(
             *args: Any, **kwargs: Any
         ) -> tuple[tuple[Any, ...], dict[str, Any]]:
@@ -471,7 +471,7 @@ class TestSynchronizedDecorator(unittest.TestCase):
         """Tests that functools.wraps preserves metadata."""
 
         # --- Inline Function Definition ---
-        @static_synchronized()
+        @synchronized_static()
         def local_metadata_func() -> None:
             """This is the docstring."""
             pass
@@ -487,23 +487,23 @@ class TestSynchronizedDecorator(unittest.TestCase):
         """Tests that locks are created and reused correctly in the registry."""
 
         # --- Define functions within the test to ensure clean state ---
-        @static_synchronized("shared_lock_test")
+        @synchronized_static("shared_lock_test")
         def func1_shared():
             pass
 
-        @static_synchronized("shared_lock_test")
+        @synchronized_static("shared_lock_test")
         def func2_shared():
             pass
 
-        @static_synchronized()
+        @synchronized_static()
         def func3_default():
             pass
 
-        @static_synchronized()
+        @synchronized_static()
         def func4_default():
             pass
 
-        @static_synchronized("another_lock_test")
+        @synchronized_static("another_lock_test")
         def func5_another():
             pass
 
@@ -538,7 +538,7 @@ class MethodTester:
         self.instance_counter = 0
         self.reentrant_method_flag = False
 
-    @static_synchronized()
+    @synchronized_static()
     def increment_default(self, delay: float = 0.01) -> None:
         """Increments instance and class counter with default method lock."""
         with log_lock:
@@ -556,7 +556,7 @@ class MethodTester:
         with log_lock:
             execution_log.append(f"Inst-{self.instance_id}: default_method_end")
 
-    @static_synchronized("method_lock")
+    @synchronized_static("method_lock")
     def increment_named(self, delay: float = 0.01) -> None:
         """Increments instance and class counter with named method lock."""
         with log_lock:
@@ -574,7 +574,7 @@ class MethodTester:
         with log_lock:
             execution_log.append(f"Inst-{self.instance_id}: named_method_end")
 
-    @static_synchronized("method_lock")
+    @synchronized_static("method_lock")
     def reentrant_method_outer_named(self) -> None:
         """Calls another method with the same named lock."""
         with log_lock:
@@ -585,7 +585,7 @@ class MethodTester:
         with log_lock:
             execution_log.append(f"Inst-{self.instance_id}: reentrant_outer_named_end")
 
-    @static_synchronized("method_lock")
+    @synchronized_static("method_lock")
     def reentrant_method_inner_named(self) -> None:
         """Inner method for named reentrancy test."""
         with log_lock:
@@ -594,7 +594,7 @@ class MethodTester:
 
     # --- Methods for Default Lock Reentrancy Test ---
     # These remain as methods because we are testing method reentrancy
-    @static_synchronized()
+    @synchronized_static()
     def reentrant_method_outer_default(self) -> None:
         """Calls another method with the same default lock."""
         with log_lock:
@@ -608,7 +608,7 @@ class MethodTester:
                 f"Inst-{self.instance_id}: reentrant_outer_default_end"
             )
 
-    @static_synchronized()
+    @synchronized_static()
     def reentrant_method_inner_default(self) -> None:
         """Inner method for default reentrancy test."""
         with log_lock:
@@ -727,7 +727,7 @@ class TestSynchronizedMethods(unittest.TestCase):
         local_reentrant_flag = False
 
         # --- Inline Recursive Method (bound later) ---
-        @static_synchronized()
+        @synchronized_static()
         def recursive_method(
             self: MethodTester, depth: int = 0, max_depth: int = 2
         ) -> None:

@@ -294,7 +294,7 @@ def _get_or_create_lock(func: Callable[..., Any], lock_name: Optional[str]) -> R
         return _lock_registry[final_lock_name]
 
 
-def static_synchronized(lock_name: Optional[str] = None) -> Callable[[F], F]:
+def synchronized_static(lock_name: Optional[str] = None) -> Callable[[F], F]:
     """
     Decorator to synchronize access to a function or method using a static reentrant lock.
 

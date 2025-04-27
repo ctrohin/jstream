@@ -251,7 +251,7 @@ from jstreams.annotations import (
     getter,
     setter,
     locked,
-    static_synchronized,
+    synchronized_static,
     synchronized,
 )
 
@@ -466,6 +466,6 @@ __all__ = [
     "getter",
     "setter",
     "locked",
-    "static_synchronized",
+    "synchronized_static",
     "synchronized",
 ]
