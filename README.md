@@ -8,7 +8,7 @@ jstreams is a Python library aiming to replicate the following:
 - a simple [state management](#state-management-api) API
 - a [task scheduler](#scheduler) with support for decorated functions and on-demand scheduling
 - an [eventing](#eventing) framework that supports event publishing an subscribing
-- [annotations](#annotations) for reducing boilerplate code. 
+- [annotations](#annotations) such as `@builder`, `@setter`, `@getter`, `@synchronized` and `@synchronized_static` for reducing boilerplate code. 
 The library is implemented with type safety in mind.
 
 ## Installation
@@ -26,6 +26,7 @@ pip install jstreams
 - Added [eventing](#eventing) framework
 - Added [annotations](#annotations) biolerplate code reduction decorators
 - Added `resolve_all` and `resolve` decorators for the injection mechanism, which will try to inject all type hinted fields of a class.
+- Added `retry`, `recover` and `recover_from` chains to [Try](#try) objects allowing the user to specify a number of times the operation should be retried if a failure happenns, recover from a failure by providing a result supplier, and also recover from specific types of exceptions. 
 ### v2025.4.2
 Added new scheduler module with the following functionality:
 - *schedule_periodic* decorator for functions that need to be executed at a given time interval
@@ -486,6 +487,13 @@ Try(returnStr).and_then(lambda s: print(s)).get() # Will print out "test"
 # The of method can actually be used as a method to inject a value into a Try without
 # actually calling a method or lambda
 Try.of("test").and_then(lambda s: print(s)).get() # Will print out "test"
+
+# You can use `retry` for API calls
+Try(lambda: requests.get(...)).retry(3).recover(lambda _: DefaultResponse()).get()
+# in this case, the recovery happens for any raised exception (and only after 3 retries)
+# or specify error types to recover from
+Try(lambda: requests.get(...)).retry(3).recover_from(HttpError, lambda _: DefaultResponse()).get()
+# in this case, the recovery only happens if an HttpError is raised.
 ```
 
 ### ReactiveX
@@ -1602,7 +1610,8 @@ from jstreams import builder, getter, setter, locked, synchronized, synchronized
 from typing import Optional
 import threading
 import time
-import abc # For the example
+import abc 
+# For the example
 
 # --- @builder, @getter, @setter ---
 # These decorators work together to simplify class creation and access.
@@ -1641,8 +1650,66 @@ print(f"Port after setter: {config_instance.get_port()}") # Output: 9090
 # Attempting to access builder/getter/setter for private attributes fails
 # config_instance.get__api_key() -> AttributeError
 # Config.builder().with__api_key("...") -> AttributeError
+```
+
+**Why should you use these annotations?** Well, typically, if you want to implement a class with the builder patter for fluent programming, you would have to do something like this:
+```python
+class Person:
+    name: str
+    age: int
+    address: str
+
+    def with_name(self, name: str) -> 'Person':
+        self.name = name
+        return self
+
+    def with_age(self, age: int) -> 'Person':
+        self.age = age
+        return self
+
+    def with_address(self, address: str) -> 'Person':
+        self.address = address
+        return self
+
+# Then call it like this:
+person = Person().with_name("John Doe").with_age(30).with_address("123 Main St")
+```
+
+What the `@builder` annotation allows you to do is simply define your class and let the annotation handle the boilerplate code for you.
+
+```python
+@builder()
+class Person:
+    name: str
+    age: int
+    address: str
+
+# Then call it like this:
+person = Person.builder().with_name("John Doe").with_age(30).with_address("123 Main St").build()
+```
+The same goes for the `@setter` and `@getter` decorators.
+
+```python
+@builder()
+@setter()
+@getter()
+class Person:
+    name: str
+    age: int
+    address: str
+
+# First we create the object
+person = Person.builder().with_name("John Doe").with_age(30).with_address("123 Main St").build()
+# This is the @getter generated method
+print(person.get_name()) # Will print out 'John Doe`
+# This is the @setter generated method
+person.set_name("Jane Doe")
+print(person.get_name()) # Will print out 'Jane Doe'
 
 
+```
+
+```python
 # --- @locked ---
 # Makes instances of the decorated class thread-safe by wrapping attribute
 # access (get/set/del) and method calls with an instance-specific RLock.
@@ -1746,8 +1813,6 @@ print(f"Final shared resource: {shared_resource}")
 # Observe that all "Acquired lock..." / "Released lock..." messages appear
 # sequentially, regardless of which function was called, due to the shared static lock.
 ```
-
-
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)

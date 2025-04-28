@@ -212,11 +212,7 @@ class TestTry(BaseTestCase):
         mock = Mock(3)
 
         self.assertEqual(
-            Try(mock.do)
-            .with_retries(2, 0.1)
-            .on_failure(mock.register_error)
-            .get()
-            .get(),
+            Try(mock.do).retry(2, 0.1).on_failure(mock.register_error).get().get(),
             "TestValue",
         )
         self.assertEqual(mock.current_try, 3)
@@ -241,7 +237,7 @@ class TestTry(BaseTestCase):
         self.assertIsNone(
             Try(mock.do)
             .mute()
-            .with_retries(2, 0.1)
+            .retry(2, 0.1)
             .on_failure(mock.register_error)
             .get()
             .get_actual(),

@@ -155,7 +155,7 @@ class Try(Generic[T]):
         self.__error_message = error_message
         return self
 
-    def with_retries(self, retries: int, delay_between: float = 0.0) -> "Try[T]":
+    def retry(self, retries: int, delay_between: float = 0.0) -> "Try[T]":
         """
         Configures the operation to retry on failure.
 
@@ -274,6 +274,13 @@ class Try(Generic[T]):
         else:
             # Operation failed after retries
             return self.__recover(last_exception)
+
+    def exec(self) -> None:
+        """
+        Executes the Try operation, including retries and handlers.
+        Basically an alias of 'get' without the return result.
+        """
+        self.get()
 
     def __recover(self, last_exception: Exception) -> Opt[T]:
         # First try to recover for typed suppliers
