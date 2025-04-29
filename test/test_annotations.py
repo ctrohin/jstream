@@ -1,7 +1,15 @@
 import threading
 import time
+from typing import Optional
 from baseTest import BaseTestCase
-from jstreams.annotations import getter, locked, setter, builder
+from jstreams.annotations import (
+    all_args,
+    getter,
+    locked,
+    required_args,
+    setter,
+    builder,
+)
 
 
 # --- Test Subject Class for @locked ---
@@ -261,3 +269,38 @@ class TestAnnotations(BaseTestCase):
             "Thread-safe wrapper around MyOriginalClass", MyOriginalClass.__doc__
         )
         self.assertIn("This is the original docstring.", MyOriginalClass.__doc__)
+
+    def test_required_args(self) -> None:
+        @required_args()
+        class Test:
+            a: int
+            b: str
+            c: Optional[int]
+            d: Optional[str]
+
+        t = Test.required(10, "test")
+        self.assertEqual(t.a, 10)
+        self.assertEqual(t.b, "test")
+        self.assertIsNone(t.c)
+        self.assertIsNone(t.d)
+
+        self.assertRaises(TypeError, lambda: Test.required(10))
+        self.assertRaises(TypeError, lambda: Test.required(10, "test", 2, "test2"))
+
+    def test_all_args(self) -> None:
+        @all_args()
+        class Test:
+            a: int
+            b: str
+            c: Optional[int]
+            d: Optional[str]
+
+        t = Test.all(10, "test", 2, "test2")
+        self.assertEqual(t.a, 10)
+        self.assertEqual(t.b, "test")
+        self.assertEqual(t.c, 2)
+        self.assertEqual(t.d, "test2")
+
+        self.assertRaises(TypeError, lambda: Test.all())
+        self.assertRaises(TypeError, lambda: Test.all(10))
+        self.assertRaises(TypeError, lambda: Test.all(10, "test", 2, "test2", 2))

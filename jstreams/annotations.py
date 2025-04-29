@@ -462,3 +462,104 @@ def synchronized(
         return cast(F, wrapper)
 
     return decorator
+
+
+def _args(require_all: bool) -> Callable[[type[T]], type[T]]:
+    """
+    A decorator that adds a static method called 'required' to a class.
+    This method constructs an object of the class using only the required
+    (non-Optional) members declared in the class.
+    """
+
+    def decorator(cls: type[T]) -> type[T]:
+        required_members: dict[str, type] = {}
+        null_members: set[str] = set()
+
+        for name, type_hint in get_type_hints(cls).items():
+            if name.startswith("_"):
+                continue
+
+            if repr(type_hint).startswith("<class"):
+                required_members[name] = type_hint
+            else:
+                if require_all:
+                    required_members[name] = type_hint.__args__[0]
+                else:
+                    null_members.add(name)
+
+        def constructor(*args: Any, **kwargs: Any) -> T:
+            """
+            Constructs an object of the decorated class using the required members.
+            """
+            if len(args) + len(kwargs) != len(required_members):
+                raise TypeError(
+                    f"Class requires arguments: {list(required_members.keys())} and received {len(args) + len(kwargs)} arguments"
+                )
+
+            call_kwargs: dict[str, Any] = {}
+            arg_index = 0
+            for param_name, param_type in required_members.items():
+                if param_name in kwargs:
+                    value = kwargs[param_name]
+                else:
+                    if arg_index >= len(args):
+                        raise TypeError("too few arguments")
+                    value = args[arg_index]
+                    arg_index += 1
+
+                if not isinstance(value, param_type):
+                    raise TypeError(
+                        f"argument '{param_name}' should be of type {param_type}, received type: {type(value)}"
+                    )
+
+                call_kwargs[param_name] = value
+
+            instance = cls.__new__(cls)
+            for name, value in call_kwargs.items():
+                setattr(instance, name, value)
+            for name in null_members:
+                setattr(instance, name, None)
+            return instance
+
+        constructor.__signature__ = inspect.Signature(  # type: ignore[attr-defined]
+            parameters=[
+                inspect.Parameter(
+                    name,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=required_members[name],
+                )
+                for name in required_members
+            ]
+        )
+
+        setattr(
+            cls, "required" if not require_all else "all", staticmethod(constructor)
+        )
+        return cls
+
+    return decorator
+
+
+def required_args() -> Callable[[type[T]], type[T]]:
+    """
+    A decorator that adds a static method called 'required' to a class.
+    This method constructs an object of the class using only the required
+    (non-Optional) public members declared in the class. The parameters can be
+    passed to the 'required' method either as positional or keyword arguments.
+    If positional arguments are used, then they must be specified in the order
+    they were declared.
+    """
+    return _args(False)
+
+
+def all_args() -> Callable[[type[T]], type[T]]:
+    """
+    A decorator that adds a static method called 'all' to a class.
+    This method constructs an object of the class using all public
+    members declared in the class, including Optionals. The parameters can be
+    passed to the 'all' method either as positional or keyword arguments.
+    If positional arguments are used, then they must be specified in the order
+    they were declared.
+    """
+
+    return _args(True)

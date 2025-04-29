@@ -253,6 +253,8 @@ from jstreams.annotations import (
     locked,
     synchronized_static,
     synchronized,
+    all_args,
+    required_args,
 )
 
 __all__ = [
@@ -468,4 +470,6 @@ __all__ = [
     "locked",
     "synchronized_static",
     "synchronized",
+    "all_args",
+    "required_args",
 ]
