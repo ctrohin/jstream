@@ -1867,18 +1867,11 @@ product1 = Product.all(201, "Thingamajig", "Does amazing things")
 print(f"Product 1: id={product1.product_id}, name='{product1.name}', desc='{product1.description}'")
 # Output: Product 1: id=201, name='Thingamajig', desc='Does amazing things'
 
-# Provide only required arguments (optional 'description' will be None)
-product2 = Product.all(202, "Doohickey")
-print(f"Product 2: id={product2.product_id}, name='{product2.name}', desc={product2.description}")
-# Output: Product 2: id=202, name='Doohickey', desc=None
-
 # Provide arguments using keywords
 product3 = Product.all(name="Contraption", product_id=203, description="Very complex")
 print(f"Product 3: id={product3.product_id}, name='{product3.name}', desc='{product3.description}'")
 # Output: Product 3: id=203, name='Contraption', desc='Very complex'
 
-# Trying to provide too many arguments will fail:
-# Product.all(204, "Whatchamacallit", "It calls whatsits", "extra") -> TypeError: too many arguments
 ```
 ## License
 

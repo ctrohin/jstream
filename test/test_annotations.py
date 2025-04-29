@@ -292,8 +292,8 @@ class TestAnnotations(BaseTestCase):
         class Test:
             a: int
             b: str
-            c: Optional[int]
-            d: Optional[str]
+            c: Optional[int] = None
+            d: Optional[str] = None
 
         t = Test.all(10, "test", 2, "test2")
         self.assertEqual(t.a, 10)
@@ -303,4 +303,6 @@ class TestAnnotations(BaseTestCase):
 
         self.assertRaises(TypeError, lambda: Test.all())
         self.assertRaises(TypeError, lambda: Test.all(10))
+        self.assertRaises(TypeError, lambda: Test.all(10, "str"))
+        self.assertRaises(TypeError, lambda: Test.all(10, "str", 4))
         self.assertRaises(TypeError, lambda: Test.all(10, "test", 2, "test2", 2))
