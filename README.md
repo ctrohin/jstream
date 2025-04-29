@@ -1601,9 +1601,9 @@ print("Eventing system cleared.")
 ```
 
 ### Annotations 
-`@builder`, `@getter`, `@setter`, `@locked`, `@synchronized`, `@synchronized_static`
+`@builder`, `@getter`, `@setter`, `@locked`, `@synchronized`, `@synchronized_static`, `@required_args`, `@all_args`
 
-The `jstreams.annotations` module provides several class and method decorators to reduce boilerplate code and implement common patterns like the builder pattern or thread synchronization.
+The `jstreams.annotations` module provides several class and method decorators to reduce boilerplate code and implement common patterns like the builder pattern, object factories or thread synchronization.
 
 ```python
 from jstreams import builder, getter, setter, locked, synchronized, synchronized_static
@@ -1812,6 +1812,73 @@ print("@synchronized_static demo finished.")
 print(f"Final shared resource: {shared_resource}")
 # Observe that all "Acquired lock..." / "Released lock..." messages appear
 # sequentially, regardless of which function was called, due to the shared static lock.
+```
+
+**`@required_args` and `@all_args`**
+
+These decorators provide alternative static constructors for your classes based on their declared public members, bypassing the standard `__init__` method. This is useful for creating instances when you want to directly populate fields without necessarily calling the initialization logic, or when you want constructors that strictly enforce required fields or allow setting all fields directly.
+
+**`@required_args`**
+
+This decorator adds a static method named `required` to the decorated class. This method accepts arguments corresponding *only* to the public members of the class that are **not** declared as `Optional`.
+
+```python
+from jstreams import required_args
+from typing import Optional
+
+@required_args()
+class Product:
+    product_id: int       # Required
+    name: str             # Required
+    description: Optional[str] = None # Optional
+    _internal_code: str = "XYZ"      # Private, ignored
+
+# Use the generated 'required' static method
+# It only expects 'product_id' and 'name'
+product1 = Product.required(101, "Gadget")
+print(f"Product 1: id={product1.product_id}, name='{product1.name}', desc={product1.description}")
+# Output: Product 1: id=101, name='Gadget', desc=None
+
+product2 = Product.required(name="Widget", product_id=102) # Keyword args work too
+print(f"Product 2: id={product2.product_id}, name='{product2.name}', desc={product2.description}")
+# Output: Product 2: id=102, name='Widget', desc=None
+
+# Trying to provide the optional 'description' will fail:
+# Product.required(103, "Gizmo", "A cool gizmo") -> TypeError: too many arguments
+```
+
+**`@all_args`**
+This decorator adds a static method named `all` to the decorated class. This method accepts arguments corresponding to all public members of the class, including `Optional` ones.
+```python
+from jstreams import all_args
+from typing import Optional
+
+@all_args()
+class Product:
+    product_id: int       # Required
+    name: str             # Required
+    description: Optional[str] = None # Optional
+    _internal_code: str = "XYZ"      # Private, ignored
+
+# Use the generated 'all' static method
+
+# Provide all arguments
+product1 = Product.all(201, "Thingamajig", "Does amazing things")
+print(f"Product 1: id={product1.product_id}, name='{product1.name}', desc='{product1.description}'")
+# Output: Product 1: id=201, name='Thingamajig', desc='Does amazing things'
+
+# Provide only required arguments (optional 'description' will be None)
+product2 = Product.all(202, "Doohickey")
+print(f"Product 2: id={product2.product_id}, name='{product2.name}', desc={product2.description}")
+# Output: Product 2: id=202, name='Doohickey', desc=None
+
+# Provide arguments using keywords
+product3 = Product.all(name="Contraption", product_id=203, description="Very complex")
+print(f"Product 3: id={product3.product_id}, name='{product3.name}', desc='{product3.description}'")
+# Output: Product 3: id=203, name='Contraption', desc='Very complex'
+
+# Trying to provide too many arguments will fail:
+# Product.all(204, "Whatchamacallit", "It calls whatsits", "extra") -> TypeError: too many arguments
 ```
 ## License
 
