@@ -119,7 +119,7 @@ class TestValidateArgs(BaseTestCase):
         self.assertEqual(union_with_none(None), "Value: None")
 
     def test_union_with_none_invalid(self):
-        self.assertRaises(TypeError, union_with_none(123))  # type: ignore
+        self.assertRaises(TypeError, lambda: union_with_none(123))  # type: ignore
 
     def test_any_type_valid(self):
         self.assertEqual(any_type(123), "Any value: 123")
