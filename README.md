@@ -1601,7 +1601,7 @@ print("Eventing system cleared.")
 ```
 
 ### Annotations 
-`@builder`, `@getter`, `@setter`, `@locked`, `@synchronized`, `@synchronized_static`, `@required_args`, `@all_args`
+`@builder`, `@getter`, `@setter`, `@locked`, `@synchronized`, `@synchronized_static`, `@required_args`, `@all_args`, `@validate_args`
 
 The `jstreams.annotations` module provides several class and method decorators to reduce boilerplate code and implement common patterns like the builder pattern, object factories or thread synchronization.
 
@@ -1872,6 +1872,37 @@ product3 = Product.all(name="Contraption", product_id=203, description="Very com
 print(f"Product 3: id={product3.product_id}, name='{product3.name}', desc='{product3.description}'")
 # Output: Product 3: id=203, name='Contraption', desc='Very complex'
 
+```
+
+**`@validate_args`**
+
+This decorator performs runtime validation of function arguments against their type hints *before* the function body is executed. If an argument's type doesn't match its hint, it raises a `TypeError`. This helps catch type errors early, especially when dealing with external data or complex function signatures.
+
+It currently supports basic types (`int`, `str`, etc.), `typing.Optional`, `typing.Union`, and `typing.Any`. For generic collections like `list` or `dict`, it validates the container type itself (e.g., checks if the argument is a `list`) but does not perform deep validation of the contents (e.g., it won't check if every item in a `list[int]` is actually an `int`). Arguments without type hints or hinted with `Any` are skipped.
+
+```python
+from jstreams import validate_args
+from typing import Optional
+
+@validate_args()
+def process_user(user_id: int, name: str, email: Optional[str] = None):
+    print(f"Processing User ID: {user_id}, Name: {name}, Email: {email or 'N/A'}")
+
+# Valid calls
+process_user(123, "Alice")
+process_user(user_id=456, name="Bob", email="bob@example.com")
+process_user(789, "Charlie", None) # Optional allows None
+
+# Invalid calls (will raise TypeError)
+try:
+    process_user("123", "Alice") # user_id should be int
+except TypeError as e:
+    print(f"\nCaught Error: {e}")
+
+try:
+    process_user(456, "Bob", 12345) # email should be str or None
+except TypeError as e:
+    print(f"Caught Error: {e}")
 ```
 ## License
 

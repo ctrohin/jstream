@@ -255,6 +255,7 @@ from jstreams.annotations import (
     synchronized,
     all_args,
     required_args,
+    validate_args,
 )
 
 __all__ = [
@@ -472,4 +473,5 @@ __all__ = [
     "synchronized",
     "all_args",
     "required_args",
+    "validate_args",
 ]

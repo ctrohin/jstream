@@ -1,6 +1,17 @@
 import inspect
 from threading import Lock, RLock
-from typing import Any, Callable, Optional, TypeVar, cast, get_type_hints
+from types import NoneType
+from typing import (
+    Any,
+    Callable,
+    Optional,
+    TypeVar,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 T = TypeVar("T")
 
@@ -563,3 +574,108 @@ def all_args() -> Callable[[type[T]], type[T]]:
     """
 
     return _args(True)
+
+
+def validate_args() -> Callable[[F], F]:
+    """
+    Decorator to validate function arguments against their type hints at runtime.
+
+    Checks if the type of each argument passed to the decorated function matches
+    the corresponding type hint in the function's signature. Raises a TypeError
+    if a mismatch is found.
+
+    Supports basic types, `typing.Optional`, and `typing.Union`.
+    Skips validation for parameters without type hints or hinted with `typing.Any`.
+    Does not perform deep validation of collection contents (e.g., list[int]).
+
+    Example:
+        @validate_args()
+        def process_data(name: str, age: Optional[int] = None, tags: list = []):
+            print(f"Processing {name} ({age}) with tags {tags}")
+
+        process_data("Alice", 30)       # OK
+        process_data("Bob", None)       # OK (Optional[int] allows None)
+        process_data("Charlie", "twenty") # Raises TypeError (age should be int or None)
+        process_data(123, 40)           # Raises TypeError (name should be str)
+
+    Returns:
+        Callable[[F], F]: A decorator function.
+    """
+
+    def decorator(func: F) -> F:
+        sig = inspect.signature(func)
+        # Use get_type_hints for better resolution of forward references etc.
+        # include_extras=False is default but good to be aware of
+        try:
+            type_hints = get_type_hints(func)
+        except Exception:
+            # Handle potential errors during type hint resolution (e.g., NameError)
+            # In this case, we might choose to skip validation or log a warning.
+            # For simplicity, we'll skip validation if hints can't be resolved.
+            type_hints = {}
+
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # Bind provided arguments to parameter names
+            try:
+                bound_args = sig.bind(*args, **kwargs)
+            except TypeError as e:
+                # Reraise if basic binding fails (e.g., wrong number of args)
+                raise TypeError(
+                    f"Error binding arguments for {func.__qualname__}: {e}"
+                ) from e
+
+            # Apply default values for parameters not provided in the call
+            bound_args.apply_defaults()
+
+            # Validate arguments against type hints
+            for param_name, value in bound_args.arguments.items():
+                if param_name not in type_hints:
+                    # Skip validation if no type hint is available
+                    continue
+
+                expected_type = type_hints[param_name]
+
+                if expected_type is Any:
+                    # Skip validation if hinted as Any
+                    continue
+
+                origin = get_origin(expected_type)
+                args_types = get_args(expected_type)
+
+                is_valid = False
+                if (
+                    origin is Union
+                ):  # Handles Union and Optional (Optional[T] is Union[T, NoneType])
+                    # Check if the value's type is one of the types in the Union
+                    for type_arg in args_types:
+                        # Special handling for NoneType in Optional/Union
+                        if type_arg is NoneType and value is None:
+                            is_valid = True
+                            break
+                        # isinstance() doesn't work directly with NoneType before 3.10
+                        if type_arg is not NoneType and isinstance(value, type_arg):
+                            is_valid = True
+                            break
+                elif origin is not None:
+                    # Handle other generic types like list, dict, etc.
+                    # Basic check: validate the origin type (e.g., list, dict)
+                    # Deeper validation (e.g., checking list contents) is complex and skipped here.
+                    if isinstance(value, origin):
+                        is_valid = True
+                else:
+                    # Simple, non-generic type hint
+                    if isinstance(value, expected_type):
+                        is_valid = True
+
+                if not is_valid:
+                    raise TypeError(
+                        f"Argument '{param_name}' for {func.__qualname__} "
+                        f"expected type {expected_type}, but got {type(value).__name__}."
+                    )
+
+            # If all validations pass, call the original function
+            return func(*bound_args.args, **bound_args.kwargs)
+
+        return cast(F, wrapper)
+
+    return decorator
