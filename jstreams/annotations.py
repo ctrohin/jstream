@@ -13,8 +13,6 @@ from typing import (
     get_type_hints,
 )
 
-from jstreams import Try
-
 T = TypeVar("T")
 
 
@@ -685,13 +683,11 @@ def validate_args() -> Callable[[F], F]:
 
 # Type variable for the return type (used in default_on_error)
 R = TypeVar("R")
-# Type variable for exception types
-E = TypeVar("E", bound=BaseException)
 
 
 def default_on_error(
     default_value: R,
-    catch_exceptions: Optional[list[type[E]]] = None,
+    catch_exceptions: Optional[list[type]] = None,
     logger: Optional[
         Any
     ] = None,  # Using Any for logger to avoid strict logging dependency
@@ -729,9 +725,9 @@ def default_on_error(
         safe_divide(10, 0) # Returns 0.0 (ZeroDivisionError caught)
     """
     # Determine which exceptions to catch
-    exceptions_to_catch: list[type[E]]
+    exceptions_to_catch: list[type]
     if catch_exceptions is None or not catch_exceptions:
-        exceptions_to_catch = [Exception]  # Catch any standard exception
+        exceptions_to_catch = [BaseException]  # Catch any standard exception
     else:
         exceptions_to_catch = catch_exceptions
 
