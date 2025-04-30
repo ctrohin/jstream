@@ -1,6 +1,5 @@
 import inspect
 from threading import Lock, RLock
-from types import NoneType
 from typing import (
     Any,
     Callable,
@@ -13,6 +12,7 @@ from typing import (
     get_type_hints,
 )
 
+NoneType = type(None)
 T = TypeVar("T")
 
 
