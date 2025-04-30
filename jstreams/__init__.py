@@ -256,6 +256,7 @@ from jstreams.annotations import (
     all_args,
     required_args,
     validate_args,
+    default_on_error,
 )
 
 __all__ = [
@@ -474,4 +475,5 @@ __all__ = [
     "all_args",
     "required_args",
     "validate_args",
+    "default_on_error",
 ]

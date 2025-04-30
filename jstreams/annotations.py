@@ -13,6 +13,8 @@ from typing import (
     get_type_hints,
 )
 
+from jstreams import Try
+
 T = TypeVar("T")
 
 
@@ -677,5 +679,84 @@ def validate_args() -> Callable[[F], F]:
             return func(*bound_args.args, **bound_args.kwargs)
 
         return cast(F, wrapper)
+
+    return decorator
+
+
+# Type variable for the return type (used in default_on_error)
+R = TypeVar("R")
+# Type variable for exception types
+E = TypeVar("E", bound=BaseException)
+
+
+def default_on_error(
+    default_value: R,
+    catch_exceptions: Optional[list[type[E]]] = None,
+    logger: Optional[
+        Any
+    ] = None,  # Using Any for logger to avoid strict logging dependency
+    log_message: str = "Caught exception in {func_name} ({exception}), returning default value.",
+) -> Callable[[F], F]:
+    """
+    Decorator factory: returns a default value if the decorated function raises specific exceptions.
+
+    Args:
+        default_value (R): The value to return if a specified exception is caught.
+        catch_exceptions (Optional[list[Type[E]]]): A list of exception types to catch.
+            If None or empty, catches all `Exception` subclasses. Defaults to None.
+        logger (Optional[Any]): Logger-like object with an `error` or `warning` method
+            to log the exception. If None, no logging occurs. Defaults to None.
+        log_message (str): Format string for the log message. Available placeholders:
+            {func_name}, {exception}, {args}, {kwargs}. Defaults to a standard message.
+
+    Returns:
+        Callable[[F], F]: The decorator.
+
+    Example:
+        @default_on_error(default_value=-1, catch_exceptions=[ValueError, TypeError])
+        def parse_int(value: str) -> int:
+            return int(value)
+
+        parse_int("10")  # Returns 10
+        parse_int("abc") # Returns -1 (ValueError caught)
+        parse_int(None)  # Returns -1 (TypeError caught)
+
+        @default_on_error(default_value=0.0) # Catches any Exception
+        def safe_divide(a, b):
+            return a / b
+
+        safe_divide(10, 2) # Returns 5.0
+        safe_divide(10, 0) # Returns 0.0 (ZeroDivisionError caught)
+    """
+    # Determine which exceptions to catch
+    exceptions_to_catch: list[type[E]]
+    if catch_exceptions is None or not catch_exceptions:
+        exceptions_to_catch = [Exception]  # Catch any standard exception
+    else:
+        exceptions_to_catch = catch_exceptions
+
+    def decorator(func: F) -> F:
+        def wrapper(
+            *args: Any, **kwargs: Any
+        ) -> Any:  # Return Any as it could be original or default
+            try:
+                return func(*args, **kwargs)
+            except BaseException as e:
+                if type(e) not in exceptions_to_catch:
+                    raise e
+                if logger and hasattr(
+                    logger, "warning"
+                ):  # Basic check for logger capability
+                    formatted_message = log_message.format(
+                        func_name=func.__qualname__,
+                        exception=e,
+                        args=args,
+                        kwargs=kwargs,
+                    )
+                    logger.warning(formatted_message, exc_info=e)  # Log with traceback
+                return default_value
+            # Let other exceptions (if specific types were requested) propagate
+
+        return cast(F, wrapper)  # Keep original signature for type checking
 
     return decorator

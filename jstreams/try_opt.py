@@ -342,6 +342,15 @@ class Try(Generic[T]):
         self.__recovery_suppliers[exception_type] = recovery_supplier
         return self
 
+    def recover_from_these(
+        self,
+        exception_types: list[type],
+        recovery_supplier: Callable[[BaseException], T],
+    ) -> "Try[T]":
+        for ex_type in exception_types:
+            self.__recovery_suppliers[ex_type] = recovery_supplier
+        return self
+
     def has_failed(self) -> bool:
         """
         Executes the Try operation (including retries, handlers) via self.get()
