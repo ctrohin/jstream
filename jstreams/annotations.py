@@ -674,7 +674,7 @@ def validate_args(
                 # Check predicates, if available
                 if rules is not None and param_name in rules:
                     rule = rules.get(param_name)
-                    if not rule(value):
+                    if rule is not None and not rule(value):
                         raise TypeError(
                             f"Argument '{param_name}' for {func.__qualname__} does not match the given predicate"
                         )
