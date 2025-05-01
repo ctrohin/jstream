@@ -8,7 +8,7 @@ jstreams is a Python library aiming to replicate the following:
 - a simple [state management](#state-management-api) API
 - a [task scheduler](#scheduler) with support for decorated functions and on-demand scheduling
 - an [eventing](#eventing) framework that supports event publishing an subscribing
-- [annotations](#annotations) such as `@builder`, `@setter`, `@getter`, `@synchronized` and `@synchronized_static` for reducing boilerplate code. 
+- [annotations](#annotations) such as `@builder`, `@setter`, `@getter`, `@synchronized` and `@synchronized_static`, `@required_args`, `@validate_args`,`@default_on_error` for reducing boilerplate code
 The library is implemented with type safety in mind.
 
 ## Installation
@@ -1604,7 +1604,7 @@ print("Eventing system cleared.")
 `@builder`, `@getter`, `@setter`, `@locked`, `@synchronized`, `@synchronized_static`, `@required_args`, `@all_args`, `@validate_args`, `@default_on_error`
 
 The `jstreams.annotations` module provides several class and method decorators to reduce boilerplate code and implement common patterns like the builder pattern, object factories or thread synchronization.
-
+#### Builder, getter and setter patterns
 ```python
 from jstreams import builder, getter, setter, locked, synchronized, synchronized_static
 from typing import Optional
@@ -1705,10 +1705,8 @@ print(person.get_name()) # Will print out 'John Doe`
 # This is the @setter generated method
 person.set_name("Jane Doe")
 print(person.get_name()) # Will print out 'Jane Doe'
-
-
 ```
-
+#### Thread syncronization using `@locked`, `@synchronized` and `@synchronized_static`
 ```python
 # --- @locked ---
 # Makes instances of the decorated class thread-safe by wrapping attribute
@@ -1740,7 +1738,6 @@ for t in threads:
     t.join()
 
 print(f"\nLocked Counter final value: {safe_counter.get_count()}") # Should reliably be 10
-
 
 # --- @synchronized (Instance Lock) ---
 # Decorator for *instance methods*. Ensures only one thread can execute
@@ -1814,7 +1811,7 @@ print(f"Final shared resource: {shared_resource}")
 # sequentially, regardless of which function was called, due to the shared static lock.
 ```
 
-**`@required_args` and `@all_args`**
+#### Factory methods using `@required_args` and `@all_args`
 
 These decorators provide alternative static constructors for your classes based on their declared public members, bypassing the standard `__init__` method. This is useful for creating instances when you want to directly populate fields without necessarily calling the initialization logic, or when you want constructors that strictly enforce required fields or allow setting all fields directly.
 
@@ -1874,6 +1871,8 @@ print(f"Product 3: id={product3.product_id}, name='{product3.name}', desc='{prod
 
 ```
 
+#### Argument validation using `@validate_args`
+
 **`@validate_args`**
 
 This decorator performs runtime validation of function arguments against their type hints *before* the function body is executed. If an argument's type doesn't match its hint, it raises a `TypeError`. This helps catch type errors early, especially when dealing with external data or complex function signatures.
@@ -1904,7 +1903,8 @@ try:
 except TypeError as e:
     print(f"Caught Error: {e}")
 ```
-## `@default_on_error`
+
+#### Error handling using `@default_on_error`
 
 Sometimes, you want a function to return a default value if it encounters an error, rather than letting the exception propagate. The `@default_on_error` decorator provides a clean way to achieve this.
 
