@@ -1,7 +1,8 @@
 from typing import Optional, Union, Any, List
 
-from jstreams.annotations import validate_args
+from jstreams.annotations import default_on_error, validate_args
 from baseTest import BaseTestCase
+from jstreams.predicate import is_higher_than
 
 
 # --- Test Functions ---
@@ -67,6 +68,15 @@ class TestOnMethod:
     @validate_args()
     def concat_str(self, a: int, b: str) -> str:
         return str(a) + b
+
+    @validate_args({"b": is_higher_than(0)})
+    def divide(self, a: float, b: float) -> float:
+        return a / b
+
+    @default_on_error(-1.0, [TypeError])
+    @validate_args({"b": is_higher_than(0)})
+    def divide_with_default(self, a: float, b: float) -> float:
+        return a / b
 
 
 # --- Test Class ---
@@ -178,3 +188,9 @@ class TestValidateArgs(BaseTestCase):
         t = TestOnMethod()
         self.assertEqual(t.concat_str(123, "abc"), "123abc")
         self.assertRaises(TypeError, lambda: t.concat_str("abc", 123))
+
+    def test_on_method_rules(self) -> None:
+        t = TestOnMethod()
+        self.assertEqual(t.divide(1.0, 1.0), 1)
+        self.assertRaises(TypeError, lambda: t.divide(1.0, 0.0))
+        self.assertEqual(t.divide_with_default(1.0, 0.0), -1)

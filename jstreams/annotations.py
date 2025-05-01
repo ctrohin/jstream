@@ -12,6 +12,8 @@ from typing import (
     get_type_hints,
 )
 
+from jstreams import Predicate
+
 NoneType = type(None)
 T = TypeVar("T")
 
@@ -576,7 +578,9 @@ def all_args() -> Callable[[type[T]], type[T]]:
     return _args(True)
 
 
-def validate_args() -> Callable[[F], F]:
+def validate_args(
+    rules: Optional[dict[str, Predicate[Any]]] = None,
+) -> Callable[[F], F]:
     """
     Decorator to validate function arguments against their type hints at runtime.
 
@@ -666,6 +670,14 @@ def validate_args() -> Callable[[F], F]:
                     # Simple, non-generic type hint
                     if isinstance(value, expected_type):
                         is_valid = True
+
+                # Check predicates, if available
+                if rules is not None and param_name in rules:
+                    rule = rules.get(param_name)
+                    if not rule(value):
+                        raise TypeError(
+                            f"Argument '{param_name}' for {func.__qualname__} does not match the given predicate"
+                        )
 
                 if not is_valid:
                     raise TypeError(
