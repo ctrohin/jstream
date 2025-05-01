@@ -1601,7 +1601,7 @@ print("Eventing system cleared.")
 ```
 
 ### Annotations 
-`@builder`, `@getter`, `@setter`, `@locked`, `@synchronized`, `@synchronized_static`, `@required_args`, `@all_args`, `@validate_args`
+`@builder`, `@getter`, `@setter`, `@locked`, `@synchronized`, `@synchronized_static`, `@required_args`, `@all_args`, `@validate_args`, `@default_on_error`
 
 The `jstreams.annotations` module provides several class and method decorators to reduce boilerplate code and implement common patterns like the builder pattern, object factories or thread synchronization.
 
@@ -1904,6 +1904,60 @@ try:
 except TypeError as e:
     print(f"Caught Error: {e}")
 ```
+## `@default_on_error`
+
+Sometimes, you want a function to return a default value if it encounters an error, rather than letting the exception propagate. The `@default_on_error` decorator provides a clean way to achieve this.
+
+It wraps your function and catches specified exceptions (or any `BaseException` by default). If a caught exception occurs during the function's execution, the decorator returns a predefined default value instead. You can also optionally provide a logger to record the error.
+
+**Arguments:**
+
+*   `default_value` (Required): The value to return if a specified exception is caught. The type should match the expected return type of the function or be compatible.
+*   `catch_exceptions` (Optional\[list\[type]]): A list of specific exception types to catch. If `None` or empty, it defaults to catching all `BaseException` subclasses.
+*   `logger` (Optional\[Any]): A logger object (like one from Python's `logging` module) with a `.warning()` method. If provided, the caught exception will be logged using this logger. Defaults to `None` (no logging).
+*   `log_message` (str): A format string for the log message if a `logger` is provided. Available placeholders are `{func_name}`, `{exception}`, `{args}`, and `{kwargs}`. Defaults to `"Caught exception in {func_name} ({exception}), returning default value."`.
+
+**Example Usage:**
+
+```python
+from jstreams import default_on_error
+import logging
+
+# Configure a simple logger (optional)
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
+
+@default_on_error(default_value=-1, catch_exceptions=[ValueError, TypeError], logger=logger)
+def parse_int_safely(value: str) -> int:
+    """Attempts to parse a string to an int, returns -1 on failure."""
+    return int(value)
+
+@default_on_error(default_value=0.0) # Catches any BaseException by default
+def safe_divide(a: float, b: float) -> float:
+    """Divides a by b, returns 0.0 if any error occurs (like division by zero)."""
+    return a / b
+
+# --- Function Calls ---
+
+result1 = parse_int_safely("123")
+print(f"Parsing '123': {result1}") # Output: Parsing '123': 123
+
+result2 = parse_int_safely("abc")
+print(f"Parsing 'abc': {result2}") # Output: Parsing 'abc': -1
+# WARNING:__main__:Caught exception in parse_int_safely (invalid literal for int() with base 10: 'abc'), returning default value. (Logged if logger provided)
+
+result3 = parse_int_safely(None) # type: ignore
+print(f"Parsing None: {result3}") # Output: Parsing None: -1
+# WARNING:__main__:Caught exception in parse_int_safely (int() argument must be a string, a bytes-like object or a real number, not 'NoneType'), returning default value. (Logged if logger provided)
+
+result4 = safe_divide(10.0, 2.0)
+print(f"Dividing 10.0 by 2.0: {result4}") # Output: Dividing 10.0 by 2.0: 5.0
+
+result5 = safe_divide(10.0, 0.0)
+print(f"Dividing 10.0 by 0.0: {result5}") # Output: Dividing 10.0 by 0.0: 0.0
+# (ZeroDivisionError is caught because we didn't specify catch_exceptions)
+```
+
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
