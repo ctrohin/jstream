@@ -10,8 +10,10 @@ from typing import (
     Union,
 )
 from abc import ABC
+from jstreams.class_operations import ClassOps
+from jstreams.iterable_operations import find_first, reduce
 from jstreams.mapper import Mapper, MapperWith, flat_map, mapper_of, mapper_with_of
-from jstreams.reducer import Reducer, reducer_of
+from jstreams.reducer import Reducer
 from jstreams.predicate import (
     Predicate,
     PredicateWith,
@@ -25,137 +27,6 @@ T = TypeVar("T")
 V = TypeVar("V")
 K = TypeVar("K")
 C = TypeVar("C")
-
-
-def find_first(
-    target: Optional[Iterable[T]], predicate: Union[Predicate[T], Callable[[T], bool]]
-) -> Optional[T]:
-    """
-    Retrieves the first element of the given iterable that matches the given predicate
-
-    Args:
-        target (Optional[Iterable[T]]): The target iterable
-        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
-
-    Returns:
-        Optional[T]: The first matching element, or None if no element matches the predicate
-    """
-    if target is None:
-        return None
-
-    for el in target:
-        if predicate_of(predicate).apply(el):
-            return el
-    return None
-
-
-def matching(
-    target: Iterable[T], predicate: Union[Predicate[T], Callable[[T], bool]]
-) -> list[T]:
-    """
-    Returns all elements of the target iterable that match the given predicate
-
-    Args:
-        target (Iterable[T]): The target iterable
-        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
-
-    Returns:
-        list[T]: The matching elements
-    """
-    ret: list[T] = []
-    if target is None:
-        return ret
-
-    pred = predicate_of(predicate)
-    for el in target:
-        if pred.apply(el):
-            ret.append(el)
-    return ret
-
-
-def take_while(
-    target: Iterable[T], predicate: Union[Predicate[T], Callable[[T], bool]]
-) -> list[T]:
-    """
-    Returns the first batch of elements matching the predicate. Once an element
-    that does not match the predicate is found, the function will return
-
-    Args:
-        target (Iterable[T]): The target iterable
-        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
-
-    Returns:
-        list[T]: The result list
-    """
-    ret: list[T] = []
-    if target is None:
-        return ret
-
-    pred = predicate_of(predicate)
-    for el in target:
-        if pred.apply(el):
-            ret.append(el)
-        else:
-            break
-    return ret
-
-
-def drop_while(
-    target: Iterable[T], predicate: Union[Predicate[T], Callable[[T], bool]]
-) -> list[T]:
-    """
-    Returns the target iterable elements without the first elements that match the
-    predicate. Once an element that does not match the predicate is found,
-    the function will start adding the remaining elements to the result list
-
-    Args:
-        target (Iterable[T]): The target iterable
-        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
-
-    Returns:
-        list[T]: The result list
-    """
-    ret: list[T] = []
-    if target is None:
-        return ret
-
-    index = 0
-
-    pred = predicate_of(predicate)
-    for el in target:
-        if pred.apply(el):
-            index += 1
-        else:
-            break
-    return list(target)[index:]
-
-
-def reduce(
-    target: Iterable[T], reducer: Union[Reducer[T], Callable[[T, T], T]]
-) -> Optional[T]:
-    """
-    Reduces an iterable to a single value. The reducer function takes two values and
-    returns only one. This function can be used to find min or max from a stream of ints.
-
-    Args:
-        reducer (Union[Reducer[T], Callable[[T, T], T]]): The reducer
-
-    Returns:
-        Optional[T]: The resulting optional
-    """
-
-    if target is None:
-        return None
-
-    elem_list = list(target)
-    if len(elem_list) == 0:
-        return None
-
-    result: T = elem_list[0]
-    reducer_obj = reducer_of(reducer)
-    for el in elem_list:
-        result = reducer_obj.reduce(el, result)
-    return result
 
 
 class Opt(Generic[T]):
@@ -673,19 +544,6 @@ class Opt(Generic[T]):
         ):
             return Opt(mapper_with_of(mapper).map(self.__val, with_val))
         return cast(Opt[V], self.__get_none())
-
-
-class ClassOps:
-    __slots__ = ("__class_type",)
-
-    def __init__(self, class_type: type) -> None:
-        self.__class_type = class_type
-
-    def instance_of(self, obj: Any) -> bool:
-        return isinstance(obj, self.__class_type)
-
-    def subclass_of(self, typ: type) -> bool:
-        return issubclass(typ, self.__class_type)
 
 
 class _GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
@@ -1409,57 +1267,3 @@ def optional(val: Optional[T]) -> Opt[T]:
         Opt[T]: The optional
     """
     return Opt(val)
-
-
-def extract_list(val: dict[K, Optional[T]], keys: Iterable[K]) -> list[Optional[T]]:
-    """
-    Extract the elements for the given keys iteration from a dictionary.
-    If an element does not exist in the dictionary, None will be returned for that key.
-
-    Args:
-        val (dict[K, Optional[T]]): The dictionary from where the values will be extracted
-        keys (Iterable[K]): The keys
-
-    Returns:
-        list[Optional[T]]: The list of extracted values
-    """
-    return Stream(keys).map(val.get).to_list()
-
-
-def extract_non_null_list(val: dict[K, Optional[T]], keys: Iterable[K]) -> list[T]:
-    """
-    Extract the elements for the given keys iteration from a dictionary.
-    If an element does not exist in the dictionary, a value will not be returned for that key.
-
-    Args:
-        val (dict[K, Optional[T]]): The dictionary from where the values will be extracted
-        keys (Iterable[K]): The keys
-
-    Returns:
-        list[Optional[T]]: The list of extracted values
-    """
-    return (
-        Stream(keys)
-        .map(val.get)
-        .filter(is_not_none)
-        .map(lambda e: require_non_null(e))
-        .to_list()
-    )
-
-
-def not_null_elements(iterable: Iterable[Optional[T]]) -> Iterable[T]:
-    """
-    Returns an iterable with all elements that are not None of the given iterable.
-
-    Args:
-        iterable (Iterable[Optional[T]]): The given iterable
-
-    Returns:
-        Iterable[T]: The iterable sans the None elements
-    """
-    return (
-        Stream(iterable)
-        .filter(is_not_none)
-        .map(lambda e: require_non_null(e))
-        .to_list()
-    )

@@ -1,17 +1,24 @@
 from jstreams.stream import (
     Stream,
-    find_first,
-    matching,
-    not_null_elements,
-    reduce,
-    take_while,
-    drop_while,
     Opt,
-    ClassOps,
     stream,
     optional,
+)
+
+from jstreams.class_operations import ClassOps
+
+from jstreams.stream_operations import (
+    not_null_elements,
     extract_list,
     extract_non_null_list,
+)
+
+from jstreams.iterable_operations import (
+    find_first,
+    take_while,
+    drop_while,
+    matching,
+    reduce,
 )
 
 from jstreams.mapper import (
