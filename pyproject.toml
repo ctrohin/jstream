@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jstreams"
-version = "2025.4.2"
+version = "2025.5.1"
 authors = [
     { name="Cristian Trohin", email="cristi.trohin@gmail.com" },
 ]
