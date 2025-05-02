@@ -1,9 +1,4 @@
-from jstreams.stream import (
-    Stream,
-    Opt,
-    stream,
-    optional,
-)
+from jstreams.stream import Stream, Opt, stream, optional, pair_stream
 
 from jstreams.class_operations import ClassOps
 
@@ -32,7 +27,7 @@ from jstreams.mapper import (
 
 from jstreams.reducer import reducer_of, Reducer
 
-from jstreams.stream_factories import pair_stream, triplet_stream
+from jstreams.stream_factories import triplet_stream
 from jstreams.stream_predicates import any_of, all_of, none_of, all_none, all_not_none
 
 from jstreams.try_opt import (
