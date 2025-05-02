@@ -1,4 +1,5 @@
 from baseTest import BaseTestCase
+from jstreams.stream_factories import pair_stream, triplet_stream
 from jstreams.predicate import not_, contains, is_in_interval, is_zero
 from jstreams.tuples import (
     Pair,
@@ -6,10 +7,8 @@ from jstreams.tuples import (
     left_matches,
     middle_matches,
     pair,
-    pair_stream,
     right_matches,
     triplet,
-    triplet_stream,
 )
 
 

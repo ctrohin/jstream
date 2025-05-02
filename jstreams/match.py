@@ -1,6 +1,7 @@
 from typing import Callable, Generic, Optional, TypeVar, Union, cast, overload
 
-from jstreams.stream import Stream, Predicate
+from jstreams.stream import Stream
+from jstreams.predicate import Predicate
 from jstreams.utils import require_non_null
 
 T = TypeVar("T")

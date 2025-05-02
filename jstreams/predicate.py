@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import re
 from typing import (
     Any,
@@ -9,11 +10,112 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    Generic,
 )
 
-from jstreams.stream import Predicate, Stream, predicate_of
-
 T = TypeVar("T")
+K = TypeVar("K")
+
+
+class Predicate(ABC, Generic[T]):
+    @abstractmethod
+    def apply(self, value: T) -> bool:
+        """
+        Apply a condition to a given value.
+
+        Args:
+            value (T): The value
+
+        Returns:
+            bool: True if the value matches, False otherwise
+        """
+
+    def or_(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
+        return predicate_of(lambda v: self.apply(v) or predicate_of(other).apply(v))
+
+    def and_(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
+        return predicate_of(lambda v: self.apply(v) and predicate_of(other).apply(v))
+
+    def __call__(self, value: T) -> bool:
+        return self.apply(value)
+
+
+class PredicateWith(ABC, Generic[T, K]):
+    @abstractmethod
+    def apply(self, value: T, with_value: K) -> bool:
+        """
+        Apply a condition to two given values.
+
+        Args:
+            value (T): The value
+            with_value (K): The second value
+
+        Returns:
+            bool: True if the values matche the predicate, False otherwise
+        """
+
+    def or_(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
+        return predicate_with_of(lambda v, k: self.apply(v, k) or other.apply(v, k))
+
+    def and_(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
+        return predicate_with_of(lambda v, k: self.apply(v, k) and other.apply(v, k))
+
+    def __call__(self, value: T, with_value: K) -> bool:
+        return self.apply(value, with_value)
+
+
+class _WrapPredicate(Predicate[T]):
+    __slots__ = ["__predicate_fn"]
+
+    def __init__(self, fn: Callable[[T], bool]) -> None:
+        self.__predicate_fn = fn
+
+    def apply(self, value: T) -> bool:
+        return self.__predicate_fn(value)
+
+
+class _WrapPredicateWith(PredicateWith[T, K]):
+    __slots__ = ["__predicate_fn"]
+
+    def __init__(self, fn: Callable[[T, K], bool]) -> None:
+        self.__predicate_fn = fn
+
+    def apply(self, value: T, withValue: K) -> bool:
+        return self.__predicate_fn(value, withValue)
+
+
+def predicate_of(predicate: Union[Predicate[T], Callable[[T], bool]]) -> Predicate[T]:
+    """
+    If the value passed is a predicate, it is returned without any changes.
+    If a function is passed, it will be wrapped into a Predicate object.
+
+    Args:
+        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+
+    Returns:
+        Predicate[T]: The produced predicate
+    """
+    if isinstance(predicate, Predicate):
+        return predicate
+    return _WrapPredicate(predicate)
+
+
+def predicate_with_of(
+    predicate: Union[PredicateWith[T, K], Callable[[T, K], bool]],
+) -> PredicateWith[T, K]:
+    """
+    If the value passed is a predicate, it is returned without any changes.
+    If a function is passed, it will be wrapped into a Predicate object.
+
+    Args:
+        predicate (Union[PredicateWith[T, K], Callable[[T, K], bool]]): The predicate
+
+    Returns:
+        PredicateWith[T, K]: The produced predicate
+    """
+    if isinstance(predicate, PredicateWith):
+        return predicate
+    return _WrapPredicateWith(predicate)
 
 
 def is_true(var: bool) -> bool:
@@ -181,36 +283,6 @@ def default(default_val: T) -> Callable[[Optional[T]], T]:
         return default_val if val is None else val
 
     return wrap
-
-
-def all_none(it: Iterable[Optional[Any]]) -> bool:
-    """
-    Checks if all elements in an iterable are None.
-
-    Args:
-        it (Iterable[Optional[Any]]): The iterable.
-
-    Returns:
-        bool: True if all values are None, False if at least one value is not None.
-    """
-    # Assumes Stream().all_match is efficient (potentially short-circuiting)
-    return Stream(it).all_match(is_none)
-
-
-def all_not_none(it: Iterable[Optional[Any]]) -> bool:
-    """
-    Checks if all elements in an iterable are not None.
-
-    Args:
-        it (Iterable[Optional[Any]]): The iterable.
-
-    Returns:
-        bool: True if all values differ from None, False if at least one None value is found.
-    """
-    # Assumes Stream().all_match is efficient (potentially short-circuiting)
-    # Using not_(is_none) might be slightly less direct than `lambda e: e is not None`
-    # but maintains consistency with using predicate functions.
-    return Stream(it).all_match(not_(is_none))
 
 
 def contains(value: Any) -> Predicate[Optional[Union[str, Iterable[Any]]]]:
@@ -661,69 +733,6 @@ def not_strict(
     return predicate_of(wrap)
 
 
-def all_of(
-    predicates: Iterable[Union[Predicate[T], Callable[[T], bool]]],
-) -> Predicate[T]:
-    """
-    Produces a predicate that returns True if the input value matches *all* provided predicates.
-    Short-circuits on the first False.
-
-    Args:
-        predicates: An iterable of predicates to check against.
-
-    Returns:
-        Predicate[T]: The combined predicate.
-    """
-    # Convert to list to avoid consuming iterator multiple times if stream doesn't cache
-    predicate_list = [predicate_of(p) for p in predicates]
-
-    def wrap(val: T) -> bool:
-        return Stream(predicate_list).all_match(lambda p: p.apply(val))
-
-    return predicate_of(wrap)
-
-
-def any_of(
-    predicates: Iterable[Union[Predicate[T], Callable[[T], bool]]],
-) -> Predicate[T]:
-    """
-    Produces a predicate that returns True if the input value matches *any* of the provided predicates.
-    Short-circuits on the first True.
-
-    Args:
-        predicates: An iterable of predicates to check against.
-
-    Returns:
-        Predicate[T]: The combined predicate.
-    """
-    predicate_list = [predicate_of(p) for p in predicates]
-
-    def wrap(val: T) -> bool:
-        return Stream(predicate_list).any_match(lambda p: p.apply(val))
-
-    return predicate_of(wrap)
-
-
-def none_of(
-    predicates: Iterable[Union[Predicate[T], Callable[[T], bool]]],
-) -> Predicate[T]:
-    """
-    Produces a predicate that returns True if the input value matches *none* of the provided predicates.
-
-    Args:
-        predicates: An iterable of predicates to check against.
-
-    Returns:
-        Predicate[T]: The combined predicate.
-    """
-    predicate_list = [predicate_of(p) for p in predicates]
-
-    def wrap(val: T) -> bool:
-        return Stream(predicate_list).none_match(lambda p: p.apply(val))
-
-    return predicate_of(wrap)
-
-
 # --- Mapping Predicates ---
 
 
@@ -799,3 +808,100 @@ def is_value_in(mapping: Mapping[Any, Any]) -> Predicate[Any]:
         return value in mapping.values()
 
     return predicate_of(wrap)
+
+
+def is_truthy(val: Any) -> bool:
+    """Checks if a value is considered True in a boolean context."""
+    return bool(val)
+
+
+def is_falsy(val: Any) -> bool:
+    """Checks if a value is considered False in a boolean context."""
+    return not bool(val)
+
+
+def is_identity(other: Any) -> Predicate[Any]:
+    """Checks if a value is the same object as 'other' (using 'is')."""
+
+    def wrap(val: Any) -> bool:
+        return val is other
+
+    return predicate_of(wrap)
+
+
+def has_length(length: int) -> Predicate[Optional[Sized]]:
+    """Checks if a Sized object has the specified length."""
+
+    def wrap(val: Optional[Sized]) -> bool:
+        # is_blank already checks for None
+        return not is_blank(val) and len(val) == length  # type: ignore
+
+    return predicate_of(wrap)
+
+
+def is_instance(cls: type) -> Predicate[Any]:
+    """Checks if a value is an instance of the given class."""
+
+    def wrap(val: Any) -> bool:
+        return isinstance(val, cls)
+
+    return predicate_of(wrap)
+
+
+def str_fullmatch(pattern: str) -> Predicate[Optional[str]]:
+    """
+    Checks if the *entire* string matches the given regex pattern (uses re.fullmatch).
+    Complements `str_matches` which only checks from the beginning (`re.match`).
+
+    Args:
+        pattern (str): The regular expression pattern.
+
+    Returns:
+        Predicate[Optional[str]]: A predicate.
+    """
+
+    # Consider compiling if performance is critical, but re caches patterns.
+    # compiled_pattern = re.compile(pattern)
+    def wrap(val: Optional[str]) -> bool:
+        if val is None:
+            return False
+        # match = compiled_pattern.fullmatch(val)
+        match = re.fullmatch(pattern, val)
+        return match is not None
+
+    return predicate_of(wrap)
+
+
+def str_is_alpha(val: Optional[str]) -> bool:
+    """Checks if a string is not None and all characters are alphabetic."""
+    return val is not None and val.isalpha()
+
+
+def str_is_digit(val: Optional[str]) -> bool:
+    """Checks if a string is not None and all characters are digits."""
+    return val is not None and val.isdigit()
+
+
+def str_is_alnum(val: Optional[str]) -> bool:
+    """Checks if a string is not None and all characters are alphanumeric."""
+    return val is not None and val.isalnum()
+
+
+def str_is_lower(val: Optional[str]) -> bool:
+    """Checks if a string is not None and all cased characters are lowercase."""
+    return val is not None and val.islower()
+
+
+def str_is_upper(val: Optional[str]) -> bool:
+    """Checks if a string is not None and all cased characters are uppercase."""
+    return val is not None and val.isupper()
+
+
+def str_is_space(val: Optional[str]) -> bool:
+    """Checks if a string is not None and all characters are whitespace."""
+    return val is not None and val.isspace()
+
+
+def str_is_title(val: Optional[str]) -> bool:
+    """Checks if a string is not None and is titlecased."""
+    return val is not None and val.istitle()

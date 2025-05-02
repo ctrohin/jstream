@@ -12,19 +12,18 @@ from jstreams.stream import (
     ClassOps,
     stream,
     optional,
-    predicate_of,
-    predicate_with_of,
     mapper_of,
     mapper_with_of,
-    Predicate,
     Mapper,
-    PredicateWith,
     MapperWith,
     Reducer,
     reducer_of,
     extract_list,
     extract_non_null_list,
 )
+
+from jstreams.stream_factories import pair_stream, triplet_stream
+from jstreams.stream_predicates import any_of, all_of, none_of, all_none, all_not_none
 
 from jstreams.try_opt import (
     Try,
@@ -145,6 +144,8 @@ from jstreams.utils import (
 )
 
 from jstreams.predicate import (
+    Predicate,
+    PredicateWith,
     is_true,
     is_false,
     is_none,
@@ -153,8 +154,6 @@ from jstreams.predicate import (
     equals,
     is_blank,
     default,
-    all_none,
-    all_not_none,
     str_contains,
     str_contains_ignore_case,
     str_starts_with,
@@ -186,9 +185,6 @@ from jstreams.predicate import (
     is_higher_than_or_eq,
     is_less_than,
     is_less_than_or_eq,
-    any_of,
-    all_of,
-    none_of,
     has_key,
     has_value,
     is_in_interval,
@@ -196,6 +192,21 @@ from jstreams.predicate import (
     is_key_in,
     is_value_in,
     contains,
+    is_truthy,
+    is_falsy,
+    is_identity,
+    has_length,
+    is_instance,
+    str_fullmatch,
+    str_is_alnum,
+    str_is_alpha,
+    str_is_digit,
+    str_is_lower,
+    str_is_space,
+    str_is_title,
+    str_is_upper,
+    predicate_of,
+    predicate_with_of,
 )
 
 from jstreams.match import (
@@ -218,8 +229,6 @@ from jstreams.tuples import (
     middle_matches,
     pair_of,
     triplet_of,
-    pair_stream,
-    triplet_stream,
 )
 
 from jstreams.collectors import (
@@ -476,4 +485,17 @@ __all__ = [
     "required_args",
     "validate_args",
     "default_on_error",
+    "is_truthy",
+    "is_falsy",
+    "is_identity",
+    "has_length",
+    "is_instance",
+    "str_fullmatch",
+    "str_is_alnum",
+    "str_is_alpha",
+    "str_is_digit",
+    "str_is_lower",
+    "str_is_space",
+    "str_is_title",
+    "str_is_upper",
 ]

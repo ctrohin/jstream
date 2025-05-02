@@ -10,79 +10,19 @@ from typing import (
     Union,
 )
 from abc import ABC, abstractmethod
+from jstreams.predicate import (
+    Predicate,
+    PredicateWith,
+    predicate_of,
+    predicate_with_of,
+)
+from jstreams.tuples import Pair
 from jstreams.utils import is_not_none, require_non_null, each, is_empty_or_none, sort
 
 T = TypeVar("T")
 V = TypeVar("V")
 K = TypeVar("K")
 C = TypeVar("C")
-
-
-class Predicate(ABC, Generic[T]):
-    @abstractmethod
-    def apply(self, value: T) -> bool:
-        """
-        Apply a condition to a given value.
-
-        Args:
-            value (T): The value
-
-        Returns:
-            bool: True if the value matches, False otherwise
-        """
-
-    def or_(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
-        return predicate_of(lambda v: self.apply(v) or predicate_of(other).apply(v))
-
-    def and_(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
-        return predicate_of(lambda v: self.apply(v) and predicate_of(other).apply(v))
-
-    def __call__(self, value: T) -> bool:
-        return self.apply(value)
-
-
-class PredicateWith(ABC, Generic[T, K]):
-    @abstractmethod
-    def apply(self, value: T, with_value: K) -> bool:
-        """
-        Apply a condition to two given values.
-
-        Args:
-            value (T): The value
-            with_value (K): The second value
-
-        Returns:
-            bool: True if the values matche the predicate, False otherwise
-        """
-
-    def or_(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
-        return predicate_with_of(lambda v, k: self.apply(v, k) or other.apply(v, k))
-
-    def and_(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
-        return predicate_with_of(lambda v, k: self.apply(v, k) and other.apply(v, k))
-
-    def __call__(self, value: T, with_value: K) -> bool:
-        return self.apply(value, with_value)
-
-
-class _WrapPredicate(Predicate[T]):
-    __slots__ = ["__predicate_fn"]
-
-    def __init__(self, fn: Callable[[T], bool]) -> None:
-        self.__predicate_fn = fn
-
-    def apply(self, value: T) -> bool:
-        return self.__predicate_fn(value)
-
-
-class _WrapPredicateWith(PredicateWith[T, K]):
-    __slots__ = ["__predicate_fn"]
-
-    def __init__(self, fn: Callable[[T, K], bool]) -> None:
-        self.__predicate_fn = fn
-
-    def apply(self, value: T, withValue: K) -> bool:
-        return self.__predicate_fn(value, withValue)
 
 
 class Mapper(ABC, Generic[T, V]):
@@ -207,40 +147,6 @@ def mapper_with_of(
     if isinstance(mapper, MapperWith):
         return mapper
     return _WrapMapperWith(mapper)
-
-
-def predicate_of(predicate: Union[Predicate[T], Callable[[T], bool]]) -> Predicate[T]:
-    """
-    If the value passed is a predicate, it is returned without any changes.
-    If a function is passed, it will be wrapped into a Predicate object.
-
-    Args:
-        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
-
-    Returns:
-        Predicate[T]: The produced predicate
-    """
-    if isinstance(predicate, Predicate):
-        return predicate
-    return _WrapPredicate(predicate)
-
-
-def predicate_with_of(
-    predicate: Union[PredicateWith[T, K], Callable[[T, K], bool]],
-) -> PredicateWith[T, K]:
-    """
-    If the value passed is a predicate, it is returned without any changes.
-    If a function is passed, it will be wrapped into a Predicate object.
-
-    Args:
-        predicate (Union[PredicateWith[T, K], Callable[[T, K], bool]]): The predicate
-
-    Returns:
-        PredicateWith[T, K]: The produced predicate
-    """
-    if isinstance(predicate, PredicateWith):
-        return predicate
-    return _WrapPredicateWith(predicate)
 
 
 def find_first(
@@ -1144,6 +1050,44 @@ class _MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
         return self.__mapper.map(self._iterator.__next__())
 
 
+class _PeekIterable(_GenericIterable[T]):
+    __slots__ = ("__action",)
+
+    def __init__(self, it: Iterable[T], action: Callable[[T], Any]) -> None:
+        super().__init__(it)
+        self.__action = action
+
+    def __next__(self) -> T:
+        obj = self._iterator.__next__()
+        try:
+            self.__action(obj)  # Perform the side-effect
+        except Exception as e:
+            # Decide how to handle exceptions in peek: log? ignore? re-raise?
+            # Logging and ignoring is often the 'peek' behavior.
+            print(f"Exception during Stream.peek: {e}")  # Simple example
+        return obj  # Return the original object
+
+
+class _IndexedIterable(Generic[T], Iterator[Pair[int, T]], Iterable[Pair[int, T]]):
+    __slots__ = ("_iterable", "_iterator", "_index")
+
+    def __init__(self, it: Iterable[T]) -> None:
+        self._iterable = it
+        self._iterator = self._iterable.__iter__()
+        self._index = 0
+
+    def __iter__(self) -> Iterator[Pair[int, T]]:
+        self._iterator = self._iterable.__iter__()
+        self._index = 0  # Reset index for new iteration
+        return self
+
+    def __next__(self) -> Pair[int, T]:
+        obj = self._iterator.__next__()  # Raises StopIteration when done
+        current_index = self._index
+        self._index += 1
+        return Pair(current_index, obj)
+
+
 class Stream(Generic[T]):
     __slots__ = ("__arg",)
 
@@ -1564,6 +1508,50 @@ class Stream(Generic[T]):
             Stream[T]: The resulting stream
         """
         return Stream(_ConcatIterable(self.__arg, new_stream.__arg))
+
+    def peek(self, action: Callable[[T], Any]) -> "Stream[T]":
+        """
+        Performs an action on each element of the stream as it passes through.
+        Useful for debugging or logging intermediate values. Does not modify the stream elements.
+
+        Args:
+            action (Callable[[T], Any]): The action to perform on each element.
+
+        Returns:
+            Stream[T]: The same stream, allowing further chaining.
+        """
+        return Stream(_PeekIterable(self.__arg, action))
+
+    def count(self) -> int:
+        """
+        Counts the number of elements in the stream.
+        This is a terminal operation and consumes the stream.
+
+        Returns:
+            int: The total number of elements.
+        """
+        # Using sum() with a generator expression is often efficient
+        # Alternatively, iterate and count manually.
+        # This approach avoids creating an intermediate list like len(self.to_list())
+        count = 0
+        for _ in self.__arg:
+            count += 1
+        return count
+
+    def indexed(self) -> "Stream[Pair[int, T]]":
+        """
+        Returns a stream consisting of pairs of (index, element).
+        The index is zero-based.
+
+        Returns:
+            Stream[Pair[int, T]]: A stream of index-element pairs.
+        """
+        return Stream(_IndexedIterable(self.__arg))
+
+    # Alias for familiarity
+    def enumerate(self) -> "Stream[Pair[int, T]]":
+        """Alias for indexed()."""
+        return self.indexed()
 
 
 def stream(it: Iterable[T]) -> Stream[T]:
