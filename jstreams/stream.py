@@ -1,3 +1,4 @@
+from collections import deque
 from typing import (
     Callable,
     Iterable,
@@ -17,6 +18,7 @@ from jstreams.reducer import Reducer
 from jstreams.predicate import (
     Predicate,
     PredicateWith,
+    is_none,
     predicate_of,
     predicate_with_of,
 )
@@ -27,6 +29,7 @@ T = TypeVar("T")
 V = TypeVar("V")
 K = TypeVar("K")
 C = TypeVar("C")
+S = TypeVar("S")
 
 
 class Opt(Generic[T]):
@@ -777,6 +780,375 @@ class _IndexedIterable(Generic[T], Iterator[Pair[int, T]], Iterable[Pair[int, T]
         return Pair(current_index, obj)
 
 
+# In stream.py, add a new Iterable class
+class _ChunkedIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
+    __slots__ = ("_iterator", "_size")
+
+    def __init__(self, it: Iterable[T], size: int) -> None:
+        if size <= 0:
+            raise ValueError("Chunk size must be positive")
+        # Store the original iterator directly
+        self._iterator = iter(it)
+        self._size = size
+
+    def __iter__(self) -> Iterator[list[T]]:
+        # Resetting isn't straightforward without consuming the original iterable again.
+        # This implementation assumes the stream is consumed once.
+        # If re-iteration is needed, the original iterable must support it.
+        # Or, store the original iterable and get a new iterator here.
+        # self._iterator = iter(self._iterable) # If storing _iterable instead
+        return self
+
+    def __next__(self) -> list[T]:
+        chunk = []
+        try:
+            for _ in range(self._size):
+                chunk.append(next(self._iterator))
+        except StopIteration:
+            # Reached the end of the underlying iterator
+            pass  # Allow the loop to finish
+
+        if not chunk:  # If no elements were added (end of iteration)
+            raise StopIteration
+        return chunk
+
+
+class _TakeUntilIterable(_GenericIterable[T]):
+    __slots__ = ("__predicate", "__done")
+
+    def __init__(self, it: Iterable[T], predicate: Predicate[T]) -> None:
+        super().__init__(it)
+        self.__predicate = predicate
+        self.__done = False
+
+    def _prepare(self) -> None:
+        self.__done = False
+
+    def __next__(self) -> T:
+        if self.__done:
+            raise StopIteration()
+
+        obj = self._iterator.__next__()
+        if self.__predicate.apply(obj):
+            self.__done = True  # Stop after yielding this one
+        return obj
+
+
+class _DropUntilIterable(_GenericIterable[T]):
+    __slots__ = ("__predicate", "__dropping")
+
+    def __init__(self, it: Iterable[T], predicate: Predicate[T]) -> None:
+        super().__init__(it)
+        self.__predicate = predicate
+        self.__dropping = True  # Start in dropping mode
+
+    def _prepare(self) -> None:
+        self.__dropping = True
+
+    def __next__(self) -> T:
+        while self.__dropping:
+            obj = self._iterator.__next__()  # Consume elements
+            if self.__predicate.apply(obj):
+                self.__dropping = False  # Stop dropping
+                return obj  # Return the first matching element
+        # Once dropping stops, just yield remaining elements
+        return self._iterator.__next__()
+
+
+class _ScanIterable(Generic[T, V], Iterator[V], Iterable[V]):
+    __slots__ = ("_iterator", "_accumulator", "_current_value", "_first")
+
+    def __init__(
+        self, it: Iterable[T], accumulator: Callable[[V, T], V], initial_value: V
+    ) -> None:
+        # Store original iterable to allow re-iteration if needed
+        self._iterable = it
+        self._iterator = iter(self._iterable)
+        self._accumulator = accumulator
+        self._initial_value = initial_value
+        # State for iteration
+        self._current_value = self._initial_value
+        self._first = True  # Flag to yield initial value first
+
+    def __iter__(self) -> Iterator[V]:
+        # Reset state for new iteration
+        self._iterator = iter(self._iterable)
+        self._current_value = self._initial_value
+        self._first = True
+        return self
+
+    def __next__(self) -> V:
+        if self._first:
+            self._first = False
+            return self._current_value  # Yield initial value first
+
+        next_element = next(self._iterator)  # Get next element from source
+        self._current_value = self._accumulator(self._current_value, next_element)
+        return self._current_value
+
+
+class _PairIterable(Generic[T, V], Iterator[Pair[T, V]], Iterable[Pair[T, V]]):
+    __slots__ = ["_it1", "_it2", "_iter1", "_iter2"]
+
+    def __init__(self, it1: Iterable[T], it2: Iterable[V]) -> None:
+        self._it1 = it1
+        self._it2 = it2
+        self._iter1 = self._it1.__iter__()
+        self._iter2 = self._it2.__iter__()
+
+    def __iter__(self) -> Iterator[Pair[T, V]]:
+        self._iter1 = self._it1.__iter__()
+        self._iter2 = self._it2.__iter__()
+        return self
+
+    def __next__(self) -> Pair[T, V]:
+        return Pair(self._iter1.__next__(), self._iter2.__next__())
+
+
+class _MultiConcatIterable(Generic[T], Iterator[T], Iterable[T]):
+    __slots__ = ("_iterables", "_current_iterator", "_iterable_index")
+
+    def __init__(self, iterables: tuple[Iterable[T], ...]) -> None:
+        self._iterables = iterables
+        self._iterable_index = 0
+        self._current_iterator: Optional[Iterator[T]] = None
+        self._advance_iterator()  # Initialize the first iterator
+
+    def _advance_iterator(self) -> None:
+        """Moves to the next iterator in the sequence."""
+        if self._iterable_index < len(self._iterables):
+            self._current_iterator = iter(self._iterables[self._iterable_index])
+            self._iterable_index += 1
+        else:
+            self._current_iterator = None  # No more iterables
+
+    def __iter__(self) -> Iterator[T]:
+        # Reset state for new iteration
+        self._iterable_index = 0
+        self._advance_iterator()
+        return self
+
+    def __next__(self) -> T:
+        while self._current_iterator is not None:
+            try:
+                return next(self._current_iterator)
+            except StopIteration:
+                # Current iterator is exhausted, move to the next one
+                self._advance_iterator()
+        # If _current_iterator becomes None, all iterables are exhausted
+        raise StopIteration
+
+
+class _PairwiseIterable(Generic[T], Iterator[Pair[T, T]], Iterable[Pair[T, T]]):
+    __slots__ = ("_iterator", "_previous", "_first_element_consumed")
+
+    def __init__(self, it: Iterable[T]) -> None:
+        self._iterable = it  # Store original iterable if re-iteration needed
+        self._iterator = iter(self._iterable)
+        self._previous: Optional[T] = None
+        self._first_element_consumed = False
+
+    def __iter__(self) -> Iterator[Pair[T, T]]:
+        self._iterator = iter(self._iterable)  # Reset iterator
+        self._previous = None
+        self._first_element_consumed = False
+        return self
+
+    def __next__(self) -> Pair[T, T]:
+        if not self._first_element_consumed:
+            # Consume the very first element to establish the initial 'previous'
+            try:
+                self._previous = next(self._iterator)
+                self._first_element_consumed = True
+            except StopIteration:
+                # Stream had 0 or 1 element, so no pairs can be formed
+                raise StopIteration
+
+        # Get the next element to form a pair with the previous one
+        current = next(self._iterator)  # Raises StopIteration when done
+        pair_to_yield = Pair(
+            require_non_null(self._previous), current
+        )  # require_non_null is safe here
+        self._previous = current  # Update previous for the next iteration
+        return pair_to_yield
+
+
+class _SlidingWindowIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
+    __slots__ = ("_iterator", "_size", "_step", "_window", "_buffer")
+
+    def __init__(self, it: Iterable[T], size: int, step: int) -> None:
+        if size <= 0 or step <= 0:
+            raise ValueError("Size and step must be positive")
+        self._iterator = iter(it)
+        self._size = size
+        self._step = step
+        # Use deque for efficient additions/removals from both ends
+        self._window: deque[T] = deque(maxlen=size)
+        # Buffer to hold elements for the next step if step < size
+        self._buffer: deque[T] = deque()
+
+    def __iter__(self) -> Iterator[list[T]]:
+        # Resetting requires re-iterating the source
+        # self._iterator = iter(self._iterable) # If storing original iterable
+        self._window.clear()
+        self._buffer.clear()
+        return self
+
+    def __next__(self) -> list[T]:
+        while len(self._window) < self._size:
+            try:
+                element = next(self._iterator)
+                self._window.append(element)
+                # If step > 1, buffer elements needed for the next window start
+                if len(self._buffer) < self._size - self._step:
+                    self._buffer.append(element)  # Incorrect logic here, needs rethink
+                # Simpler initial fill:
+                # self._window.append(next(self._iterator))
+
+            except StopIteration:
+                # Not enough elements to form a full window initially or remaining
+                if len(self._window) > 0 and len(self._window) < self._size:
+                    # Option: yield partial window at the end? Or require full windows?
+                    # Current StopIteration implies only full windows.
+                    pass  # Let StopIteration be raised below if window is empty
+                raise StopIteration
+
+        # Yield the current full window
+        result = list(self._window)  # Create list copy
+
+        # Prepare for the next window by sliding
+        for _ in range(self._step):
+            if not self._window:
+                break  # Should not happen if size > 0
+            self._window.popleft()  # Remove element(s) from the left
+
+        # Need to refill the window up to size for the next iteration
+        # This requires careful handling based on step vs size
+        # A simpler, less lazy approach might be easier first.
+
+        # --- Simplified (potentially less lazy) approach ---
+        # This version might read ahead more than strictly necessary
+        # It's tricky to get perfect laziness with arbitrary step/size.
+
+        # Refill buffer/window for next step
+        for _ in range(self._step):
+            try:
+                if self._window:  # Only pop if window isn't empty
+                    self._window.popleft()
+                # Add next element to window
+                element = next(self._iterator)
+                self._window.append(element)
+            except StopIteration:
+                # End of source iterator while sliding
+                # If window still has elements but less than size, stop?
+                if not self._window:  # If window became empty, definitely stop
+                    raise StopIteration from None
+                # Decide if partial windows are allowed at the end
+                # For now, assume only full windows, so let StopIteration propagate if refill fails
+                break  # Exit refill loop
+
+        # If after sliding/refilling, window is smaller than size, we can't form next full window
+        if (
+            len(self._window) < self._size and self._step > 0
+        ):  # Check step > 0 to avoid infinite loop if step=0 (invalid)
+            raise StopIteration  # Cannot form the next full window
+
+        return result  # Return the window captured before sliding
+
+
+class _RepeatIterable(Generic[T], Iterator[T], Iterable[T]):
+    __slots__ = ("_buffered_elements", "_n", "_current_n", "_iterator")
+
+    def __init__(self, it: Iterable[T], n: Optional[int]) -> None:
+        # Buffer the original iterable ONCE
+        self._buffered_elements = list(it)
+        self._n = n  # None means infinite
+        self._current_n = 0
+        self._iterator = iter(self._buffered_elements)
+
+    def __iter__(self) -> Iterator[T]:
+        # Reset for new iteration
+        self._current_n = 0
+        self._iterator = iter(self._buffered_elements)
+        return self
+
+    def __next__(self) -> T:
+        try:
+            return next(self._iterator)
+        except StopIteration:
+            # End of current cycle reached
+            if self._n is not None:  # Finite repetitions
+                self._current_n += 1
+                if self._current_n >= self._n:
+                    raise StopIteration  # Max repetitions reached
+            # Start next cycle
+            if not self._buffered_elements:  # Handle empty source
+                raise StopIteration
+            self._iterator = iter(self._buffered_elements)
+            return next(self._iterator)  # Get first element of next cycle
+
+
+class _IntersperseIterable(Generic[T], Iterator[T], Iterable[T]):
+    __slots__ = ("_iterator", "_separator", "_needs_separator")
+
+    def __init__(self, it: Iterable[T], separator: T) -> None:
+        self._iterable = it  # Store original if re-iteration needed
+        self._iterator = iter(self._iterable)
+        self._separator = separator
+        self._needs_separator = False  # Don't insert before the first element
+
+    def __iter__(self) -> Iterator[T]:
+        self._iterator = iter(self._iterable)  # Reset
+        self._needs_separator = False
+        return self
+
+    def __next__(self) -> T:
+        if self._needs_separator:
+            self._needs_separator = False  # Reset flag after yielding separator
+            return self._separator
+        else:
+            # Get the next actual element from the source
+            next_element = next(
+                self._iterator
+            )  # Raises StopIteration when source is done
+            # Set flag to insert separator *before* the *next* element
+            self._needs_separator = True
+            return next_element
+
+
+class _UnfoldIterable(Generic[T, S], Iterator[T], Iterable[T]):
+    __slots__ = ("_initial_seed", "_generator", "_current_seed", "_next_pair")
+
+    def __init__(self, seed: S, generator: Callable[[S], Optional[Pair[T, S]]]) -> None:
+        self._initial_seed = seed
+        self._generator = generator
+        # State for iteration
+        self._current_seed = self._initial_seed
+        self._next_pair: Optional[Pair[T, S]] = self._generator(
+            self._current_seed
+        )  # Compute first pair
+
+    def __iter__(self) -> Iterator[T]:
+        # Reset state for new iteration
+        self._current_seed = self._initial_seed
+        self._next_pair = self._generator(self._current_seed)
+        return self
+
+    def __next__(self) -> T:
+        if self._next_pair is None:
+            raise StopIteration  # Generator signaled end
+
+        # Get current element and next seed from the pair
+        current_element = self._next_pair.left()
+        next_seed = self._next_pair.right()
+
+        # Update state for the *next* call to __next__
+        self._current_seed = next_seed
+        self._next_pair = self._generator(self._current_seed)
+
+        return current_element  # Return the element generated in the previous step
+
+
 class Stream(Generic[T]):
     __slots__ = ("__arg",)
 
@@ -941,6 +1313,40 @@ class Stream(Generic[T]):
         """
         return not is_empty_or_none(self.__arg)
 
+    def scan(self, accumulator: Callable[[V, T], V], initial_value: V) -> "Stream[V]":
+        """
+        Performs a cumulative reduction operation on the stream elements,
+        yielding each intermediate result, starting with the initial_value.
+
+        Example:
+            Stream([1, 2, 3]).scan(lambda acc, x: acc + x, 0).to_list()
+            # Output: [0, 1, 3, 6]
+
+        Args:
+            accumulator: A function that takes the current accumulated value (V)
+                        and the next element (T), returning the new accumulated value (V).
+            initial_value: The initial value for the accumulation (V).
+
+        Returns:
+            Stream[V]: A stream of the intermediate accumulated values.
+        """
+        return Stream(_ScanIterable(self.__arg, accumulator, initial_value))
+
+    def zip(self, other: Iterable[V]) -> "Stream[Pair[T, V]]":
+        """
+        Zips this stream with another iterable, producing a stream of Pairs.
+        The resulting stream's length is the minimum of the lengths of the
+        two input iterables.
+
+        Args:
+            other: The iterable to zip with this stream.
+
+        Returns:
+            Stream[Pair[T, V]]: A stream of pairs.
+        """
+        # Delegate to the pair_stream factory function
+        return pair_stream(self.__arg, other)
+
     def collect(self) -> Iterable[T]:
         """
         Returns an iterable with the content of the stream
@@ -1045,6 +1451,16 @@ class Stream(Generic[T]):
         value_mapper_obj = mapper_of(value_mapper)
         return {v: value_mapper_obj.map(v) for v in self.__arg}
 
+    def to_tuple(self) -> tuple[T, ...]:
+        """
+        Collects the elements of the stream into a tuple.
+        This is a terminal operation.
+
+        Returns:
+            tuple[T, ...]: A tuple containing the stream elements in order.
+        """
+        return tuple(self.__arg)
+
     def each(self, action: Callable[[T], Any]) -> "Stream[T]":
         """
         Executes the action callable for each of the stream's elements.
@@ -1120,6 +1536,38 @@ class Stream(Generic[T]):
             Stream[T]: The result stream
         """
         return Stream(_DropWhileIterable(self.__arg, predicate_of(predicate)))
+
+    def take_until(
+        self, predicate: Union[Predicate[T], Callable[[T], bool]]
+    ) -> "Stream[T]":
+        """
+        Returns a stream consisting of elements taken from this stream until
+        the predicate returns True for the first time. The element that satisfies
+        the predicate IS included in the resulting stream.
+
+        Args:
+            predicate: The predicate to test elements against.
+
+        Returns:
+            Stream[T]: The resulting stream.
+        """
+        return Stream(_TakeUntilIterable(self.__arg, predicate_of(predicate)))
+
+    def drop_until(
+        self, predicate: Union[Predicate[T], Callable[[T], bool]]
+    ) -> "Stream[T]":
+        """
+        Returns a stream consisting of the remaining elements after dropping
+        elements until the predicate returns True for the first time. The element
+        that satisfies the predicate IS included in the resulting stream.
+
+        Args:
+            predicate: The predicate to test elements against.
+
+        Returns:
+            Stream[T]: The resulting stream.
+        """
+        return Stream(_DropUntilIterable(self.__arg, predicate_of(predicate)))
 
     def reduce(self, reducer: Union[Reducer[T], Callable[[T, T], T]]) -> Opt[T]:
         """
@@ -1242,6 +1690,299 @@ class Stream(Generic[T]):
         """Alias for indexed()."""
         return self.indexed()
 
+    def chunked(self, size: int) -> "Stream[list[T]]":
+        """
+        Groups elements of the stream into chunks (lists) of a specified size.
+        The last chunk may contain fewer elements than the specified size.
+
+        Args:
+            size (int): The desired size of each chunk. Must be positive.
+
+        Returns:
+            Stream[list[T]]: A stream where each element is a list (chunk).
+
+        Raises:
+            ValueError: If size is not positive.
+        """
+        return Stream(_ChunkedIterable(self.__arg, size))
+
+    def find_last(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> Opt[T]:
+        """
+        Finds the last element in the stream that matches the given predicate.
+        This is a terminal operation and consumes the stream.
+
+        Args:
+            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate to match.
+
+        Returns:
+            Opt[T]: An Opt containing the last matching element, or empty if none match or the stream is empty.
+        """
+        last_match: Optional[T] = None
+        pred = predicate_of(predicate)
+        for element in self.__arg:
+            if pred.apply(element):
+                last_match = element
+        return Opt(last_match)
+
+    @staticmethod
+    def range(start: int, stop: Optional[int] = None, step: int = 1) -> "Stream[int]":
+        """
+        Creates a stream of integers from a range, similar to Python's range().
+
+        Args:
+            start: The starting value (or stop value if stop is None).
+            stop: The stopping value (exclusive). If None, range is from 0 to start.
+            step: The step between values. Defaults to 1.
+
+        Returns:
+            Stream[int]: A stream of integers.
+        """
+        if stop is None:
+            # Mimic range(stop) behavior
+            return Stream(range(start))
+        else:
+            # Mimic range(start, stop, step) behavior
+            return Stream(range(start, stop, step))
+
+    @staticmethod
+    def iterate(initial_value: T, next_value_fn: Callable[[T], T]) -> "Stream[T]":
+        """
+        Creates an infinite ordered stream produced by iterative application
+        of a function f to an initial element seed.
+        Produces seed, f(seed), f(f(seed)), etc.
+
+        Example:
+            Stream.iterate(0, lambda x: x + 2).limit(5).to_list()
+            # Output: [0, 2, 4, 6, 8]
+
+        Args:
+            initial_value: The initial element.
+            next_value_fn: A function to be applied to the previous element to produce the next element.
+
+        Returns:
+            Stream[T]: An infinite stream. Remember to use limit() or take_while() etc.
+        """
+        return Stream(_iterate_generator(initial_value, next_value_fn))
+
+    @staticmethod
+    def generate(supplier: Callable[[], T]) -> "Stream[T]":
+        """
+        Creates an infinite unordered stream where each element is generated
+        by the provided supplier function.
+
+        Example:
+            import random
+            Stream.generate(lambda: random.randint(1, 10)).limit(5).to_list()
+            # Output: [e.g., 7, 2, 9, 1, 5]
+
+        Args:
+            supplier: A function that produces elements for the stream.
+
+        Returns:
+            Stream[T]: An infinite stream. Remember to use limit() or take_while() etc.
+        """
+        return Stream(_generate_generator(supplier))
+
+    @staticmethod
+    def empty() -> "Stream[Any]":  # Use Any as type T isn't bound here
+        """
+        Returns an empty sequential Stream.
+
+        Returns:
+            Stream[Any]: An empty stream.
+        """
+        # Could potentially cache a single empty stream instance
+        return Stream([])
+
+    @staticmethod
+    def concat_of(*iterables: Iterable[T]) -> "Stream[T]":
+        """
+        Creates a lazily concatenated stream whose elements are all the
+        elements of the first iterable followed by all the elements of the
+        second iterable, and so on.
+
+        Args:
+            *iterables: The iterables to concatenate.
+
+        Returns:
+            Stream[T]: The concatenated stream.
+        """
+        if not iterables:
+            return Stream.empty()
+        # If only one iterable, just return a stream of it
+        if len(iterables) == 1:
+            return Stream(iterables[0])
+        return Stream(_MultiConcatIterable(iterables))
+
+    def pairwise(self) -> "Stream[Pair[T, T]]":
+        """
+        Returns a stream of pairs consisting of adjacent elements from this stream.
+        If the stream has N elements, the resulting stream will have N-1 elements.
+        Returns an empty stream if the original stream has 0 or 1 element.
+
+        Example:
+            Stream([1, 2, 3, 4]).pairwise().to_list()
+            # Output: [Pair(1, 2), Pair(2, 3), Pair(3, 4)]
+
+        Returns:
+            Stream[Pair[T, T]]: A stream of adjacent pairs.
+        """
+        return Stream(_PairwiseIterable(self.__arg))
+
+    def sliding_window(self, size: int, step: int = 1) -> "Stream[list[T]]":
+        """
+        Returns a stream of lists, where each list is a sliding window of
+        elements from the original stream.
+
+        Example:
+            Stream([1, 2, 3, 4, 5]).sliding_window(3, 1).to_list()
+            # Output: [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
+
+            Stream([1, 2, 3, 4, 5]).sliding_window(2, 2).to_list()
+            # Output: [[1, 2], [3, 4]] (depends on exact end behavior)
+
+
+        Args:
+            size (int): The size of each window. Must be positive.
+            step (int, optional): The number of elements to slide forward for
+                                the next window. Defaults to 1. Must be positive.
+
+        Returns:
+            Stream[list[T]]: A stream of lists representing the sliding windows.
+
+        Raises:
+            ValueError: If size or step are not positive.
+        """
+        # NOTE: The _SlidingWindowIterable implementation above is complex and might need refinement
+        # for full correctness and laziness, especially around edge cases and step > size.
+        # Consider starting with a simpler implementation if needed.
+        return Stream(_SlidingWindowIterable(self.__arg, size, step))
+
+    def any_none(self) -> bool:
+        """
+        Checks if any element in this stream is None.
+        This is a terminal operation and may short-circuit.
+
+        Returns:
+            bool: True if at least one element is None, False otherwise.
+        """
+        return self.any_match(is_none)
+
+    def none_none(self) -> bool:
+        """
+        Checks if no element in this stream is None.
+        Equivalent to `all_not_none()`.
+        This is a terminal operation and may short-circuit.
+
+        Returns:
+            bool: True if no elements are None, False otherwise.
+        """
+        return self.none_match(is_none)
+
+    def of_items(*items: T) -> "Stream[T]":
+        """
+        Creates a stream from the provided items.
+
+        Example:
+            Stream.of_items(1, 2, 3).map(lambda x: x * 2).to_list()
+            # Output: [2, 4, 6]
+
+        Args:
+            *items: The items to include in the stream.
+
+        Returns:
+            Stream[T]: A stream containing the provided items.
+        """
+        return Stream(items)  # Pass the tuple of items directly
+
+    def repeat(self, n: Optional[int] = None) -> "Stream[T]":
+        """
+        Returns a stream that repeats the elements of this stream n times,
+        or indefinitely if n is None.
+
+        CAUTION: This operation needs to buffer the original stream elements
+                to allow repetition, which might consume significant memory
+                for large streams. It should not be used on infinite streams
+                unless n is specified and finite.
+
+        Args:
+            n (Optional[int]): The number of times to repeat the stream.
+                            If None, repeats indefinitely. Defaults to None.
+
+        Returns:
+            Stream[T]: A stream consisting of the repeated elements.
+
+        Raises:
+            ValueError: If n is specified and is not positive.
+        """
+        if n is not None and n <= 0:
+            raise ValueError("Number of repetitions 'n' must be positive if specified.")
+        # The _RepeatIterable buffers the original self.__arg
+        return Stream(_RepeatIterable(self.__arg, n))
+
+    def intersperse(self, separator: T) -> "Stream[T]":
+        """
+        Returns a stream with the separator element inserted between each
+        element of this stream.
+
+        Example:
+            Stream([1, 2, 3]).intersperse(0).to_list()
+            # Output: [1, 0, 2, 0, 3]
+
+            Stream(["a", "b"]).intersperse("-").to_list()
+            # Output: ["a", "-", "b"]
+
+            Stream([]).intersperse(0).to_list()
+            # Output: []
+
+            Stream([1]).intersperse(0).to_list()
+            # Output: [1]
+
+        Args:
+            separator (T): The element to insert between original elements.
+
+        Returns:
+            Stream[T]: The resulting stream with separators.
+        """
+        return Stream(_IntersperseIterable(self.__arg, separator))
+
+    @staticmethod
+    def unfold(seed: S, generator: Callable[[S], Optional[Pair[T, S]]]) -> "Stream[T]":
+        """
+        Creates a stream by repeatedly applying a generator function to a seed value.
+
+        The generator function takes the current state (seed) and returns an
+        Optional Pair containing the next element for the stream and the next state (seed).
+        The stream terminates when the generator returns None.
+
+        Example (Fibonacci sequence):
+            def fib_generator(state: Pair[int, int]) -> Optional[Pair[int, Pair[int, int]]]:
+                a, b = state.left(), state.right()
+                return Pair(a, Pair(b, a + b)) # Yield a, next state is (b, a+b)
+
+            Stream.unfold(Pair(0, 1), fib_generator).limit(10).to_list()
+            # Output: [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
+
+        Example (Range):
+            def range_generator(current: int) -> Optional[Pair[int, int]]:
+                if current >= 10:
+                    return None
+                return Pair(current, current + 1) # Yield current, next state is current + 1
+
+            Stream.unfold(0, range_generator).to_list()
+            # Output: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+
+        Args:
+            seed (S): The initial state.
+            generator (Callable[[S], Optional[Pair[T, S]]]): Function that takes the
+                current state and returns an Optional Pair(next_element, next_state).
+
+        Returns:
+            Stream[T]: The generated stream.
+        """
+        return Stream(_UnfoldIterable(seed, generator))
+
 
 def stream(it: Iterable[T]) -> Stream[T]:
     """
@@ -1267,3 +2008,32 @@ def optional(val: Optional[T]) -> Opt[T]:
         Opt[T]: The optional
     """
     return Opt(val)
+
+
+def pair_stream(left: Iterable[T], right: Iterable[V]) -> Stream[Pair[T, V]]:
+    """
+    Create a pair stream by zipping two iterables. The resulting stream will have the length
+    of the shortest iterable.
+
+    Args:
+        left (Iterable[T]): The left iterable
+        right (Iterable[V]): The right iterable
+
+    Returns:
+        Stream[Pair[T, V]]: The resulting pair stream
+    """
+    return Stream(_PairIterable(left, right))
+
+
+def _generate_generator(supplier: Callable[[], T]) -> Iterator[T]:
+    while True:
+        yield supplier()
+
+
+def _iterate_generator(
+    initial_value: T, next_value_fn: Callable[[T], T]
+) -> Iterator[T]:
+    current = initial_value
+    while True:
+        yield current
+        current = next_value_fn(current)

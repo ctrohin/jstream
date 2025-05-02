@@ -1,30 +1,12 @@
 from typing import Generic, Iterable, Iterator, TypeVar
 
 from jstreams.stream import Stream
-from jstreams.tuples import Pair, Triplet
+from jstreams.tuples import Triplet
 
 
 T = TypeVar("T")
 V = TypeVar("V")
 K = TypeVar("K")
-
-
-class _PairIterable(Generic[T, V], Iterator[Pair[T, V]], Iterable[Pair[T, V]]):
-    __slots__ = ["_it1", "_it2", "_iter1", "_iter2"]
-
-    def __init__(self, it1: Iterable[T], it2: Iterable[V]) -> None:
-        self._it1 = it1
-        self._it2 = it2
-        self._iter1 = self._it1.__iter__()
-        self._iter2 = self._it2.__iter__()
-
-    def __iter__(self) -> Iterator[Pair[T, V]]:
-        self._iter1 = self._it1.__iter__()
-        self._iter2 = self._it2.__iter__()
-        return self
-
-    def __next__(self) -> Pair[T, V]:
-        return Pair(self._iter1.__next__(), self._iter2.__next__())
 
 
 class _TripletIterable(
@@ -50,21 +32,6 @@ class _TripletIterable(
         return Triplet(
             self._iter1.__next__(), self._iter2.__next__(), self._iter3.__next__()
         )
-
-
-def pair_stream(left: Iterable[T], right: Iterable[V]) -> Stream[Pair[T, V]]:
-    """
-    Create a pair stream by zipping two iterables. The resulting stream will have the length
-    of the shortest iterable.
-
-    Args:
-        left (Iterable[T]): The left iterable
-        right (Iterable[V]): The right iterable
-
-    Returns:
-        Stream[Pair[T, V]]: The resulting pair stream
-    """
-    return Stream(_PairIterable(left, right))
 
 
 def triplet_stream(
