@@ -1,9 +1,7 @@
 from jstreams.stream import (
     Stream,
     find_first,
-    map_it,
     matching,
-    flat_map,
     not_null_elements,
     reduce,
     take_while,
@@ -12,15 +10,20 @@ from jstreams.stream import (
     ClassOps,
     stream,
     optional,
+    extract_list,
+    extract_non_null_list,
+)
+
+from jstreams.mapper import (
+    map_it,
+    flat_map,
     mapper_of,
     mapper_with_of,
     Mapper,
     MapperWith,
-    Reducer,
-    reducer_of,
-    extract_list,
-    extract_non_null_list,
 )
+
+from jstreams.reducer import reducer_of, Reducer
 
 from jstreams.stream_factories import pair_stream, triplet_stream
 from jstreams.stream_predicates import any_of, all_of, none_of, all_none, all_not_none
