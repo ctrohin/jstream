@@ -1329,7 +1329,7 @@ def resolve_all() -> Callable[[type[T]], type[T]]:
                 if dep is not None:
                     # If a dependency has been resolved, set it as an attribute of the class
                     setattr(cls, attr_name, dep)
-                    # The remove it from the dependencies map
+                    # Then remove it from the dependencies map
                     dependencies.pop(attr_name)
                 return dep
             return original_get_attribute(self, attr_name)

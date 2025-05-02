@@ -3,7 +3,9 @@ README.md
 pyproject.toml
 setup.py
 jstreams/__init__.py
+jstreams/annotations.py
 jstreams/collectors.py
+jstreams/eventing.py
 jstreams/ioc.py
 jstreams/match.py
 jstreams/noop.py
@@ -22,6 +24,7 @@ jstreams.egg-info/PKG-INFO
 jstreams.egg-info/SOURCES.txt
 jstreams.egg-info/dependency_links.txt
 jstreams.egg-info/top_level.txt
+test/test_annotations.py
 test/test_complex_ioc.py
 test/test_ioc.py
 test/test_is_function.py
@@ -34,7 +37,9 @@ test/test_profile.py
 test/test_rx.py
 test/test_scheduler.py
 test/test_state.py
+test/test_static_synchronized.py
 test/test_stream.py
+test/test_synchronized.py
 test/test_timers.py
 test/test_try.py
 test/test_tuples.py
