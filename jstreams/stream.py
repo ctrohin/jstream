@@ -25,11 +25,15 @@ from jstreams.predicate import (
 from jstreams.tuples import Pair
 from jstreams.utils import is_not_none, require_non_null, each, is_empty_or_none, sort
 
+A = TypeVar("A")
+B = TypeVar("B")
+
 T = TypeVar("T")
 V = TypeVar("V")
 K = TypeVar("K")
 C = TypeVar("C")
 S = TypeVar("S")
+U = TypeVar("U")
 
 
 class Opt(Generic[T]):
@@ -547,6 +551,124 @@ class Opt(Generic[T]):
         ):
             return Opt(mapper_with_of(mapper).map(self.__val, with_val))
         return cast(Opt[V], self.__get_none())
+
+    def flatten(self: "Opt[Opt[U]]") -> "Opt[U]":
+        """
+        Flattens a nested Opt[Opt[U]] into Opt[U].
+        If the outer Opt is empty, or the inner Opt is empty, returns an empty Opt.
+
+        Returns:
+            Opt[U]: The flattened Opt.
+        """
+        if self.is_present():
+            inner_opt = self.__val  # self.__val is Opt[U] here
+            if isinstance(inner_opt, Opt):
+                return inner_opt  # Return the inner Opt[U]
+            else:
+                # This case shouldn't happen if type hints are correct,
+                # but defensively return empty if the contained value isn't an Opt.
+                # Or perhaps raise a TypeError? Returning empty seems safer.
+                return cast(Opt[U], self.__get_none())
+        else:
+            return cast(Opt[U], self.__get_none())  # Outer Opt was empty
+
+    def flat_map(self, mapper: Callable[[T], "Opt[V]"]) -> "Opt[V]":
+        """
+        If a value is present, applies the provided mapping function to it,
+        returning the Opt result of the function. Otherwise returns an empty Opt.
+        This is useful for chaining operations that return Opt.
+
+        Args:
+            mapper: A function that takes the value T and returns an Opt[V].
+
+        Returns:
+            Opt[V]: The result of the mapping function if the value was present,
+                    otherwise an empty Opt.
+        """
+        if self.is_empty():
+            return cast(Opt[V], self.__get_none())
+        else:
+            # Type checker knows self.__val is T here
+            return mapper(require_non_null(self.__val))
+
+    def zip(self, other: "Opt[V]") -> "Opt[Pair[T, V]]":
+        """
+        Combines this Opt with another Opt. If both contain a value, returns an
+        Opt containing a Pair of the two values. Otherwise, returns an empty Opt.
+
+        Args:
+            other: The other Opt instance to zip with.
+
+        Returns:
+            Opt[Pair[T, V]]: An Opt containing the pair if both were present, else empty.
+        """
+        if self.is_present() and other.is_present():
+            # Type checker knows self.__val is T and other.__val is V
+            return Opt(
+                Pair(require_non_null(self.__val), require_non_null(other.__val))
+            )
+        else:
+            return cast(Opt[Pair[T, V]], self.__get_none())
+
+    def zip_with(self, other: "Opt[V]", zipper: Callable[[T, V], K]) -> "Opt[K]":
+        """
+        Combines this Opt with another Opt using a zipper function. If both contain
+        a value, applies the zipper function to them and returns an Opt containing
+        the result. Otherwise, returns an empty Opt.
+
+        Args:
+            other: The other Opt instance to zip with.
+            zipper: A function that takes values T and V and returns K.
+
+        Returns:
+            Opt[K]: An Opt containing the result of the zipper function if both
+                    were present, else empty.
+        """
+        if self.is_present() and other.is_present():
+            # Type checker knows self.__val is T and other.__val is V
+            return Opt(
+                zipper(require_non_null(self.__val), require_non_null(other.__val))
+            )
+        else:
+            return cast(Opt[K], self.__get_none())
+
+    def or_opt(self, other: "Opt[T]") -> "Opt[T]":
+        """
+        Returns this Opt if it contains a value, otherwise returns the other Opt.
+        Useful for providing an alternative Opt as a fallback.
+
+        Args:
+            other: The alternative Opt to return if this one is empty.
+
+        Returns:
+            Opt[T]: This Opt if present, otherwise the other Opt.
+        """
+        return self if self.is_present() else other
+
+    def peek(self, action: Callable[[T], Any]) -> "Opt[T]":
+        return self.if_present(action)
+
+    def unzip(self: "Opt[Pair[A, B]]") -> "Pair[Opt[A], Opt[B]]":
+        """
+        Transforms an Opt[Pair[A, B]] into a Pair[Opt[A], Opt[B]].
+        If the original Opt is empty, returns a Pair of two empty Opts.
+
+        Returns:
+            Pair[Opt[A], Opt[B]]: The resulting pair of Opts.
+        """
+        if self.is_present():
+            pair_val = self.__val  # Type is Pair[A, B]
+            if isinstance(pair_val, Pair):
+                return Pair(Opt(pair_val.left()), Opt(pair_val.right()))
+            else:
+                # Should not happen with correct types, return pair of empty
+                return Pair(
+                    cast(Opt[A], self.__get_none()), cast(Opt[B], self.__get_none())
+                )
+        else:
+            return Pair(
+                cast(Opt[A], self.__get_none()), cast(Opt[B], self.__get_none())
+            )
 
 
 class _GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
