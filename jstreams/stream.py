@@ -826,22 +826,29 @@ class _ConcatIterable(_GenericIterable[T]):
             return self.__next__()
 
 
+# Modify _DistinctIterable to accept key_func
 class _DistinctIterable(_GenericIterable[T]):
-    __slots__ = ("__set",)
+    __slots__ = ("__seen", "__key_func")  # Use __seen instead of __set for clarity
 
-    def __init__(self, it: Iterable[T]) -> None:
+    def __init__(
+        self, it: Iterable[T], key_func: Optional[Callable[[T], Any]] = None
+    ) -> None:
         super().__init__(it)
-        self.__set: set[T] = set()
+        self.__seen: set[Any] = (
+            set()
+        )  # Stores keys if key_func is provided, else elements
+        self.__key_func = key_func
 
     def _prepare(self) -> None:
-        self.__set = set()
+        self.__seen = set()
 
     def __next__(self) -> T:
-        obj = self._iterator.__next__()
-        if obj not in self.__set:
-            self.__set.add(obj)
-            return obj
-        return self.__next__()
+        while True:  # Keep trying until a distinct element is found or iterator ends
+            obj = self._iterator.__next__()
+            key_to_check = self.__key_func(obj) if self.__key_func else obj
+            if key_to_check not in self.__seen:
+                self.__seen.add(key_to_check)
+                return obj
 
 
 class _MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
@@ -1271,6 +1278,53 @@ class _UnfoldIterable(Generic[T, S], Iterator[T], Iterable[T]):
         return current_element  # Return the element generated in the previous step
 
 
+class _ZipLongestIterable(
+    Generic[T, V],
+    Iterator[Pair[Optional[T], Optional[V]]],
+    Iterable[Pair[Optional[T], Optional[V]]],
+):
+    __slots__ = ("_it1", "_it2", "_iter1", "_iter2", "_fillvalue", "_done1", "_done2")
+
+    def __init__(
+        self, it1: Iterable[T], it2: Iterable[V], fillvalue: Any = None
+    ) -> None:
+        self._it1 = it1
+        self._it2 = it2
+        self._fillvalue = fillvalue
+        self._iter1 = iter(self._it1)
+        self._iter2 = iter(self._it2)
+        self._done1 = False
+        self._done2 = False
+
+    def __iter__(self) -> Iterator[Pair[Optional[T], Optional[V]]]:
+        self._iter1 = iter(self._it1)
+        self._iter2 = iter(self._it2)
+        self._done1 = False
+        self._done2 = False
+        return self
+
+    def __next__(self) -> Pair[Optional[T], Optional[V]]:
+        val1: Optional[T] = self._fillvalue
+        val2: Optional[V] = self._fillvalue
+
+        if not self._done1:
+            try:
+                val1 = next(self._iter1)
+            except StopIteration:
+                self._done1 = True
+
+        if not self._done2:
+            try:
+                val2 = next(self._iter2)
+            except StopIteration:
+                self._done2 = True
+
+        if self._done1 and self._done2:
+            raise StopIteration
+
+        return Pair(val1, val2)
+
+
 class Stream(Generic[T]):
     __slots__ = ("__arg",)
 
@@ -1295,6 +1349,27 @@ class Stream(Generic[T]):
             Stream[V]: The result stream
         """
         return Stream(_MapIterable(self.__arg, mapper_of(mapper)))
+
+    def zip_longest(
+        self, other: Iterable[V], fillvalue: Any = None
+    ) -> "Stream[Pair[Optional[T], Optional[V]]]":
+        """
+        Zips this stream with another iterable, producing a stream of Pairs.
+        Continues until the longest iterable is exhausted, filling missing
+        values with `fillvalue`.
+
+        Args:
+            other: The iterable to zip with this stream.
+            fillvalue: The value to use for missing elements from shorter iterables.
+                       Defaults to None.
+
+        Returns:
+            Stream[Pair[Optional[T], Optional[V]]]: A stream of pairs, potentially
+                                                    containing the fillvalue.
+        """
+        # Note: The Pair type hints need to reflect the Optional nature
+        # Pair[Optional[T], Optional[V]] is correct.
+        return Stream(_ZipLongestIterable(self.__arg, other, fillvalue))
 
     def flat_map(
         self, mapper: Union[Mapper[T, Iterable[V]], Callable[[T], Iterable[V]]]
@@ -1742,18 +1817,18 @@ class Stream(Generic[T]):
         elems.reverse()
         return Stream(elems)
 
-    def distinct(self) -> "Stream[T]":
+    def distinct(self, key: Optional[Callable[[T], Any]] = None) -> "Stream[T]":
         """
-        Returns disting elements from the stream.
-        CAUTION: Use this method on stream of items that have the __eq__ method implemented,
-        otherwise the method will consider all values distinct
+        Returns a stream consisting of the distinct elements of this stream.
+        Uniqueness is determined by the element itself or by the result of applying the key function.
 
-        Returns:
-            Stream[T]: The resulting stream
+        CAUTION: For objects without a key function, ensure `__eq__` and `__hash__` are properly implemented.
+                 This operation requires storing seen keys/elements, potentially consuming memory.
+
+        Args:
+            key (Optional[Callable[[T], Ay]]): A function to extract the key for uniqueness comparison. If None, the element itself is used. Defaults to None.
         """
-        if self.__arg is None:
-            return self
-        return Stream(_DistinctIterable(self.__arg))
+        return Stream(_DistinctIterable(self.__arg, key))
 
     def concat(self, new_stream: "Stream[T]") -> "Stream[T]":
         """
