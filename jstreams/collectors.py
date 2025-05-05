@@ -4,6 +4,7 @@ from jstreams.stream import Opt
 from jstreams.utils import cmp_to_key
 
 T = TypeVar("T")
+R = TypeVar("R")
 V = TypeVar("V")
 K = TypeVar("K")
 
@@ -32,6 +33,37 @@ def grouping_by(group_by: Callable[[T], K], elements: Iterable[T]) -> dict[K, li
             values.setdefault(key, []).append(element)
         else:
             values[key] = [element]
+    return values
+
+
+def grouping_by_mapping(
+    group_by: Callable[[T], K], elements: Iterable[T], mapper: Callable[[T], R]
+) -> dict[K, list[R]]:
+    """
+    Groups elements of an iterable into a dictionary based on a classification function.
+
+    The classification function (`group_by`) is applied to each element, and the
+    result is used as the key in the dictionary. Each value in the dictionary
+    is a list of elements that produced the corresponding key.
+
+    Args:
+        group_by (Callable[[T], K]): The function to classify elements into groups.
+                                    It takes an element and returns a key.
+        elements (Iterable[T]): The iterable containing elements to be grouped.
+        mapper (Callable[[T], R]): The mapping function that transforms the iterable
+                                    elements into resulting elements
+
+    Returns:
+        dict[K, list[R]]: A dictionary where keys are the results of the `group_by`
+                        function and values are mapped lists of elements belonging to that group.
+    """
+    values: dict[K, list[R]] = {}
+    for element in elements:
+        key = group_by(element)
+        if key in values:
+            values.setdefault(key, []).append(mapper(element))
+        else:
+            values[key] = [mapper(element)]
     return values
 
 
@@ -127,6 +159,37 @@ class Collectors:
         return transform
 
     @staticmethod
+    def grouping_by_mapping(
+        group_by_func: Callable[[T], K],
+        mapper: Callable[[T], R],
+    ) -> Callable[[Iterable[T]], dict[K, list[R]]]:
+        """
+        Returns a collector function that groups mapped elements into a dictionary based on a
+        classification function.
+
+        The classification function (`group_by_func`) is applied to each element, and the
+        result is used as the key in the dictionary. Each value in the dictionary
+        is a list of elements that produced the corresponding key.
+
+        Usage:
+            grouped_dict = stream_instance.collect_using(Collectors.grouping_by(lambda x: x.category, lambda x: x.value))
+
+        Args:
+            group_by_func (Callable[[T], R]): The function to classify mapped elements into groups.
+
+        Returns:
+            Callable[[Iterable[T]], dict[K, list[R]]]: A function that takes an iterable
+            and returns a dictionary grouped by the classification function.
+        """
+
+        def transform(elements: Iterable[T]) -> dict[K, list[R]]:
+            """Groups elements based on the provided function."""
+            # Delegates to the standalone grouping_by function
+            return grouping_by_mapping(group_by_func, elements, mapper)
+
+        return transform
+
+    @staticmethod
     def joining(separator: str = "") -> Callable[[Iterable[str]], str]:
         """
         Returns a collector function that concatenates string elements into a single string,
@@ -171,6 +234,34 @@ class Collectors:
         """
 
         return Collectors.grouping_by(condition)
+
+    @staticmethod
+    def partitioning_by_mapping(
+        condition: Callable[[T], bool],
+        mapper: Callable[[T], R],
+    ) -> Callable[[Iterable[T]], dict[bool, list[R]]]:
+        """
+        Returns a collector function that partitions mapped elements into a dictionary
+        based on whether they satisfy a given predicate (condition).
+
+        The dictionary will have two keys: `True` and `False`. The value associated
+        with `True` is a list of mapped elements for which the condition returned True,
+        and the value associated with `False` is a list of mapped elements for which
+        the condition returned False.
+
+        Usage:
+            partitioned_dict = stream_instance.collect_using(Collectors.partitioning_by(lambda x: x > 10, lambda x: x*x))
+
+        Args:
+            condition (Callable[[T], bool]): The predicate used to partition elements.
+            mapper (Callable[[T], R]): The mapper function
+
+        Returns:
+            Callable[[Iterable[T]], dict[bool, list[R]]]: A function that takes an iterable
+            and returns a dictionary partitioned by the condition.
+        """
+
+        return Collectors.grouping_by_mapping(condition, mapper)
 
     @staticmethod
     def counting() -> Callable[[Iterable[Any]], int]:

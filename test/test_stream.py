@@ -358,3 +358,39 @@ class TestStream(BaseTestCase):
         self.assertSetEqual(
             value, expected, "Collection should produce a set of the values"
         )
+
+    def test_collector_partitioning_by_mapping(self) -> None:
+        values = Stream(
+            [
+                {"key": 1, "prop": "prop", "value": "X1"},
+                {"key": 1, "prop": "prop", "value": "X2"},
+                {"key": 2, "prop": "prop1", "value": "X3"},
+                {"key": 2, "prop": "prop1", "value": "X4"},
+            ]
+        ).collect_using(
+            Collectors.partitioning_by_mapping(
+                lambda x: x["key"] == 1, lambda x: x["value"]
+            )
+        )
+        expected = {
+            True: ["X1", "X2"],
+            False: ["X3", "X4"],
+        }
+        self.assertDictEqual(values, expected, "Values should be properly partitioned")
+
+    def test_collector_group_by_mapping(self) -> None:
+        values = Stream(
+            [
+                {"key": 1, "prop": "prop", "value": "X1"},
+                {"key": 1, "prop": "prop", "value": "X2"},
+                {"key": 1, "prop": "prop1", "value": "X3"},
+                {"key": 1, "prop": "prop1", "value": "X4"},
+            ]
+        ).collect_using(
+            Collectors.grouping_by_mapping(lambda x: x["prop"], lambda x: x["value"])
+        )
+        expected = {
+            "prop": ["X1", "X2"],
+            "prop1": ["X3", "X4"],
+        }
+        self.assertDictEqual(values, expected, "Values should be properly grouped")
