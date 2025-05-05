@@ -14,6 +14,9 @@ from jstreams.iterable_operations import (
     drop_while,
     matching,
     reduce,
+    take_until,
+    drop_until,
+    find_last,
 )
 
 from jstreams.mapper import (
@@ -507,4 +510,7 @@ __all__ = [
     "str_is_upper",
     "grouping_by_mapping",
     "RX",
+    "take_until",
+    "drop_until",
+    "find_last",
 ]

@@ -29,6 +29,31 @@ def find_first(
     return None
 
 
+def find_last(
+    target: Optional[Iterable[T]], predicate: Union[Predicate[T], Callable[[T], bool]]
+) -> Optional[T]:
+    """
+    Retrieves the last element of the given iterable that matches the given predicate.
+    Note: This function will iterate through the entire iterable.
+
+    Args:
+        target (Optional[Iterable[T]]): The target iterable.
+        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate.
+
+    Returns:
+        Optional[T]: The last matching element, or None if no element matches the predicate.
+    """
+    if target is None:
+        return None
+
+    last_match: Optional[T] = None
+    pred = predicate_of(predicate)
+    for el in target:
+        if pred.apply(el):
+            last_match = el
+    return last_match
+
+
 def matching(
     target: Iterable[T], predicate: Union[Predicate[T], Callable[[T], bool]]
 ) -> list[T]:
@@ -108,6 +133,64 @@ def drop_while(
         else:
             break
     return list(target)[index:]
+
+
+def take_until(
+    target: Iterable[T], predicate: Union[Predicate[T], Callable[[T], bool]]
+) -> list[T]:
+    """
+    Returns the first batch of elements until the predicate returns True.
+    The element that satisfies the predicate IS included in the result.
+
+    Args:
+        target (Iterable[T]): The target iterable.
+        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate.
+
+    Returns:
+        list[T]: The result list including the element that matched the predicate.
+    """
+    ret: list[T] = []
+    if target is None:
+        return ret
+
+    pred = predicate_of(predicate)
+    for el in target:
+        ret.append(el)  # Append the element first
+        if pred.apply(el):  # Then check if the condition is met
+            break  # Stop after including the element
+    return ret
+
+
+def drop_until(
+    target: Iterable[T], predicate: Union[Predicate[T], Callable[[T], bool]]
+) -> list[T]:
+    """
+    Returns the target iterable elements starting from the first element that
+    matches the predicate (inclusive). Elements before the first match are dropped.
+
+    Args:
+        target (Iterable[T]): The target iterable.
+        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate.
+
+    Returns:
+        list[T]: The result list starting from the first matching element.
+                 Returns an empty list if the predicate never matches.
+    """
+    if target is None:
+        return []
+
+    index = 0
+    found_match = False
+    target_list = list(target)  # Convert once for slicing and indexing
+
+    pred = predicate_of(predicate)
+    for i, el in enumerate(target_list):
+        if pred.apply(el):
+            index = i  # Index of the first element matching the predicate
+            found_match = True
+            break  # Stop searching
+
+    return target_list[index:] if found_match else []
 
 
 def reduce(
