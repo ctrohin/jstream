@@ -56,12 +56,12 @@ from jstreams.rx import (
     Reduce,
     Filter,
     Map,
-    rx_reduce,
-    rx_filter,
-    rx_map,
     RxOperator,
     BaseFilteringOperator,
     BaseMappingOperator,
+    rx_reduce,
+    rx_filter,
+    rx_map,
     rx_take,
     rx_take_while,
     rx_take_until,
@@ -74,6 +74,7 @@ from jstreams.rx import (
     DropUntil,
     DropWhile,
     Take,
+    RX,
 )
 
 from jstreams.thread import (
@@ -239,6 +240,7 @@ from jstreams.tuples import (
 from jstreams.collectors import (
     grouping_by,
     joining,
+    grouping_by_mapping,
     Collectors,
 )
 
@@ -503,4 +505,6 @@ __all__ = [
     "str_is_space",
     "str_is_title",
     "str_is_upper",
+    "grouping_by_mapping",
+    "RX",
 ]

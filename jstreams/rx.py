@@ -1168,3 +1168,41 @@ def rx_drop_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
         RxOperator[T, T]: A DropUntil operator
     """
     return DropUntil(predicate)
+
+
+class RX:
+    @staticmethod
+    def filter(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+        return rx_filter(predicate)
+
+    @staticmethod
+    def map(mapper: Callable[[T], V]) -> RxOperator[T, V]:
+        return rx_map(mapper)
+
+    @staticmethod
+    def reduce(reducer: Callable[[T, T], T]) -> RxOperator[T, T]:
+        return rx_reduce(reducer)
+
+    @staticmethod
+    def take(typ: type[T], count: int) -> RxOperator[T, T]:
+        return rx_take(typ, count)
+
+    @staticmethod
+    def take_while(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+        return rx_take_while(predicate)
+
+    @staticmethod
+    def take_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+        return rx_take_until(predicate)
+
+    @staticmethod
+    def drop(typ: type[T], count: int) -> RxOperator[T, T]:
+        return rx_drop(typ, count)
+
+    @staticmethod
+    def drop_while(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+        return rx_drop_while(predicate)
+
+    @staticmethod
+    def drop_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+        return rx_drop_until(predicate)

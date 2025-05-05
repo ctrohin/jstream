@@ -3,12 +3,14 @@ import unittest
 
 from jstreams.ioc import injector
 from jstreams.eventing import events
+from jstreams.scheduler import scheduler
 
 
 class BaseTestCase(unittest.TestCase):
     def setUp(self):
         injector().clear()
         events().clear()
+        scheduler().reset()
 
     def assertThrowsException(
         self, fn: Callable[[], Any], message: Optional[str] = None
