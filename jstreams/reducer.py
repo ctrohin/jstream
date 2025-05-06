@@ -21,6 +21,12 @@ class Reducer(ABC, Generic[T]):
     def __call__(self, a: T, b: T) -> T:
         return self.reduce(a, b)
 
+    @staticmethod
+    def of(reducer: "Union[Reducer[T], Callable[[T, T], T]]") -> "Reducer[T]":
+        if isinstance(reducer, Reducer):
+            return reducer
+        return _WrapReducer(reducer)
+
 
 class _WrapReducer(Reducer[T]):
     __slots__ = ["__reducer"]
@@ -33,6 +39,4 @@ class _WrapReducer(Reducer[T]):
 
 
 def reducer_of(reducer: Union[Reducer[T], Callable[[T, T], T]]) -> Reducer[T]:
-    if isinstance(reducer, Reducer):
-        return reducer
-    return _WrapReducer(reducer)
+    return Reducer.of(reducer)
