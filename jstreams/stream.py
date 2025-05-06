@@ -960,6 +960,8 @@ class _TakeUntilIterable(_GenericIterable[T]):
         obj = self._iterator.__next__()
         if self.__predicate.apply(obj):
             self.__done = True  # Stop after yielding this one
+            raise StopIteration()
+
         return obj
 
 

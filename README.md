@@ -689,7 +689,7 @@ pipe1.subscribe(
     lambda v: print(v)
 )
 # Won't print anything anymore since the first 3 elements were already taken
-subject.onNext(9)
+subject.on_next(9)
 ```
 
 ##### TakeWhile - rx_take_while
@@ -705,7 +705,7 @@ pipe1.subscribe(
     lambda v: print(v)
 )
 # Won't print anything since the while condition has already been reached
-subject.onNext(9)
+subject.on_next(9)
 ```
 
 ##### TakeUntil - rx_take_until
