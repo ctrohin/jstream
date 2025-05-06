@@ -5,15 +5,7 @@ from jstreams import (
     PublishSubject,
     ReplaySubject,
     Single,
-    rx_map,
-    rx_filter,
-    rx_reduce,
-    rx_take,
-    rx_take_while,
-    rx_take_until,
-    rx_drop_while,
-    rx_drop_until,
-    rx_drop,
+    RX,
 )
 from jstreams.eventing import event, events
 from jstreams.utils import Value
@@ -124,7 +116,7 @@ class TestRx(BaseTestCase):
     def test_replay_subject_map(self) -> None:
         subject = ReplaySubject(["a1", "a2", "a3"])
         val = []
-        subject.pipe(rx_map(str.upper)).subscribe(val.append)
+        subject.pipe(RX.map(str.upper)).subscribe(val.append)
         self.assertListEqual(val, ["A1", "A2", "A3"])
         subject.on_next("a4")
         self.assertListEqual(val, ["A1", "A2", "A3", "A4"])
@@ -133,7 +125,7 @@ class TestRx(BaseTestCase):
     def test_replay_subject_filter(self) -> None:
         subject = ReplaySubject(["a1", "a2", "a3", "b", "c", "a4"])
         val = []
-        subject.pipe(rx_filter(lambda s: s.startswith("a"))).subscribe(val.append)
+        subject.pipe(RX.filter(lambda s: s.startswith("a"))).subscribe(val.append)
         self.assertListEqual(val, ["a1", "a2", "a3", "a4"])
         subject.on_next("a5")
         self.assertListEqual(val, ["a1", "a2", "a3", "a4", "a5"])
@@ -144,7 +136,7 @@ class TestRx(BaseTestCase):
     def test_replay_subject_map_and_filter(self) -> None:
         subject = ReplaySubject(["a1", "a2", "a3"])
         val = []
-        pipe1 = subject.pipe(rx_map(str.upper), rx_filter(lambda s: s.endswith("3")))
+        pipe1 = subject.pipe(RX.map(str.upper), RX.filter(lambda s: s.endswith("3")))
         pipe1.subscribe(val.append)
         self.assertListEqual(val, ["A3"])
         subject.on_next("a4")
@@ -155,9 +147,9 @@ class TestRx(BaseTestCase):
         subject = ReplaySubject(["a1", "a2", "a3"])
         val = []
         pipe1 = subject.pipe(
-            rx_map(str.upper),
-            rx_filter(lambda s: s.endswith("3")),
-            rx_map(lambda s: s + "Test"),
+            RX.map(str.upper),
+            RX.filter(lambda s: s.endswith("3")),
+            RX.map(lambda s: s + "Test"),
         )
         pipe1.subscribe(val.append)
         self.assertListEqual(val, ["A3Test"])
@@ -169,7 +161,7 @@ class TestRx(BaseTestCase):
         subject = ReplaySubject([1, 7, 20, 5, 100, 40])
         val = []
         pipe1 = subject.pipe(
-            rx_filter(lambda nr: nr <= 10), rx_reduce(lambda a, b: max(a, b))
+            RX.filter(lambda nr: nr <= 10), RX.reduce(lambda a, b: max(a, b))
         )
         pipe1.subscribe(val.append)
         self.assertListEqual(val, [1, 7])
@@ -180,7 +172,7 @@ class TestRx(BaseTestCase):
     def test_replay_subject_with_take(self) -> None:
         subject = ReplaySubject([1, 7, 20, 5, 100, 40])
         val = []
-        pipe1 = subject.pipe(rx_take(int, 3))
+        pipe1 = subject.pipe(RX.take(int, 3))
         pipe1.subscribe(val.append)
         self.assertListEqual(val, [1, 7, 20])
         subject.on_next(9)
@@ -190,7 +182,7 @@ class TestRx(BaseTestCase):
     def test_replay_subject_with_takeWhile(self) -> None:
         subject = ReplaySubject([1, 7, 20, 5, 100, 40])
         val = []
-        pipe1 = subject.pipe(rx_take_while(lambda v: v < 10))
+        pipe1 = subject.pipe(RX.take_while(lambda v: v < 10))
         pipe1.subscribe(val.append)
         self.assertListEqual(val, [1, 7])
         subject.on_next(9)
@@ -200,7 +192,7 @@ class TestRx(BaseTestCase):
     def test_replay_subject_with_takeUntil(self) -> None:
         subject = ReplaySubject([1, 7, 20, 5, 100, 40])
         val = []
-        pipe1 = subject.pipe(rx_take_until(lambda v: v > 10))
+        pipe1 = subject.pipe(RX.take_until(lambda v: v > 10))
         pipe1.subscribe(val.append)
         self.assertListEqual(val, [1, 7])
         subject.on_next(9)
@@ -210,7 +202,7 @@ class TestRx(BaseTestCase):
     def test_replay_subject_with_drop(self) -> None:
         subject = ReplaySubject([1, 7, 20, 5, 100, 40])
         val = []
-        pipe1 = subject.pipe(rx_drop(int, 3))
+        pipe1 = subject.pipe(RX.drop(int, 3))
         pipe1.subscribe(val.append)
         self.assertListEqual(val, [5, 100, 40])
         subject.on_next(9)
@@ -220,7 +212,7 @@ class TestRx(BaseTestCase):
     def test_replay_subject_with_dropWhile(self) -> None:
         subject = ReplaySubject([1, 7, 20, 5, 100, 40])
         val = []
-        pipe1 = subject.pipe(rx_drop_while(lambda v: v < 100))
+        pipe1 = subject.pipe(RX.drop_while(lambda v: v < 100))
         pipe1.subscribe(val.append)
         self.assertListEqual(val, [100, 40])
         subject.on_next(9)
@@ -230,7 +222,7 @@ class TestRx(BaseTestCase):
     def test_replay_subject_with_dropUntil(self) -> None:
         subject = ReplaySubject([1, 7, 20, 5, 100, 40])
         val = []
-        pipe1 = subject.pipe(rx_drop_until(lambda v: v > 20))
+        pipe1 = subject.pipe(RX.drop_until(lambda v: v > 20))
         pipe1.subscribe(val.append)
         self.assertListEqual(val, [100, 40])
         subject.on_next(9)
@@ -242,9 +234,9 @@ class TestRx(BaseTestCase):
         val = []
         val2 = []
         chainedPipe = (
-            subject.pipe(rx_take_until(lambda e: e > 20))
-            .pipe(rx_filter(lambda e: e % 2 == 0))
-            .pipe(rx_take_while(lambda e: e < 10))
+            subject.pipe(RX.take_until(lambda e: e > 20))
+            .pipe(RX.filter(lambda e: e % 2 == 0))
+            .pipe(RX.take_while(lambda e: e < 10))
         )
         chainedPipe.subscribe(val.append)
         chainedPipe.subscribe(val2.append)
@@ -267,7 +259,7 @@ class TestRx(BaseTestCase):
 
         subpipe = (
             event(int)
-            .pipe(rx_map(lambda i: str(i)))
+            .pipe(RX.map(lambda i: str(i)))
             .subscribe(vals.append, on_dispose=lambda: disposed_val.set(True))
         )
         subval = event(int).subscribe(valsub.append, lambda: disposed_valsub.set(True))

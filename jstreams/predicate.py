@@ -39,6 +39,24 @@ class Predicate(ABC, Generic[T]):
     def __call__(self, value: T) -> bool:
         return self.apply(value)
 
+    @staticmethod
+    def of(
+        predicate: "Union[Predicate[T], Callable[[T], bool]]",
+    ) -> "Predicate[T]":
+        """
+        If the value passed is a predicate, it is returned without any changes.
+        If a function is passed, it will be wrapped into a Predicate object.
+
+        Args:
+            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+
+        Returns:
+            Predicate[T]: The produced predicate
+        """
+        if isinstance(predicate, Predicate):
+            return predicate
+        return _WrapPredicate(predicate)
+
 
 class PredicateWith(ABC, Generic[T, K]):
     @abstractmethod
@@ -62,6 +80,23 @@ class PredicateWith(ABC, Generic[T, K]):
 
     def __call__(self, value: T, with_value: K) -> bool:
         return self.apply(value, with_value)
+
+    def of(
+        predicate: "Union[PredicateWith[T, K], Callable[[T, K], bool]]",
+    ) -> "PredicateWith[T, K]":
+        """
+        If the value passed is a predicate, it is returned without any changes.
+        If a function is passed, it will be wrapped into a Predicate object.
+
+        Args:
+            predicate (Union[PredicateWith[T, K], Callable[[T, K], bool]]): The predicate
+
+        Returns:
+            PredicateWith[T, K]: The produced predicate
+        """
+        if isinstance(predicate, PredicateWith):
+            return predicate
+        return _WrapPredicateWith(predicate)
 
 
 class _WrapPredicate(Predicate[T]):
@@ -95,9 +130,7 @@ def predicate_of(predicate: Union[Predicate[T], Callable[[T], bool]]) -> Predica
     Returns:
         Predicate[T]: The produced predicate
     """
-    if isinstance(predicate, Predicate):
-        return predicate
-    return _WrapPredicate(predicate)
+    return Predicate.of(predicate)
 
 
 def predicate_with_of(
@@ -113,9 +146,7 @@ def predicate_with_of(
     Returns:
         PredicateWith[T, K]: The produced predicate
     """
-    if isinstance(predicate, PredicateWith):
-        return predicate
-    return _WrapPredicateWith(predicate)
+    return PredicateWith.of(predicate)
 
 
 def is_true(var: bool) -> bool:
