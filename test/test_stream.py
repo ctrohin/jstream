@@ -161,7 +161,7 @@ class TestStream(BaseTestCase):
         """
 
         self.assertEqual(
-            Stream(["a1", "a2", "a3", "b", "c", "d"])
+            Stream(["a1", "a2", "a3", "b", "c", "d", "a4"])
             .take_while(lambda e: e.startswith("a"))
             .to_list(),
             ["a1", "a2", "a3"],
