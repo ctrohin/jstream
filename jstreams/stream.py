@@ -759,12 +759,15 @@ class _LimitIterable(_GenericIterable[T]):
 
 
 class _TakeWhileIterable(_GenericIterable[T]):
-    __slots__ = ("__predicate", "__done")
+    __slots__ = ("__predicate", "__done", "__include_stop_value")
 
-    def __init__(self, it: Iterable[T], predicate: Predicate[T]) -> None:
+    def __init__(
+        self, it: Iterable[T], predicate: Predicate[T], include_stop_value: bool
+    ) -> None:
         super().__init__(it)
         self.__done = False
         self.__predicate = predicate
+        self.__include_stop_value = include_stop_value
 
     def _prepare(self) -> None:
         self.__done = False
@@ -776,7 +779,8 @@ class _TakeWhileIterable(_GenericIterable[T]):
         obj = self._iterator.__next__()
         if not self.__predicate.apply(obj):
             self.__done = True
-            raise StopIteration()
+            if not self.__include_stop_value:
+                raise StopIteration()
 
         return obj
 
@@ -943,12 +947,15 @@ class _ChunkedIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
 
 
 class _TakeUntilIterable(_GenericIterable[T]):
-    __slots__ = ("__predicate", "__done")
+    __slots__ = ("__predicate", "__done", "__include_stop_value")
 
-    def __init__(self, it: Iterable[T], predicate: Predicate[T]) -> None:
+    def __init__(
+        self, it: Iterable[T], predicate: Predicate[T], include_stop_value: bool
+    ) -> None:
         super().__init__(it)
         self.__predicate = predicate
         self.__done = False
+        self.__include_stop_value = include_stop_value
 
     def _prepare(self) -> None:
         self.__done = False
@@ -960,7 +967,8 @@ class _TakeUntilIterable(_GenericIterable[T]):
         obj = self._iterator.__next__()
         if self.__predicate.apply(obj):
             self.__done = True  # Stop after yielding this one
-            raise StopIteration()
+            if not self.__include_stop_value:
+                raise StopIteration()
 
         return obj
 
@@ -1709,7 +1717,9 @@ class Stream(Generic[T]):
         return Stream(_LimitIterable(self.__arg, count))
 
     def take_while(
-        self, predicate: Union[Predicate[T], Callable[[T], bool]]
+        self,
+        predicate: Union[Predicate[T], Callable[[T], bool]],
+        include_stop_value: bool = False,
     ) -> "Stream[T]":
         """
         Returns a stream of elements until the first element that DOES NOT match the given predicate
@@ -1720,7 +1730,9 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The result stream
         """
-        return Stream(_TakeWhileIterable(self.__arg, predicate_of(predicate)))
+        return Stream(
+            _TakeWhileIterable(self.__arg, predicate_of(predicate), include_stop_value)
+        )
 
     def drop_while(
         self, predicate: Union[Predicate[T], Callable[[T], bool]]
@@ -1737,7 +1749,9 @@ class Stream(Generic[T]):
         return Stream(_DropWhileIterable(self.__arg, predicate_of(predicate)))
 
     def take_until(
-        self, predicate: Union[Predicate[T], Callable[[T], bool]]
+        self,
+        predicate: Union[Predicate[T], Callable[[T], bool]],
+        include_stop_value: bool = False,
     ) -> "Stream[T]":
         """
         Returns a stream consisting of elements taken from this stream until
@@ -1750,7 +1764,9 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The resulting stream.
         """
-        return Stream(_TakeUntilIterable(self.__arg, predicate_of(predicate)))
+        return Stream(
+            _TakeUntilIterable(self.__arg, predicate_of(predicate), include_stop_value)
+        )
 
     def drop_until(
         self, predicate: Union[Predicate[T], Callable[[T], bool]]

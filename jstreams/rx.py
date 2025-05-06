@@ -931,7 +931,9 @@ class Take(BaseFilteringOperator[T]):
 
 
 class TakeWhile(BaseFilteringOperator[T]):
-    def __init__(self, predicate: Callable[[T], bool]) -> None:
+    def __init__(
+        self, predicate: Callable[[T], bool], include_stop_value: bool
+    ) -> None:
         """
         Allows values to pass through as long as they match the give predicate. After one value is found not matching, no other values will flow through
 
@@ -940,6 +942,7 @@ class TakeWhile(BaseFilteringOperator[T]):
         """
         self.__fn = predicate
         self.__should_push = True
+        self.__include_stop_value = include_stop_value
         super().__init__(self.__take)
 
     def init(self) -> None:
@@ -950,12 +953,14 @@ class TakeWhile(BaseFilteringOperator[T]):
             return False
         if not self.__fn(val):
             self.__should_push = False
-            return False
+            return self.__include_stop_value
         return True
 
 
 class TakeUntil(BaseFilteringOperator[T]):
-    def __init__(self, predicate: Callable[[T], bool]) -> None:
+    def __init__(
+        self, predicate: Callable[[T], bool], include_stop_value: bool
+    ) -> None:
         """
         Allows values to pass through until the first value found to match the give predicate. After that, no other values will flow through
 
@@ -964,6 +969,7 @@ class TakeUntil(BaseFilteringOperator[T]):
         """
         self.__fn = predicate
         self.__should_push = True
+        self.__include_stop_value = include_stop_value
         super().__init__(self.__take)
 
     def init(self) -> None:
@@ -974,7 +980,7 @@ class TakeUntil(BaseFilteringOperator[T]):
             return False
         if self.__fn(val):
             self.__should_push = False
-            return False
+            return self.__include_stop_value
         return True
 
 
@@ -1054,38 +1060,130 @@ class DropUntil(BaseFilteringOperator[T]):
 class RX:
     @staticmethod
     def filter(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+        """
+        Allows only values that match the given predicate to flow through
+
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+
+        Returns:
+            RxOperator[T, T]: A Filter operator
+        """
+
         return Filter(predicate)
 
     @staticmethod
     def map(mapper: Callable[[T], V]) -> RxOperator[T, V]:
+        """
+        Maps a value to a differnt value/form using the mapper function
+
+        Args:
+            mapper (Callable[[T], V]): The mapper function
+
+        Returns:
+            RxOperator[T, V]: A Map operator
+        """
         return Map(mapper)
 
     @staticmethod
     def reduce(reducer: Callable[[T, T], T]) -> RxOperator[T, T]:
+        """
+        Reduces two consecutive values into one by applying the provided reducer function
+
+        Args:
+            reducer (Callable[[T, T], T]): The reducer function
+
+        Returns:
+            RxOperator[T, T]: A Reduce operator
+        """
+
         return Reduce(reducer)
 
     @staticmethod
     def take(typ: type[T], count: int) -> RxOperator[T, T]:
+        """
+        Allows only the first "count" values to flow through
+
+        Args:
+            typ (type[T]): The type of the values that will pass throgh
+            count (int): The number of values that will pass through
+
+        Returns:
+            RxOperator[T, T]: A Take operator
+        """
         return Take(typ, count)
 
     @staticmethod
-    def take_while(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
-        return TakeWhile(predicate)
+    def take_while(
+        predicate: Callable[[T], bool], include_stop_value: bool = False
+    ) -> RxOperator[T, T]:
+        """
+        Allows values to pass through as long as they match the give predicate. After one value is found not matching, no other values will flow through
+
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+            include_stop_value (bool): Flag indicating that the stop value should be included
+
+        Returns:
+            RxOperator[T, T]: A TakeWhile operator
+        """
+        return TakeWhile(predicate, include_stop_value)
 
     @staticmethod
-    def take_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
-        return TakeUntil(predicate)
+    def take_until(
+        predicate: Callable[[T], bool], include_stop_value: bool = False
+    ) -> RxOperator[T, T]:
+        """
+        Allows values to pass through until the first value found to match the give predicate. After that, no other values will flow through
+
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+            include_stop_value (bool): Flag indicating that the stop value should be included
+
+        Returns:
+            RxOperator[T, T]: A TakeUntil operator
+        """
+
+        return TakeUntil(predicate, include_stop_value)
 
     @staticmethod
     def drop(typ: type[T], count: int) -> RxOperator[T, T]:
+        """
+        Blocks the first "count" values, then allows all remaining values to pass through
+
+        Args:
+            typ (type[T]): The type of the values
+            count (int): The number of values to pass through
+
+        Returns:
+            RxOperator[T, T]: A Drop operator
+        """
         return Drop(typ, count)
 
     @staticmethod
     def drop_while(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+        """
+        Blocks values as long as they match the given predicate. Once a value is encountered that does not match the predicate, all remaining values will be allowed to pass through
+
+        Args:
+            predicate (Callable[[T], bool]): The predicate
+
+        Returns:
+            RxOperator[T, T]: A DropWhile operator
+        """
         return DropWhile(predicate)
 
     @staticmethod
     def drop_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+        """
+        Blocks values until the first value found that matches the given predicate. All remaining values will be allowed to pass through
+
+        Args:
+            predicate (Callable[[T], bool]): The given predicate
+
+        Returns:
+            RxOperator[T, T]: A DropUntil operator
+        """
         return DropUntil(predicate)
 
 
@@ -1142,25 +1240,31 @@ def rx_take(typ: type[T], count: int) -> RxOperator[T, T]:
     return RX.take(typ, count)
 
 
-def rx_take_while(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+def rx_take_while(
+    predicate: Callable[[T], bool], include_stop_value: bool = False
+) -> RxOperator[T, T]:
     """
     Allows values to pass through as long as they match the give predicate. After one value is found not matching, no other values will flow through
 
     Args:
         predicate (Callable[[T], bool]): The predicate
+        include_stop_value (bool): Flag indicating that the stop value should be included
 
     Returns:
         RxOperator[T, T]: A TakeWhile operator
     """
-    return RX.take_while(predicate)
+    return RX.take_while(predicate, include_stop_value)
 
 
-def rx_take_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+def rx_take_until(
+    predicate: Callable[[T], bool], include_stop_value: bool = False
+) -> RxOperator[T, T]:
     """
     Allows values to pass through until the first value found to match the give predicate. After that, no other values will flow through
 
     Args:
         predicate (Callable[[T], bool]): The predicate
+        include_stop_value (bool): Flag indicating that the stop value should be included
 
     Returns:
         RxOperator[T, T]: A TakeUntil operator
