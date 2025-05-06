@@ -1,6 +1,7 @@
 from typing import Any
 from baseTest import BaseTestCase
 from jstreams import Try
+from jstreams.utils import Value
 
 
 class CallRegister:
@@ -246,18 +247,16 @@ class TestTry(BaseTestCase):
         self.assertIsInstance(mock.error, ValueError)
         self.assertEqual(str(mock.error), "Test")
 
-    def __callback_test_try_with_resource(self, content) -> None:
-        self.__callback_test_try_with_resource_content = content
-
     def test_try_with_resource(self) -> None:
         path = "/tmp/test_file"
+        val = Value(None)
         Try.with_resource(lambda: open(path, "w")).and_then(
             lambda f: f.write("Test")
         ).get()
         Try.with_resource(lambda: open(path, "r")).and_then(
-            lambda f: self.__callback_test_try_with_resource(f.read())
+            lambda f: val.set(f.read())
         ).get()
-        self.assertEqual(self.__callback_test_try_with_resource_content, "Test")
+        self.assertEqual(val.get(), "Test")
 
     def test_try_with_resource_controlled(self) -> None:
         class FakeResource:

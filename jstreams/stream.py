@@ -1361,7 +1361,7 @@ class Stream(Generic[T]):
         Args:
             other: The iterable to zip with this stream.
             fillvalue: The value to use for missing elements from shorter iterables.
-                       Defaults to None.
+                        Defaults to None.
 
         Returns:
             Stream[Pair[Optional[T], Optional[V]]]: A stream of pairs, potentially

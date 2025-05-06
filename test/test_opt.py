@@ -1,6 +1,7 @@
 from typing import Optional
 from baseTest import BaseTestCase
 from jstreams import Opt, equals, is_true, str_longer_than
+from jstreams.utils import Value
 
 
 class TestOpt(BaseTestCase):
@@ -81,15 +82,13 @@ class TestOpt(BaseTestCase):
             lambda: Opt(None).or_else_raise_from(lambda: Exception("Test")), Exception
         )
 
-    def __callback_test_if_matches(self, calledStr: str) -> None:
-        self.test_if_matches_result = calledStr
-
     def test_if_matches(self) -> None:
         """
         Test opt ifMatches function
         """
-        Opt("str").if_matches(equals("str"), self.__callback_test_if_matches)
-        self.assertEqual(self.test_if_matches_result, "str")
+        val = Value(None)
+        Opt("str").if_matches(equals("str"), val.set)
+        self.assertEqual(val.get(), "str")
 
     def test_if_matches_map(self) -> None:
         """
@@ -100,4 +99,12 @@ class TestOpt(BaseTestCase):
         )
         self.assertIsNone(
             Opt(False).if_matches_map(is_true, lambda _: "success").get_actual()
+        )
+
+    def test_flat_map(self) -> None:
+        """
+        Test opt flat_map function
+        """
+        self.assertEqual(
+            Opt(True).map(lambda v: Opt(v)).flat_map(lambda v: v).get(), True
         )

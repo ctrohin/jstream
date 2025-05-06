@@ -11,6 +11,7 @@ from jstreams.ioc import (
     resolve_variables,
 )
 from jstreams.predicate import equals
+from jstreams.utils import Value
 
 SUCCESS = "SUCCESS"
 
@@ -119,24 +120,21 @@ class TestIOC(BaseTestCase):
             "Should throw error when dependency is forced and not present",
         )
 
-    def __produceHook(self) -> str:
-        setattr(self, "produceHookCalled", True)
-        return "Test"
-
     def test_lazy_dependency(self) -> None:
-        injector().provide(str, self.__produceHook)
+        val = Value(False)
+
+        def produceHook() -> str:
+            val.set(True)
+            return "Test"
+
+        injector().provide(str, produceHook)
         self.assertFalse(
-            hasattr(self, "produceHookCalled"),
+            val.get(),
             "Produce hook should not have been called",
         )
         self.assertEqual(injector().get(str), "Test", "Value should be present")
         self.assertTrue(
-            hasattr(self, "produceHookCalled"),
-            "Produce hook should have been called",
-        )
-
-        self.assertTrue(
-            getattr(self, "produceHookCalled"),
+            val.get(),
             "Produce hook should have been called",
         )
 

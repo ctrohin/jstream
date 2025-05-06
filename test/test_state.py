@@ -1,5 +1,6 @@
 from baseTest import BaseTestCase
 from jstreams.state import default_state, null_state, use_state
+from jstreams.utils import Value
 
 
 class TestState(BaseTestCase):
@@ -9,26 +10,27 @@ class TestState(BaseTestCase):
         setValue("B")
         self.assertEqual(getValue(), "B", "State value should be B")
 
-    def __callback_test_use_state_with_on_change(
-        self, value: str, oldValue: str
-    ) -> None:
-        self.callback_test_use_state_with_on_change = value
-        self.callback_test_use_state_with_on_change_old_value = oldValue
-
     def test_use_state_with_on_change(self) -> None:
+        val = Value(None)
+        old_val = Value(None)
+
+        def callback_test_use_state_with_on_change(value: str, oldValue: str) -> None:
+            val.set(value)
+            old_val.set(oldValue)
+
         (getValue, setValue) = use_state(
-            "test2", "A", self.__callback_test_use_state_with_on_change
+            "test2", "A", callback_test_use_state_with_on_change
         )
         self.assertEqual(getValue(), "A", "State value should be A")
         setValue("B")
         self.assertEqual(getValue(), "B", "State value should be B")
         self.assertEqual(
-            self.callback_test_use_state_with_on_change,
+            val.get(),
             "B",
             "Callback should have been called with the correct new value",
         )
         self.assertEqual(
-            self.callback_test_use_state_with_on_change_old_value,
+            old_val.get(),
             "A",
             "Callback should have been called with the correct old value",
         )
