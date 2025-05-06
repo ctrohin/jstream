@@ -394,3 +394,18 @@ class TestStream(BaseTestCase):
             "prop1": ["X3", "X4"],
         }
         self.assertDictEqual(values, expected, "Values should be properly grouped")
+
+    def test_chunked(self) -> None:
+        expected = [
+            list(range(0, 10)),
+            list(range(10, 20)),
+            list(range(20, 30)),
+        ]
+        self.assertEqual(Stream(range(30)).chunked(10).to_list(), expected)
+
+        init = range(0, 10)
+        self.assertEqual(Stream(init).chunked(100).to_list(), [list(init)])
+
+    def test_range(self) -> None:
+        expected = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        self.assertEqual(Stream.range(10).to_list(), expected)

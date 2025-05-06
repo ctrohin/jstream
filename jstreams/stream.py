@@ -876,20 +876,29 @@ class _MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
 
 
 class _PeekIterable(_GenericIterable[T]):
-    __slots__ = ("__action",)
+    __slots__ = ("__action", "__logger")
 
-    def __init__(self, it: Iterable[T], action: Callable[[T], Any]) -> None:
+    def __init__(
+        self,
+        it: Iterable[T],
+        action: Callable[[T], Any],
+        logger: Optional[Callable[[Exception], Any]] = None,
+    ) -> None:
         super().__init__(it)
         self.__action = action
+        self.__logger = logger
+
+    def _prepare(self) -> None:
+        pass
 
     def __next__(self) -> T:
         obj = self._iterator.__next__()
         try:
             self.__action(obj)  # Perform the side-effect
         except Exception as e:
-            # Decide how to handle exceptions in peek: log? ignore? re-raise?
-            # Logging and ignoring is often the 'peek' behavior.
-            print(f"Exception during Stream.peek: {e}")  # Simple example
+            print(
+                f"Exception during Stream.peek: {e}"
+            ) if self.__logger is None else self.__logger(e)
         return obj  # Return the original object
 
 
@@ -1861,7 +1870,11 @@ class Stream(Generic[T]):
         """
         return Stream(_ConcatIterable(self.__arg, new_stream.__arg))
 
-    def peek(self, action: Callable[[T], Any]) -> "Stream[T]":
+    def peek(
+        self,
+        action: Callable[[T], Any],
+        logger: Optional[Callable[[Exception], Any]] = None,
+    ) -> "Stream[T]":
         """
         Performs an action on each element of the stream as it passes through.
         Useful for debugging or logging intermediate values. Does not modify the stream elements.
@@ -1872,7 +1885,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The same stream, allowing further chaining.
         """
-        return Stream(_PeekIterable(self.__arg, action))
+        return Stream(_PeekIterable(self.__arg, action, logger))
 
     def count(self) -> int:
         """
