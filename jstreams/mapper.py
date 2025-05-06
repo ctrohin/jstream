@@ -24,6 +24,22 @@ class Mapper(ABC, Generic[T, V]):
     def __call__(self, value: T) -> V:
         return self.map(value)
 
+    @staticmethod
+    def of(mapper: "Union[Mapper[T, V], Callable[[T], V]]") -> "Mapper[T, V]":
+        """
+        If the value passed is a mapper, it is returned without changes.
+        If a function is passed, it will be wrapped into a Mapper object.
+
+        Args:
+            mapper (Union[Mapper[T, V], Callable[[T], V]]): The mapper
+
+        Returns:
+            Mapper[T, V]: The produced mapper
+        """
+        if isinstance(mapper, Mapper):
+            return mapper
+        return _WrapMapper(mapper)
+
 
 class MapperWith(ABC, Generic[T, K, V]):
     @abstractmethod
@@ -41,6 +57,25 @@ class MapperWith(ABC, Generic[T, K, V]):
 
     def __call__(self, value: T, with_value: K) -> V:
         return self.map(value, with_value)
+
+    @staticmethod
+    def of(
+        mapper: "Union[MapperWith[T, K, V], Callable[[T, K], V]]",
+    ) -> "MapperWith[T, K, V]":
+        """
+        If the value passed is a mapper, it is returned without changes.
+        If a function is passed, it will be wrapped into a Mapper object.
+
+
+        Args:
+            mapper (Union[MapperWith[T, K, V], Callable[[T, K], V]]): The mapper
+
+        Returns:
+            MapperWith[T, K, V]: The produced mapper
+        """
+        if isinstance(mapper, MapperWith):
+            return mapper
+        return _WrapMapperWith(mapper)
 
 
 class _WrapMapper(Mapper[T, V]):
@@ -74,9 +109,7 @@ def mapper_of(mapper: Union[Mapper[T, V], Callable[[T], V]]) -> Mapper[T, V]:
     Returns:
         Mapper[T, V]: The produced mapper
     """
-    if isinstance(mapper, Mapper):
-        return mapper
-    return _WrapMapper(mapper)
+    return Mapper.of(mapper)
 
 
 def mapper_with_of(
@@ -93,9 +126,7 @@ def mapper_with_of(
     Returns:
         MapperWith[T, K, V]: The produced mapper
     """
-    if isinstance(mapper, MapperWith):
-        return mapper
-    return _WrapMapperWith(mapper)
+    return MapperWith.of(mapper)
 
 
 def map_it(
@@ -113,7 +144,7 @@ def map_it(
     """
     if target is None:
         return []
-    mapper_obj = mapper_of(mapper)
+    mapper_obj = Mapper.of(mapper)
     return [mapper_obj.map(el) for el in target]
 
 
@@ -137,7 +168,7 @@ def flat_map(
     if target is None:
         return ret
 
-    mapper_obj = mapper_of(mapper)
+    mapper_obj = Mapper.of(mapper)
 
     for el in target:
         mapped = mapper_obj.map(el)

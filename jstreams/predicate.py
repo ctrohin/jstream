@@ -31,10 +31,10 @@ class Predicate(ABC, Generic[T]):
         """
 
     def or_(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
-        return predicate_of(lambda v: self.apply(v) or predicate_of(other).apply(v))
+        return Predicate.of(lambda v: self.apply(v) or predicate_of(other).apply(v))
 
     def and_(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
-        return predicate_of(lambda v: self.apply(v) and predicate_of(other).apply(v))
+        return Predicate.of(lambda v: self.apply(v) and predicate_of(other).apply(v))
 
     def __call__(self, value: T) -> bool:
         return self.apply(value)
@@ -205,7 +205,7 @@ def is_in(it: Iterable[Any]) -> Predicate[Any]:
     def wrap(elem: Any) -> bool:
         return elem in it
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def is_not_in(it: Iterable[Any]) -> Predicate[Any]:
@@ -241,7 +241,7 @@ def equals(obj: T) -> Predicate[T]:
         # Handles None comparison explicitly
         return (obj is None and other is None) or (obj == other)
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def not_equals(obj: Any) -> Predicate[Any]:
@@ -337,7 +337,7 @@ def contains(value: Any) -> Predicate[Optional[Union[str, Iterable[Any]]]]:
         # Check for None before using 'in'
         return val is not None and value in val
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def str_contains(value: str) -> Predicate[Optional[str]]:
@@ -371,7 +371,7 @@ def str_contains_ignore_case(value: str) -> Predicate[Optional[str]]:
     def wrap(val: Optional[str]) -> bool:
         return val is not None and value.lower() in val.lower()
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def str_starts_with(value: str) -> Predicate[Optional[str]]:
@@ -390,7 +390,7 @@ def str_starts_with(value: str) -> Predicate[Optional[str]]:
     def wrap(val: Optional[str]) -> bool:
         return val is not None and val.startswith(value)
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def str_starts_with_ignore_case(value: str) -> Predicate[Optional[str]]:
@@ -408,7 +408,7 @@ def str_starts_with_ignore_case(value: str) -> Predicate[Optional[str]]:
     def wrap(val: Optional[str]) -> bool:
         return val is not None and val.lower().startswith(value.lower())
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def str_ends_with(value: str) -> Predicate[Optional[str]]:
@@ -427,7 +427,7 @@ def str_ends_with(value: str) -> Predicate[Optional[str]]:
     def wrap(val: Optional[str]) -> bool:
         return val is not None and val.endswith(value)
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def str_ends_with_ignore_case(value: str) -> Predicate[Optional[str]]:
@@ -445,7 +445,7 @@ def str_ends_with_ignore_case(value: str) -> Predicate[Optional[str]]:
     def wrap(val: Optional[str]) -> bool:
         return val is not None and val.lower().endswith(value.lower())
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def str_matches(pattern: str) -> Predicate[Optional[str]]:
@@ -472,7 +472,7 @@ def str_matches(pattern: str) -> Predicate[Optional[str]]:
         match = re.match(pattern, val)
         return match is not None
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def str_not_matches(pattern: str) -> Predicate[Optional[str]]:
@@ -504,7 +504,7 @@ def str_longer_than(length: int) -> Predicate[Optional[str]]:
     def wrap(val: Optional[str]) -> bool:
         return val is not None and len(val) > length
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def str_shorter_than(length: int) -> Predicate[Optional[str]]:
@@ -521,7 +521,7 @@ def str_shorter_than(length: int) -> Predicate[Optional[str]]:
     def wrap(val: Optional[str]) -> bool:
         return val is not None and len(val) < length
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def str_longer_than_or_eq(length: int) -> Predicate[Optional[str]]:
@@ -538,7 +538,7 @@ def str_longer_than_or_eq(length: int) -> Predicate[Optional[str]]:
     def wrap(val: Optional[str]) -> bool:
         return val is not None and len(val) >= length
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def str_shorter_than_or_eq(length: int) -> Predicate[Optional[str]]:
@@ -555,7 +555,7 @@ def str_shorter_than_or_eq(length: int) -> Predicate[Optional[str]]:
     def wrap(val: Optional[str]) -> bool:
         return val is not None and len(val) <= length
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def equals_ignore_case(value: str) -> Predicate[Optional[str]]:
@@ -574,7 +574,7 @@ def equals_ignore_case(value: str) -> Predicate[Optional[str]]:
         # Check both for None before comparing
         return val is not None and value.lower() == val.lower()
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 # --- Numeric Predicates ---
@@ -620,7 +620,7 @@ def _beween(interval_start: float, interval_end: float) -> Predicate[Optional[fl
     def wrap(val: Optional[float]) -> bool:
         return val is not None and interval_start < val < interval_end
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def _beween_closed(
@@ -631,7 +631,7 @@ def _beween_closed(
     def wrap(val: Optional[float]) -> bool:
         return val is not None and interval_start <= val <= interval_end
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def is_beween_closed(
@@ -668,7 +668,7 @@ def is_beween_closed_start(
     def wrap(val: Optional[float]) -> bool:
         return val is not None and interval_start <= val < interval_end
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def is_beween_closed_end(
@@ -679,7 +679,7 @@ def is_beween_closed_end(
     def wrap(val: Optional[float]) -> bool:
         return val is not None and interval_start < val <= interval_end
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def is_higher_than(value: float) -> Predicate[Optional[float]]:
@@ -688,7 +688,7 @@ def is_higher_than(value: float) -> Predicate[Optional[float]]:
     def wrap(val: Optional[float]) -> bool:
         return val is not None and val > value
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def is_higher_than_or_eq(value: float) -> Predicate[Optional[float]]:
@@ -697,7 +697,7 @@ def is_higher_than_or_eq(value: float) -> Predicate[Optional[float]]:
     def wrap(val: Optional[float]) -> bool:
         return val is not None and val >= value
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def is_less_than(value: float) -> Predicate[Optional[float]]:
@@ -706,7 +706,7 @@ def is_less_than(value: float) -> Predicate[Optional[float]]:
     def wrap(val: Optional[float]) -> bool:
         return val is not None and val < value
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def is_less_than_or_eq(value: float) -> Predicate[Optional[float]]:
@@ -715,7 +715,7 @@ def is_less_than_or_eq(value: float) -> Predicate[Optional[float]]:
     def wrap(val: Optional[float]) -> bool:
         return val is not None and val <= value
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 # --- Higher-Order Predicates ---
@@ -740,7 +740,7 @@ def not_(
     def wrap(val: Optional[T]) -> bool:
         return not wrapped_predicate.apply(val)
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def not_strict(
@@ -761,7 +761,7 @@ def not_strict(
     def wrap(val: T) -> bool:
         return not wrapped_predicate.apply(val)
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 # --- Mapping Predicates ---
@@ -782,7 +782,7 @@ def has_key(key: Any) -> Predicate[Optional[Mapping[Any, Any]]]:
     def wrap(dct: Optional[Mapping[Any, Any]]) -> bool:
         return dct is not None and key in dct
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def has_value(value: Any) -> Predicate[Optional[Mapping[Any, Any]]]:
@@ -801,7 +801,7 @@ def has_value(value: Any) -> Predicate[Optional[Mapping[Any, Any]]]:
     def wrap(dct: Optional[Mapping[Any, Any]]) -> bool:
         return dct is not None and value in dct.values()
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def is_key_in(mapping: Mapping[Any, Any]) -> Predicate[Any]:
@@ -820,7 +820,7 @@ def is_key_in(mapping: Mapping[Any, Any]) -> Predicate[Any]:
         # Check key is not None if that's a requirement, depends on use case
         return key in mapping
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def is_value_in(mapping: Mapping[Any, Any]) -> Predicate[Any]:
@@ -838,7 +838,7 @@ def is_value_in(mapping: Mapping[Any, Any]) -> Predicate[Any]:
     def wrap(value: Any) -> bool:
         return value in mapping.values()
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def is_truthy(val: Any) -> bool:
@@ -857,7 +857,7 @@ def is_identity(other: Any) -> Predicate[Any]:
     def wrap(val: Any) -> bool:
         return val is other
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def has_length(length: int) -> Predicate[Optional[Sized]]:
@@ -867,7 +867,7 @@ def has_length(length: int) -> Predicate[Optional[Sized]]:
         # is_blank already checks for None
         return not is_blank(val) and len(val) == length  # type: ignore
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def is_instance(cls: type) -> Predicate[Any]:
@@ -876,7 +876,7 @@ def is_instance(cls: type) -> Predicate[Any]:
     def wrap(val: Any) -> bool:
         return isinstance(val, cls)
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def str_fullmatch(pattern: str) -> Predicate[Optional[str]]:
@@ -900,7 +900,7 @@ def str_fullmatch(pattern: str) -> Predicate[Optional[str]]:
         match = re.fullmatch(pattern, val)
         return match is not None
 
-    return predicate_of(wrap)
+    return Predicate.of(wrap)
 
 
 def str_is_alpha(val: Optional[str]) -> bool:
