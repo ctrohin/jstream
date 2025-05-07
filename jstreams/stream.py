@@ -11,6 +11,7 @@ from typing import (
     Union,
 )
 from abc import ABC
+
 from jstreams.class_operations import ClassOps
 from jstreams.iterable_operations import find_first, reduce
 from jstreams.mapper import Mapper, MapperWith, flat_map, mapper_of, mapper_with_of
@@ -669,6 +670,35 @@ class Opt(Generic[T]):
             return Pair(
                 cast(Opt[A], self.__get_none()), cast(Opt[B], self.__get_none())
             )
+
+    @staticmethod
+    def of(value: T) -> "Opt[T]":
+        """
+        Creates an Opt instance containing the given value. If the value is None, it raises a value error.
+        This method is useful for creating an Opt from a non-null value. This helps to ensure that the value
+        is not null when creating the Opt. In some cases, you might not expect a null value, and this method
+        can help catch that error early.
+
+        Args:
+            value (T): The given value
+
+        Returns:
+            Opt[T]: The optional object
+        """
+        return Opt(require_non_null(value))
+
+    @staticmethod
+    def of_nullable(value: Optional[T]) -> "Opt[T]":
+        """
+        Creates an Opt instance containing the given value. If the value is None, it returns an empty Opt.
+
+        Args:
+            value (Optional[T]): The given value
+
+        Returns:
+            Opt[T]: The optional object
+        """
+        return Opt(value)
 
 
 class _GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
@@ -1348,14 +1378,37 @@ class Stream(Generic[T]):
     __slots__ = ("__arg",)
 
     def __init__(self, arg: Iterable[T]) -> None:
-        self.__arg = arg
+        self.__arg = require_non_null(arg)
 
     @staticmethod
     def of(arg: Iterable[T]) -> "Stream[T]":
+        """
+        Creates a stream from an iterable. Much in the same way as when calling the Stream constructor, the
+        type of the stream is inferred from the type of the iterable.
+        This method is useful when you want to create a stream from an iterable without explicitly specifying
+        the type of the stream. It allows for more concise code and can be used in situations where the type
+        of the iterable is known but the type of the stream is not.
+
+        Args:
+            arg (Iterable[T]): The iterable to create the stream from
+        Returns:
+            Stream[T]: The stream
+        """
         return Stream(arg)
 
     @staticmethod
     def of_nullable(arg: Iterable[Optional[T]]) -> "Stream[T]":
+        """
+        Creates a stream from an iterable of optional values, filtering out None values.
+        This method is useful when you want to create a stream from an iterable that may contain None values,
+        and you want to filter them out. It allows for more concise code and can be used in situations where
+        the type of the iterable is known to be optional, but the resulting stream needs to be of non-null elements.
+
+        Args:
+            arg (Iterable[Optional[T]]): The iterable of optional values
+        Returns:
+            Stream[T]: The stream of non-null values
+        """
         return Stream(arg).filter(is_not_none).map(lambda el: require_non_null(el))
 
     def map(self, mapper: Union[Mapper[T, V], Callable[[T], V]]) -> "Stream[V]":
@@ -2107,6 +2160,7 @@ class Stream(Generic[T]):
         """
         return self.none_match(is_none)
 
+    @staticmethod
     def of_items(*items: T) -> "Stream[T]":
         """
         Creates a stream from the provided items.
