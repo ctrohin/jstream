@@ -23,7 +23,7 @@ from jstreams.predicate import (
     predicate_of,
     predicate_with_of,
 )
-from jstreams.tuples import Pair
+from jstreams.tuples import Pair, pair_of
 from jstreams.utils import is_not_none, require_non_null, each, is_empty_or_none, sort
 
 A = TypeVar("A")
@@ -700,6 +700,80 @@ class Opt(Generic[T]):
         """
         return Opt(value)
 
+    @staticmethod
+    def empty() -> "Opt[T]":
+        """
+        Returns a cached empty Opt instance.
+
+        Returns:
+            Opt[T]: An empty Opt. The type T is inferred from context.
+        """
+        if Opt.__NONE is None:
+            Opt.__NONE = Opt(None)
+        return cast(Opt[T], Opt.__NONE)
+
+    @staticmethod
+    def when(condition: bool, value: T) -> "Opt[T]":
+        """
+        Creates an Opt containing the given value if the condition is true,
+        otherwise returns an empty Opt.
+
+        Args:
+            condition (bool): The condition to evaluate.
+            value (T): The value to wrap in an Opt if the condition is true.
+
+        Returns:
+            Opt[T]: An Opt containing the value if the condition is true, else an empty Opt.
+        """
+        return Opt(value) if condition else Opt.empty()
+
+    @staticmethod
+    def when_supplied(condition: bool, supplier: Callable[[], T]) -> "Opt[T]":
+        """
+        If the condition is true, calls the supplier and returns an Opt
+        containing the supplied value. Otherwise, returns an empty Opt.
+        The supplier is only called if the condition is true.
+
+        Args:
+            condition (bool): The condition to evaluate.
+            supplier (Callable[[], T]): A function that supplies the value if the condition is true.
+
+        Returns:
+            Opt[T]: An Opt containing the supplied value if the condition is true, else an empty Opt.
+        """
+        return Opt(supplier()) if condition else Opt.empty()
+
+    @staticmethod
+    def try_or_empty(
+        callable_fn: Callable[[], T], *catch_exceptions: type[BaseException]
+    ) -> "Opt[T]":
+        """
+        Executes the given callable. If it succeeds, returns an Opt containing its result.
+        If any of the specified exceptions (or `Exception` by default if none are specified)
+        are raised during execution, returns an empty Opt.
+
+        Args:
+            callable_fn (Callable[[], T]): The function to call.
+            *catch_exceptions (type[BaseException]): Specific exception types to catch.
+                If not provided, defaults to `(Exception,)`.
+
+        Returns:
+            Opt[T]: An Opt containing the result of the callable, or an empty Opt if an exception occurred.
+        """
+        exceptions_to_catch = catch_exceptions if catch_exceptions else (Exception,)
+        try:
+            return Opt(callable_fn())
+        except exceptions_to_catch:
+            return Opt.empty()
+
+    @staticmethod
+    def first_present(*opts: "Opt[T]") -> "Opt[T]":
+        """
+        Returns the first Opt in the given sequence that is present (non-empty).
+        If all Opts are empty or no Opts are provided, returns an empty Opt.
+        """
+        return Stream(opts).find_first(Opt.is_present).flat_map(lambda x: x)
+
 
 class _GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
     __slots__ = ("_iterable", "_iterator")
@@ -1374,6 +1448,87 @@ class _ZipLongestIterable(
         return Pair(val1, val2)
 
 
+class _CycleIterable(Generic[T], Iterator[T], Iterable[T]):
+    __slots__ = ("_elements", "_n", "_current_n", "_iterator")
+
+    def __init__(self, it: Iterable[T], n: Optional[int]) -> None:
+        self._n: Optional[int] = n
+        self._elements = list(it)  # Buffer elements
+        if not self._elements and n is not None and n > 0:
+            # Cannot cycle an empty iterable a fixed number of times > 0
+            # If n is None (infinite) or n is 0, an empty iterable source is fine (results in empty stream).
+            self._elements = []  # Ensure it's empty and will stop immediately
+            self._n = 0  # Force stop
+        else:
+            self._n = n
+        self._current_n = 0
+        self._iterator = iter(self._elements)
+
+    def __iter__(self) -> Iterator[T]:
+        self._current_n = 0
+        if not self._elements:  # Handle empty iterable source
+            self._iterator = iter([])  # Empty iterator
+        else:
+            self._iterator = iter(self._elements)
+        return self
+
+    def __next__(self) -> T:
+        if not self._elements:  # If original iterable was empty
+            raise StopIteration
+
+        try:
+            return next(self._iterator)
+        except StopIteration:
+            if self._n is not None:
+                self._current_n += 1
+                if self._current_n >= self._n:
+                    raise StopIteration
+            # Reset for next cycle (will raise StopIteration if _elements is empty,
+            # but we've guarded against that if n > 0)
+            self._iterator = iter(self._elements)
+            return next(self._iterator)
+
+
+class _IteratorFactoryIterable(Generic[T], Iterator[T], Iterable[T]):
+    __slots__ = ("_factory", "_current_iterator")
+
+    def __init__(self, factory: Callable[[], Iterator[T]]) -> None:
+        self._factory = factory
+        self._current_iterator: Optional[Iterator[T]] = None  # Initialized in __iter__
+
+    def __iter__(self) -> Iterator[T]:
+        self._current_iterator = self._factory()  # Get a fresh iterator
+        return self
+
+    def __next__(self) -> T:
+        if self._current_iterator is None:
+            raise RuntimeError(
+                "Iterator not initialized. __iter__ must be called first."
+            )
+        return next(self._current_iterator)
+
+
+class _DeferIterable(Generic[T], Iterator[T], Iterable[T]):
+    __slots__ = ("_supplier", "_current_iterator")
+
+    def __init__(self, supplier: Callable[[], Iterable[T]]) -> None:
+        self._supplier = supplier
+        self._current_iterator: Optional[Iterator[T]] = None  # Initialized in __iter__
+
+    def __iter__(self) -> Iterator[T]:
+        self._current_iterator = iter(
+            self._supplier()
+        )  # Call supplier and get iterator
+        return self
+
+    def __next__(self) -> T:
+        if self._current_iterator is None:
+            raise RuntimeError(
+                "Iterator not initialized. __iter__ must be called first."
+            )
+        return next(self._current_iterator)
+
+
 class Stream(Generic[T]):
     __slots__ = ("__arg",)
 
@@ -1410,6 +1565,70 @@ class Stream(Generic[T]):
             Stream[T]: The stream of non-null values
         """
         return Stream(arg).filter(is_not_none).map(lambda el: require_non_null(el))
+
+    @staticmethod
+    def cycle(iterable: Iterable[T], n: Optional[int] = None) -> "Stream[T]":
+        """
+        Creates a stream that cycles over the elements of an iterable.
+
+        The elements of the input iterable are buffered. The stream will then
+        repeat these buffered elements.
+
+        Args:
+            iterable (Iterable[T]): The iterable whose elements are to be cycled.
+            n (Optional[int]): The number of times to cycle through the iterable.
+                If None (default), cycles indefinitely.
+                If 0, results in an empty stream.
+                If the input iterable is empty and n > 0, an empty stream is also produced.
+
+        Returns:
+            Stream[T]: A stream that cycles through the elements of the iterable.
+
+        Raises:
+            ValueError: If n is specified and is negative.
+        """
+        if n is not None and n < 0:
+            raise ValueError("Number of repetitions 'n' must be non-negative.")
+        if n == 0:
+            return Stream.empty()
+        return Stream(_CycleIterable(iterable, n))
+
+    @staticmethod
+    def of_dict_keys(dictionary: dict[K, Any]) -> "Stream[K]":
+        """
+        Creates a stream from the keys of the given dictionary.
+        """
+        return Stream(dictionary.keys())
+
+    @staticmethod
+    def of_dict_values(dictionary: dict[Any, V]) -> "Stream[V]":
+        """
+        Creates a stream from the values of the given dictionary.
+        """
+        return Stream(dictionary.values())
+
+    @staticmethod
+    def of_dict_items(dictionary: dict[K, V]) -> "Stream[Pair[K, V]]":
+        """
+        Creates a stream of Pair(key, value) from the items of the given dictionary.
+        """
+        return Stream(dictionary.items()).map(pair_of)
+
+    @staticmethod
+    def from_iterator_factory(factory: Callable[[], Iterator[T]]) -> "Stream[T]":
+        """
+        Creates a stream from an iterator factory. The factory is called to produce
+        a new iterator each time the stream is iterated over.
+        """
+        return Stream(_IteratorFactoryIterable(factory))
+
+    @staticmethod
+    def defer(supplier: Callable[[], Iterable[T]]) -> "Stream[T]":
+        """
+        Creates a stream whose underlying iterable is obtained by calling the
+        supplier function only when the stream is iterated.
+        """
+        return Stream(_DeferIterable(supplier))
 
     def map(self, mapper: Union[Mapper[T, V], Callable[[T], V]]) -> "Stream[V]":
         """
