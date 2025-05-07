@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: jstreams
-Version: 2025.5.1
+Version: 2025.5.2
 Summary: A package providing streams and optional functionality similar to Java streams and optionals, a vavr.io Try minimal implementation, threading utilities such as JavaScript-like setTimer and setInterval,1 as well as a basic implementation of ReactiveX and a dependency injection framework.
 Author: Cristian Trohin
 Author-email: Cristian Trohin <cristi.trohin@gmail.com>
@@ -39,7 +39,11 @@ If you wish to check out some example integrations you can visit the [examples](
 pip install jstreams
 ```
 ## Changelog
-### v2025.5.1
+### v2025.5.2
+- Fixed bugs in intersperse, scan, pairwise and sliding window
+- Added factory methods for Stream and Opt
+
+### v2025.5.1 (yanked)
 - Added [eventing](#eventing) framework
 - Added [annotations](#annotations) biolerplate code reduction decorators
 - Added `resolve_all` and `resolve` decorators for the injection mechanism, which will try to inject all type hinted fields of a class.
@@ -706,7 +710,7 @@ pipe1.subscribe(
     lambda v: print(v)
 )
 # Won't print anything anymore since the first 3 elements were already taken
-subject.onNext(9)
+subject.on_next(9)
 ```
 
 ##### TakeWhile - rx_take_while
@@ -722,7 +726,7 @@ pipe1.subscribe(
     lambda v: print(v)
 )
 # Won't print anything since the while condition has already been reached
-subject.onNext(9)
+subject.on_next(9)
 ```
 
 ##### TakeUntil - rx_take_until
