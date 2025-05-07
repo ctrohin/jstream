@@ -22,7 +22,11 @@ If you wish to check out some example integrations you can visit the [examples](
 pip install jstreams
 ```
 ## Changelog
-### v2025.5.1
+### v2025.5.2
+- Fixed bugs in intersperse, scan, pairwise and sliding window
+- Added factory methods for Stream and Opt
+
+### v2025.5.1 (yanked)
 - Added [eventing](#eventing) framework
 - Added [annotations](#annotations) biolerplate code reduction decorators
 - Added `resolve_all` and `resolve` decorators for the injection mechanism, which will try to inject all type hinted fields of a class.

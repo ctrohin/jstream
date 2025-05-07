@@ -1108,7 +1108,14 @@ class _DropUntilIterable(_GenericIterable[T]):
 
 
 class _ScanIterable(Generic[T, V], Iterator[V], Iterable[V]):
-    __slots__ = ("_iterator", "_accumulator", "_current_value", "_first")
+    __slots__ = (
+        "_iterator",
+        "_accumulator",
+        "_current_value",
+        "_first",
+        "_iterable",
+        "_initial_value",
+    )
 
     def __init__(
         self, it: Iterable[T], accumulator: Callable[[V, T], V], initial_value: V
@@ -1192,7 +1199,7 @@ class _MultiConcatIterable(Generic[T], Iterator[T], Iterable[T]):
 
 
 class _PairwiseIterable(Generic[T], Iterator[Pair[T, T]], Iterable[Pair[T, T]]):
-    __slots__ = ("_iterator", "_previous", "_first_element_consumed")
+    __slots__ = ("_iterator", "_previous", "_first_element_consumed", "_iterable")
 
     def __init__(self, it: Iterable[T]) -> None:
         self._iterable = it  # Store original iterable if re-iteration needed
@@ -1233,17 +1240,16 @@ class _SlidingWindowIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
             raise ValueError("Size and step must be positive")
         self._iterator = iter(it)
         self._size = size
+        if step <= 0:
+            raise ValueError("Step must be positive")
         self._step = step
         # Use deque for efficient additions/removals from both ends
         self._window: deque[T] = deque(maxlen=size)
-        # Buffer to hold elements for the next step if step < size
-        self._buffer: deque[T] = deque()
 
     def __iter__(self) -> Iterator[list[T]]:
         # Resetting requires re-iterating the source
         # self._iterator = iter(self._iterable) # If storing original iterable
         self._window.clear()
-        self._buffer.clear()
         return self
 
     def __next__(self) -> list[T]:
@@ -1251,11 +1257,6 @@ class _SlidingWindowIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
             try:
                 element = next(self._iterator)
                 self._window.append(element)
-                # If step > 1, buffer elements needed for the next window start
-                if len(self._buffer) < self._size - self._step:
-                    self._buffer.append(element)  # Incorrect logic here, needs rethink
-                # Simpler initial fill:
-                # self._window.append(next(self._iterator))
 
             except StopIteration:
                 # Not enough elements to form a full window initially or remaining
@@ -1273,37 +1274,6 @@ class _SlidingWindowIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
             if not self._window:
                 break  # Should not happen if size > 0
             self._window.popleft()  # Remove element(s) from the left
-
-        # Need to refill the window up to size for the next iteration
-        # This requires careful handling based on step vs size
-        # A simpler, less lazy approach might be easier first.
-
-        # --- Simplified (potentially less lazy) approach ---
-        # This version might read ahead more than strictly necessary
-        # It's tricky to get perfect laziness with arbitrary step/size.
-
-        # Refill buffer/window for next step
-        for _ in range(self._step):
-            try:
-                if self._window:  # Only pop if window isn't empty
-                    self._window.popleft()
-                # Add next element to window
-                element = next(self._iterator)
-                self._window.append(element)
-            except StopIteration:
-                # End of source iterator while sliding
-                # If window still has elements but less than size, stop?
-                if not self._window:  # If window became empty, definitely stop
-                    raise StopIteration from None
-                # Decide if partial windows are allowed at the end
-                # For now, assume only full windows, so let StopIteration propagate if refill fails
-                break  # Exit refill loop
-
-        # If after sliding/refilling, window is smaller than size, we can't form next full window
-        if (
-            len(self._window) < self._size and self._step > 0
-        ):  # Check step > 0 to avoid infinite loop if step=0 (invalid)
-            raise StopIteration  # Cannot form the next full window
 
         return result  # Return the window captured before sliding
 
@@ -1341,7 +1311,7 @@ class _RepeatIterable(Generic[T], Iterator[T], Iterable[T]):
 
 
 class _IntersperseIterable(Generic[T], Iterator[T], Iterable[T]):
-    __slots__ = ("_iterator", "_separator", "_needs_separator")
+    __slots__ = ("_iterator", "_separator", "_needs_separator", "_iterable")
 
     def __init__(self, it: Iterable[T], separator: T) -> None:
         self._iterable = it  # Store original if re-iteration needed
@@ -1489,25 +1459,6 @@ class _CycleIterable(Generic[T], Iterator[T], Iterable[T]):
             return next(self._iterator)
 
 
-class _IteratorFactoryIterable(Generic[T], Iterator[T], Iterable[T]):
-    __slots__ = ("_factory", "_current_iterator")
-
-    def __init__(self, factory: Callable[[], Iterator[T]]) -> None:
-        self._factory = factory
-        self._current_iterator: Optional[Iterator[T]] = None  # Initialized in __iter__
-
-    def __iter__(self) -> Iterator[T]:
-        self._current_iterator = self._factory()  # Get a fresh iterator
-        return self
-
-    def __next__(self) -> T:
-        if self._current_iterator is None:
-            raise RuntimeError(
-                "Iterator not initialized. __iter__ must be called first."
-            )
-        return next(self._current_iterator)
-
-
 class _DeferIterable(Generic[T], Iterator[T], Iterable[T]):
     __slots__ = ("_supplier", "_current_iterator")
 
@@ -1613,14 +1564,6 @@ class Stream(Generic[T]):
         Creates a stream of Pair(key, value) from the items of the given dictionary.
         """
         return Stream(dictionary.items()).map(pair_of)
-
-    @staticmethod
-    def from_iterator_factory(factory: Callable[[], Iterator[T]]) -> "Stream[T]":
-        """
-        Creates a stream from an iterator factory. The factory is called to produce
-        a new iterator each time the stream is iterated over.
-        """
-        return Stream(_IteratorFactoryIterable(factory))
 
     @staticmethod
     def defer(supplier: Callable[[], Iterable[T]]) -> "Stream[T]":
@@ -2428,16 +2371,16 @@ class Stream(Generic[T]):
 
         Example:
             Stream([1, 2, 3]).intersperse(0).to_list()
-            # Output: [1, 0, 2, 0, 3]
+            # Output: [1, 0, 2, 0, 3, 0]
 
             Stream(["a", "b"]).intersperse("-").to_list()
-            # Output: ["a", "-", "b"]
+            # Output: ["a", "-", "b", "-"]
 
             Stream([]).intersperse(0).to_list()
             # Output: []
 
             Stream([1]).intersperse(0).to_list()
-            # Output: [1]
+            # Output: [1, 0]
 
         Args:
             separator (T): The element to insert between original elements.

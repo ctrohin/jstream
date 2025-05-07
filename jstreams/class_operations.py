@@ -17,7 +17,7 @@ class ClassOps:
         Returns:
             bool: True if the object is an instance, False otherwise
         """
-        return isinstance(obj, self.__class_type)
+        return type(obj) == self.__class_type
 
     def instance_of_subclass(self, obj: Any) -> bool:
         """

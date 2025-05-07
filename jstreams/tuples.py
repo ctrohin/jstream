@@ -34,7 +34,13 @@ class Pair(Generic[T, V]):
             and value.right() == self.right()
         )
 
+    def __hash__(self) -> int:
+        return hash((self.__left, self.__right))
+
     def __str__(self) -> str:
+        return f"left={self.__left}, right={self.__right}"
+
+    def __repr__(self) -> str:
         return f"left={self.__left}, right={self.__right}"
 
 
@@ -64,7 +70,13 @@ class Triplet(Generic[T, V, K], Pair[T, K]):
             and value.middle() == self.middle()
         )
 
+    def __hash__(self) -> int:
+        return hash((self.__left, self.__middle, self.__right))
+
     def __str__(self) -> str:
+        return f"left={self.__left}, middle={self.__middle}, right={self.__right}"
+
+    def __repr__(self) -> str:
         return f"left={self.__left}, middle={self.__middle}, right={self.__right}"
 
 

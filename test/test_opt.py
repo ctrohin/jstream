@@ -108,3 +108,150 @@ class TestOpt(BaseTestCase):
         self.assertEqual(
             Opt(True).map(lambda v: Opt(v)).flat_map(lambda v: v).get(), True
         )
+
+    def test_opt_empty_factory(self) -> None:
+        empty_opt1 = Opt.empty()
+        empty_opt2 = Opt.empty()
+        self.assertTrue(empty_opt1.is_empty())
+        self.assertIs(
+            empty_opt1, empty_opt2, "Opt.empty() should return a cached instance"
+        )
+
+    def test_opt_when_factory(self) -> None:
+        self.assertEqual(
+            Opt.when(True, "value").get_actual(), Opt("value").get_actual()
+        )
+        self.assertIsNone(Opt.when(False, "value").get_actual())
+        self.assertTrue(Opt.when(False, "value").is_empty())
+
+    def test_opt_when_supplied_factory(self) -> None:
+        supplier_called = False
+
+        def supplier() -> str:
+            nonlocal supplier_called
+            supplier_called = True
+            return "supplied_value"
+
+        # Condition is True
+        opt1 = Opt.when_supplied(True, supplier)
+        self.assertEqual(opt1.get_actual(), "supplied_value")
+        self.assertTrue(
+            supplier_called, "Supplier should be called when condition is True"
+        )
+
+        # Reset and test False condition
+        supplier_called = False
+        opt2 = Opt.when_supplied(False, supplier)
+        self.assertIsNone(opt2.get_actual())
+        self.assertTrue(opt2.is_empty())
+        self.assertFalse(
+            supplier_called, "Supplier should not be called when condition is False"
+        )
+
+    def test_opt_try_or_empty_factory(self) -> None:
+        def successful_call() -> str:
+            return "success"
+
+        def raises_value_error() -> str:
+            raise ValueError("Test error")
+
+        def raises_type_error() -> str:
+            raise TypeError("Another error")
+
+        # Successful call
+        self.assertEqual(Opt.try_or_empty(successful_call).get_actual(), "success")
+
+        # Catches specified exception (ValueError)
+        self.assertIsNone(Opt.try_or_empty(raises_value_error, ValueError).get_actual())
+        self.assertTrue(Opt.try_or_empty(raises_value_error, ValueError).is_empty())
+
+        # Does not catch unspecified exception if others are specified
+        with self.assertRaises(TypeError):
+            Opt.try_or_empty(raises_type_error, ValueError)
+
+        # Catches default Exception if no specific exceptions are provided
+        self.assertEqual(Opt.try_or_empty(raises_value_error), Opt.empty())
+        self.assertEqual(Opt.try_or_empty(raises_type_error), Opt.empty())
+
+        # Catches multiple specified exceptions
+        self.assertEqual(
+            Opt.try_or_empty(raises_value_error, ValueError, TypeError), Opt.empty()
+        )
+        self.assertEqual(
+            Opt.try_or_empty(raises_type_error, ValueError, TypeError), Opt.empty()
+        )
+
+    def test_opt_first_present_factory(self) -> None:
+        opt_a = Opt("a")
+        opt_b = Opt("b")
+        empty1 = Opt.empty()
+        empty2 = Opt.empty()
+
+        self.assertEqual(Opt.first_present(empty1, opt_a, opt_b), opt_a)
+        self.assertEqual(Opt.first_present(opt_a, empty1, opt_b), opt_a)
+        self.assertEqual(Opt.first_present(empty1, empty2, opt_b), opt_b)
+        self.assertEqual(Opt.first_present(empty1, empty2), Opt.empty())
+        self.assertTrue(Opt.first_present(empty1, empty2).is_empty())
+        self.assertEqual(Opt.first_present(), Opt.empty())
+        self.assertEqual(Opt.first_present(opt_a), opt_a)
+
+    def test_or_else_raise(self) -> None:
+        self.assertEqual(Opt("value").or_else_raise(), "value")
+        self.assertRaises(ValueError, lambda: Opt(None).or_else_raise())
+        self.assertRaises(
+            RuntimeError,
+            lambda: Opt(None).or_else_raise_from(lambda: RuntimeError("Test error")),
+        )
+
+    def test_if_present_or_else(self) -> None:
+        present_action_called = False
+        empty_action_called = False
+
+        def present_action(val: str) -> None:
+            nonlocal present_action_called
+            present_action_called = True
+            self.assertEqual(val, "value")
+
+        def empty_action() -> None:
+            nonlocal empty_action_called
+            empty_action_called = True
+
+        Opt("value").if_present_or_else(present_action, empty_action)
+        self.assertTrue(present_action_called)
+        self.assertFalse(empty_action_called)
+
+        present_action_called = False  # Reset
+        Opt.empty().if_present_or_else(present_action, empty_action)
+        self.assertFalse(present_action_called)
+        self.assertTrue(empty_action_called)
+
+    def test_or_else_opt(self) -> None:
+        self.assertEqual(Opt("value").or_else_opt("other"), "value")
+        self.assertEqual(Opt.empty().or_else_opt("other"), "other")
+        self.assertIsNone(
+            Opt.empty().or_else_opt(None),
+        )
+
+    def test_or_else_get_opt(self) -> None:
+        supplier_called = False
+
+        def supplier() -> Optional[str]:
+            nonlocal supplier_called
+            supplier_called = True
+            return "supplied_opt"
+
+        self.assertEqual(Opt("value").or_else_get_opt(supplier), "value")
+        self.assertFalse(supplier_called)
+
+        self.assertEqual(Opt.empty().or_else_get_opt(supplier), "supplied_opt")
+        self.assertTrue(supplier_called)
+
+        supplier_called = False  # Reset
+
+        def empty_supplier() -> Optional[str]:
+            nonlocal supplier_called
+            supplier_called = True
+            return None
+
+        self.assertIsNone(Opt.empty().or_else_get_opt(empty_supplier))
+        self.assertTrue(supplier_called)
