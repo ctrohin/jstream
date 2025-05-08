@@ -3,6 +3,11 @@ from baseTest import BaseTestCase
 from jstreams import Stream
 from jstreams.collectors import Collectors
 from jstreams.stream import Opt
+from jstreams.stream_operations import (
+    extract_list,
+    extract_non_null_list,
+    not_null_elements,
+)
 from jstreams.tuples import Pair
 
 
@@ -780,3 +785,43 @@ class TestStream(BaseTestCase):
         self.assertEqual(Stream([1, 2, 3]).zip([]).to_list(), [])
         self.assertEqual(Stream([]).zip([1, 2, 3]).to_list(), [])
         self.assertEqual(Stream([]).zip([]).to_list(), [])
+
+    def test_extract_list(self) -> None:
+        obj = {
+            "test": 1,
+            "test2": 2,
+            "test3": 3,
+            "test4": 4,
+            "test5": 5,
+        }
+        self.assertEqual(extract_list(obj, ["test"]), [1])
+        self.assertEqual(extract_list(obj, ["test2"]), [2])
+        self.assertEqual(extract_list(obj, ["test3", "test4"]), [3, 4])
+        self.assertEqual(extract_list(obj, ["test5", "test6"]), [5, None])
+        self.assertEqual(extract_list(obj, ["test5", "test6", "test"]), [5, None, 1])
+
+    def test_extract_non_null_list(self) -> None:
+        obj = {
+            "test": 1,
+            "test2": 2,
+            "test3": 3,
+            "test4": 4,
+            "test5": 5,
+        }
+        self.assertEqual(extract_non_null_list(obj, ["test"]), [1])
+        self.assertEqual(extract_non_null_list(obj, ["test2"]), [2])
+        self.assertEqual(extract_non_null_list(obj, ["test3", "test4"]), [3, 4])
+        self.assertEqual(extract_non_null_list(obj, ["test5", "test6"]), [5])
+        self.assertEqual(extract_non_null_list(obj, ["test5", "test6", "test"]), [5, 1])
+
+    def test_non_null_elements(self) -> None:
+        self.assertEqual(not_null_elements([1, None, 2, None, 3]), [1, 2, 3])
+        self.assertEqual(not_null_elements([]), [])
+        self.assertEqual(not_null_elements([None, None]), [])
+        self.assertEqual(not_null_elements([None, 1]), [1])
+        self.assertEqual(not_null_elements([1, None]), [1])
+        self.assertEqual(not_null_elements([None]), [])
+        self.assertEqual(not_null_elements([1]), [1])
+        self.assertEqual(not_null_elements([None, 1, None]), [1])
+        self.assertEqual(not_null_elements([None, None, 1]), [1])
+        self.assertEqual(not_null_elements([1, 2, 3]), [1, 2, 3])

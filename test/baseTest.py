@@ -10,6 +10,7 @@ class BaseTestCase(unittest.TestCase):
     def setUp(self):
         injector().clear()
         events().clear()
+        scheduler().stop()
         scheduler().reset()
 
     def assertThrowsException(
