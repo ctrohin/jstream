@@ -125,18 +125,25 @@ def drop_while(
         return ret
 
     index = 0
-
+    start_adding = False
     pred = predicate_of(predicate)
     for el in target:
+        if start_adding:
+            ret.append(el)
+            continue
         if pred.apply(el):
             index += 1
         else:
-            break
-    return list(target)[index:]
+            start_adding = True
+            ret.append(el)
+
+    return ret
 
 
 def take_until(
-    target: Iterable[T], predicate: Union[Predicate[T], Callable[[T], bool]]
+    target: Iterable[T],
+    predicate: Union[Predicate[T], Callable[[T], bool]],
+    include_stop_value: bool = False,
 ) -> list[T]:
     """
     Returns the first batch of elements until the predicate returns True.
@@ -155,9 +162,11 @@ def take_until(
 
     pred = predicate_of(predicate)
     for el in target:
-        ret.append(el)  # Append the element first
         if pred.apply(el):  # Then check if the condition is met
+            if include_stop_value:
+                ret.append(el)  # Append the if it needs to be included
             break  # Stop after including the element
+        ret.append(el)
     return ret
 
 
@@ -216,6 +225,10 @@ def reduce(
 
     result: T = elem_list[0]
     reducer_obj = reducer_of(reducer)
+    first = True
     for el in elem_list:
-        result = reducer_obj.reduce(el, result)
+        if first:
+            first = False
+            continue
+        result = reducer_obj.reduce(result, el)
     return result
