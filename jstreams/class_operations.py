@@ -1,3 +1,4 @@
+import inspect
 from typing import Any
 
 from jstreams.predicate import is_instance
@@ -45,6 +46,12 @@ class ClassOps:
         """
         return self.subclass_of(type(obj))
 
+    def __inherits_from(self, child: type, parent_name: str) -> bool:
+        if inspect.isclass(child):
+            if parent_name in [c.__name__ for c in inspect.getmro(child)[1:]]:
+                return True
+        return False
+
     def subclass_of(self, typ: type) -> bool:
         """
         Checks if the given class is a subclass of this `ClassOps` type
@@ -55,7 +62,9 @@ class ClassOps:
         Returns:
             bool: True if the type is a subclass, False otherwise
         """
-        return issubclass(typ, self.__class_type)
+        return self.is_same_type(typ) or self.__inherits_from(
+            typ, self.__class_type.__name__
+        )
 
     def is_same_type(self, typ: type) -> bool:
         """
@@ -100,4 +109,4 @@ class ClassOps:
         Returns:
             bool: True if the object is not an instance, False otherwise
         """
-        return not isinstance(obj, self.__class_type)
+        return not self.instance_of(obj)
