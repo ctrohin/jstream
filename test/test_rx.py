@@ -316,8 +316,10 @@ class TestRx(BaseTestCase):
         val = Value(None)
         event(int).subscribe(val.set)
         event(int).publish_if(1, lambda _: True)
+        sleep(1)
         self.assertEqual(val.get(), 1)
 
         val.set(None)
         event(int).publish_if(2, lambda _: False)
+        sleep(1)
         self.assertEqual(val.get(), None)

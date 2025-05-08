@@ -379,8 +379,19 @@ class _ObservableBase(Subscribable[T]):
         self._last_val = val
 
         if self.__subscriptions is not None:
-            for sub in self.__subscriptions:
-                self._push_to_subscription(sub, val)
+            # Notify async subscriptions first, so they can be executed in parallel
+            sub_stream = Stream(self.__subscriptions)
+            (
+                sub_stream.filter(lambda s: not s.is_paused())
+                .filter(lambda s: s.is_async())
+                .each(lambda s: self._push_to_subscription(s, val))
+            )
+            # Notify sync subscriptions after async ones
+            (
+                sub_stream.filter(lambda s: not s.is_paused())
+                .filter(lambda s: not s.is_async())
+                .each(lambda s: self._push_to_subscription(s, val))
+            )
 
     def _push_to_subscription(self, sub: ObservableSubscription[Any], val: T) -> None:
         if not sub.is_paused():
@@ -401,6 +412,26 @@ class _ObservableBase(Subscribable[T]):
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
     ) -> ObservableSubscription[Any]:
+        """
+        Subscribe to this pipe in either synchronous(default) or asynchronous mode.
+        The subscription will be executed in a thread pool if asynchronous is set to True.
+        Asynchronous subscriptions will receive events emitted from the parent observable
+        as soon as they are available. Synchronous subscriptions will receive events in the order of subscription.
+        Heavy computations in the subscription will block the parent observable until the subscription is completed.
+        As such, it is recommended to use asynchronous subscriptions for heavy computations.
+
+        Args:
+            on_next (NextHandler[V]): On next handler for incoming values
+            on_error (ErrorHandler, optional): Error handler. Defaults to None.
+            on_completed (CompletedHandler[V], optional): Competed handler. Defaults to None.
+            on_dispose (DisposeHandler, optional): Dispose handler. Defaults to None.
+            asynchronous (boolean): Flags if the subscription should be asynchronous. Asynchronous subscriptions
+                                    are executed in a thread pool. Defaults to False.
+
+        Returns:
+            ObservableSubscription[V]: The subscription
+        """
+
         sub = ObservableSubscription(
             self, on_next, on_error, on_completed, on_dispose, asynchronous
         )
@@ -472,22 +503,30 @@ class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[V] = None,
         on_dispose: DisposeHandler = None,
+        asynchronous: bool = False,
     ) -> ObservableSubscription[V]:
         """
-        Subscribe to this pipe
+        Subscribe to this pipe in either synchronous(default) or asynchronous mode.
+        The subscription will be executed in a thread pool if asynchronous is set to True.
+        Asynchronous subscriptions will receive events emitted from the parent observable
+        as soon as they are available. Synchronous subscriptions will receive events in the order of subscription.
+        Heavy computations in the subscription will block the parent observable until the subscription is completed.
+        As such, it is recommended to use asynchronous subscriptions for heavy computations.
 
         Args:
             on_next (NextHandler[V]): On next handler for incoming values
             on_error (ErrorHandler, optional): Error handler. Defaults to None.
             on_completed (CompletedHandler[V], optional): Competed handler. Defaults to None.
             on_dispose (DisposeHandler, optional): Dispose handler. Defaults to None.
+            asynchronous (boolean): Flags if the subscription should be asynchronous. Asynchronous subscriptions
+                                    are executed in a thread pool. Defaults to False.
 
         Returns:
             ObservableSubscription[V]: The subscription
         """
         wrapped_on_next, wrapped_on_completed = self.__wrap(on_next, on_completed)
         return self.__parent.subscribe(
-            wrapped_on_next, on_error, wrapped_on_completed, on_dispose
+            wrapped_on_next, on_error, wrapped_on_completed, on_dispose, asynchronous
         )
 
     def __wrap(
