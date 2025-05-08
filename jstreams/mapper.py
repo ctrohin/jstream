@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Generic, Iterable, TypeVar, Union
+from typing import Any, Callable, Generic, Iterable, TypeVar, Union
 
 from jstreams.utils import each
 
@@ -87,6 +87,11 @@ class _WrapMapper(Mapper[T, V]):
     def map(self, value: T) -> V:
         return self.__mapper(value)
 
+    def __eq__(self, value: Any) -> bool:
+        if not isinstance(value, _WrapMapper):
+            return False
+        return self.__mapper == value.__mapper
+
 
 class _WrapMapperWith(MapperWith[T, K, V]):
     __slots__ = ["__mapper"]
@@ -96,6 +101,11 @@ class _WrapMapperWith(MapperWith[T, K, V]):
 
     def map(self, value: T, withValue: K) -> V:
         return self.__mapper(value, withValue)
+
+    def __eq__(self, value: Any) -> bool:
+        if not isinstance(value, _WrapMapperWith):
+            return False
+        return self.__mapper == value.__mapper
 
 
 def mapper_of(mapper: Union[Mapper[T, V], Callable[[T], V]]) -> Mapper[T, V]:
