@@ -67,7 +67,9 @@ class _Event(Generic[T]):
             ObservableSubscription[T]: An object representing the subscription, which can be used
                                     to cancel the subscription later (`.cancel()`).
         """
-        return self.__subject.subscribe(on_publish, on_dispose=on_dispose)
+        return self.__subject.subscribe(
+            on_publish, on_dispose=on_dispose, asynchronous=True
+        )
 
     def publish_if(
         self, event_payload: T, condition: Union[Callable[[T], bool], Predicate[T]]

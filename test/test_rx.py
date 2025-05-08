@@ -1,3 +1,4 @@
+from time import sleep
 from baseTest import BaseTestCase
 from jstreams import (
     BehaviorSubject,
@@ -269,7 +270,7 @@ class TestRx(BaseTestCase):
 
         event(int).publish(1)
         event(int).publish(2)
-
+        sleep(1)
         if subs:
             subpipe.cancel()
             subval.cancel()
@@ -306,6 +307,7 @@ class TestRx(BaseTestCase):
         self.assertIsNone(test.str_value)
         event(int).publish(10)
         event(str).publish("test")
+        sleep(1)
         self.assertEqual(test.int_value, 10)
         self.assertEqual(test.str_value, "test")
         del test

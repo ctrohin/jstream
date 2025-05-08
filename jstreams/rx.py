@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from typing import (
     Callable,
@@ -11,6 +12,7 @@ from typing import (
 )
 import uuid
 from copy import deepcopy
+
 from jstreams.stream import Stream
 import abc
 
@@ -87,6 +89,7 @@ class ObservableSubscription(Generic[T]):
         "__on_dispose",
         "__subscription_id",
         "__paused",
+        "__asynchronous",
     )
 
     def __init__(
@@ -96,6 +99,7 @@ class ObservableSubscription(Generic[T]):
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
+        asynchronous: bool = False,
     ) -> None:
         self.__parent = parent
         self.__on_next = on_next
@@ -104,6 +108,10 @@ class ObservableSubscription(Generic[T]):
         self.__on_dispose = on_dispose
         self.__subscription_id = str(uuid.uuid4())
         self.__paused = False
+        self.__asynchronous = asynchronous
+
+    def is_async(self) -> bool:
+        return self.__asynchronous
 
     def get_subscription_id(self) -> str:
         return self.__subscription_id
@@ -355,8 +363,12 @@ class Piped(abc.ABC, Generic[T, V]):
         pass
 
 
+MAX_EXECUTORS = 10
+
+
 class _ObservableBase(Subscribable[T]):
     __slots__ = ("__subscriptions", "_parent", "_last_val")
+    _thread_pool = ThreadPoolExecutor(max_workers=MAX_EXECUTORS)
 
     def __init__(self) -> None:
         self.__subscriptions: list[ObservableSubscription[Any]] = []
@@ -373,7 +385,10 @@ class _ObservableBase(Subscribable[T]):
     def _push_to_subscription(self, sub: ObservableSubscription[Any], val: T) -> None:
         if not sub.is_paused():
             try:
-                sub.on_next(val)
+                if sub.is_async():
+                    _ObservableBase._thread_pool.submit(sub.on_next, val)
+                else:
+                    sub.on_next(val)
             except Exception as e:
                 if sub.on_error is not None:
                     sub.on_error(e)
@@ -384,8 +399,11 @@ class _ObservableBase(Subscribable[T]):
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
+        asynchronous: bool = False,
     ) -> ObservableSubscription[Any]:
-        sub = ObservableSubscription(self, on_next, on_error, on_completed, on_dispose)
+        sub = ObservableSubscription(
+            self, on_next, on_error, on_completed, on_dispose, asynchronous
+        )
         self.__subscriptions.append(sub)
         if self._parent is not None:
             self._parent._push_to_sub_on_subscribe(sub)
