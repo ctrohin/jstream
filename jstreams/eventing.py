@@ -1,6 +1,7 @@
 from threading import Lock
-from typing import Any, Callable, Generic, Optional, TypeVar, overload
+from typing import Any, Callable, Generic, Optional, TypeVar, Union, overload
 
+from jstreams.predicate import Predicate
 from jstreams.rx import (
     DisposeHandler,
     ObservableSubscription,
@@ -28,6 +29,9 @@ N = TypeVar("N")
 V = TypeVar("V")
 
 __DEFAULT_EVENT_NAME__ = "__default__"
+# Attribute name for storing event listener metadata on function objects
+# Using a somewhat unique name to minimize collision chances.
+_EVENT_LISTENERS_METADATA_ATTR = "_jstreams_event_listeners_metadata_"
 
 
 class _Event(Generic[T]):
@@ -64,6 +68,22 @@ class _Event(Generic[T]):
                                     to cancel the subscription later (`.cancel()`).
         """
         return self.__subject.subscribe(on_publish, on_dispose=on_dispose)
+
+    def publish_if(
+        self, event_payload: T, condition: Union[Callable[[T], bool], Predicate[T]]
+    ) -> bool:
+        """
+        Publishes the event only if the condition is met.
+        Args:
+            event_payload (T): The event to potentially publish.
+            condition (Callable[[T], bool]): A function that takes the event and returns True if it should be published.
+        Returns:
+            bool: True if the event was published, False otherwise.
+        """
+        if condition(event_payload):
+            self.publish(event_payload)
+            return True
+        return False
 
     @overload
     def pipe(
@@ -441,3 +461,89 @@ def event(event_type: type[T], event_name: str = __DEFAULT_EVENT_NAME__) -> _Eve
         >>> counter_pipe_sub.cancel()
     """
     return _EventBroadcaster.get_instance().get_event(event_type, event_name)
+
+
+def on_event(
+    event_type: type, event_name: str = __DEFAULT_EVENT_NAME__
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """
+    Method decorator to mark a method as a listener for a specific event.
+
+    When a class is decorated with `@managed_events`, methods decorated
+    with `@on_event` will be automatically subscribed to the specified event.
+    The decorated method will be called with the event payload as its single
+    argument (after `self`).
+
+    A method can be decorated multiple times with `@on_event` to listen to
+    different events.
+
+    Args:
+        event_type (type): The type of the event to listen for.
+        event_name (str, optional): The specific name of the event channel.
+                                    Defaults to `__DEFAULT_EVENT_NAME__`.
+    """
+
+    def decorator(method: Callable[..., Any]) -> Callable[..., Any]:
+        if not hasattr(method, _EVENT_LISTENERS_METADATA_ATTR):
+            setattr(method, _EVENT_LISTENERS_METADATA_ATTR, [])
+        # Store as a list of tuples (event_type, event_name)
+        getattr(method, _EVENT_LISTENERS_METADATA_ATTR).append((event_type, event_name))
+        return method
+
+    return decorator
+
+
+def managed_events() -> Callable[[T], T]:
+    def decorator(cls: F) -> F:
+        """
+        Class decorator that automatically subscribes methods marked with `@on_event`
+        to their respective events and manages their subscriptions.
+
+        It wraps the class's `__init__` method to set up subscriptions after
+        the instance is initialized. It also adds a `cancel_all_managed_events`
+        method to the class for explicit cleanup of all subscriptions made through
+        this mechanism for an instance (including those from superclasses if they
+        also use `@managed_events()`).
+        """
+        original_init = cls.__init__  # type: ignore[misc]
+
+        def new_init(self: Any, *args: Any, **kwargs: Any) -> None:
+            original_init(self, *args, **kwargs)
+
+            if not hasattr(self, "_managed_event_subscriptions"):
+                self._managed_event_subscriptions: list[  # type: ignore[misc]
+                    ObservableSubscription[Any]
+                ] = []
+
+            # Iterate over members defined in the current class `cls` being decorated
+            for name, member_in_cls_dict in cls.__dict__.items():
+                if callable(member_in_cls_dict) and hasattr(
+                    member_in_cls_dict, _EVENT_LISTENERS_METADATA_ATTR
+                ):
+                    instance_method_obj = getattr(
+                        self, name
+                    )  # Get the bound method from the instance
+                    event_info_list = getattr(
+                        member_in_cls_dict, _EVENT_LISTENERS_METADATA_ATTR
+                    )
+                    for etype, ename in event_info_list:
+                        subscription = event(etype, ename).subscribe(
+                            instance_method_obj
+                        )
+                        self._managed_event_subscriptions.append(subscription)
+
+        def cancel_all_managed_events(self_instance: Any) -> None:
+            if hasattr(self_instance, "_managed_event_subscriptions"):
+                for sub in self_instance._managed_event_subscriptions:
+                    try:
+                        sub.cancel()
+                    except Exception:  # pragma: no cover
+                        pass  # Best effort to cancel
+                self_instance._managed_event_subscriptions.clear()
+
+        cls.__init__ = new_init  # type: ignore[misc]
+        cls.__del__ = cancel_all_managed_events  # type: ignore[attr-defined]
+
+        return cls
+
+    return decorator

@@ -7,7 +7,7 @@ from jstreams import (
     Single,
     RX,
 )
-from jstreams.eventing import event, events
+from jstreams.eventing import event, events, managed_events, on_event
 from jstreams.utils import Value
 
 
@@ -285,3 +285,37 @@ class TestRx(BaseTestCase):
         self.assertListEqual(valsub, [1, 2])
         self.assertTrue(disposed_val.get())
         self.assertTrue(disposed_valsub.get())
+
+    def test_managed_events(self) -> None:
+        @managed_events()
+        class TestManagedEvents:
+            def __init__(self):
+                self.int_value = None
+                self.str_value = None
+
+            @on_event(int)
+            def on_int_event(self, value: int) -> None:
+                self.int_value = value
+
+            @on_event(str)
+            def on_str_event(self, value: str) -> None:
+                self.str_value = value
+
+        test = TestManagedEvents()
+        self.assertIsNone(test.int_value)
+        self.assertIsNone(test.str_value)
+        event(int).publish(10)
+        event(str).publish("test")
+        self.assertEqual(test.int_value, 10)
+        self.assertEqual(test.str_value, "test")
+        del test
+
+    def test_publish_if(self) -> None:
+        val = Value(None)
+        event(int).subscribe(val.set)
+        event(int).publish_if(1, lambda _: True)
+        self.assertEqual(val.get(), 1)
+
+        val.set(None)
+        event(int).publish_if(2, lambda _: False)
+        self.assertEqual(val.get(), None)
