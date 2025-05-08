@@ -20,3 +20,15 @@ class TestClassOperations(BaseTestCase):
         self.assertFalse(ClassOps(BaseClass).type_equals(DerivedClass()))
         self.assertFalse(ClassOps(DerivedClass).type_equals(BaseClass()))
         self.assertTrue(ClassOps(BaseClass).type_equals(BaseClass()))
+
+    def test_instance_of_derived(self) -> None:
+        class BaseClass:
+            pass
+
+        class DerivedClass(BaseClass):
+            pass
+
+        self.assertTrue(ClassOps(DerivedClass).instance_of(DerivedClass()))
+        self.assertTrue(ClassOps(BaseClass).instance_of(DerivedClass()))
+        self.assertFalse(ClassOps(DerivedClass).instance_of(BaseClass()))
+        self.assertTrue(ClassOps(BaseClass).instance_of(BaseClass()))
