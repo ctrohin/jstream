@@ -1906,6 +1906,19 @@ class Stream(Generic[T]):
 
     def of_type(self, the_type: type[V]) -> "Stream[V]":
         """
+        Returns all items of the exact given type as a stream. Subclasses will not
+        be considered of the exact same type
+
+        Args:
+            the_type (type[V]): The given type
+
+        Returns:
+            Stream[V]: The result stream
+        """
+        return self.filter(ClassOps(the_type).type_equals).cast(the_type)
+
+    def instances_of(self, the_type: type[V]) -> "Stream[V]":
+        """
         Returns all items of the given type as a stream
 
         Args:
