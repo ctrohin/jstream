@@ -1,8 +1,6 @@
 import inspect
 from typing import Any
 
-from jstreams.predicate import is_instance
-
 
 class ClassOps:
     __slots__ = ("__class_type",)

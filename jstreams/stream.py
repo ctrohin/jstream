@@ -49,6 +49,11 @@ class Opt(Generic[T]):
             Opt.__NONE = Opt(None)
         return cast(Opt[T], Opt.__NONE)
 
+    def __eq__(self, value: Any) -> bool:
+        if not isinstance(value, Opt):
+            return False
+        return self.__val == value.__val
+
     def get(self) -> T:
         """
         Returns the value of the Opt object if present, otherwise will raise a ValueError
