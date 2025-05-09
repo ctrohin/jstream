@@ -336,6 +336,15 @@ class _EventBroadcaster:
             )
         return self
 
+    def has_event(
+        self, event_type: type, event_name: str = __DEFAULT_EVENT_NAME__
+    ) -> bool:
+        with self._event_lock:
+            return (
+                event_type in self._subjects
+                and event_name in self._subjects[event_type]
+            )
+
     def get_event(
         self, event_type: type[T], event_name: str = __DEFAULT_EVENT_NAME__
     ) -> _Event[T]:
@@ -389,6 +398,21 @@ class EventBroadcaster:
         """
         _EventBroadcaster.get_instance().clear()
         return self
+
+    def has_event(
+        self, event_type: type, event_name: str = __DEFAULT_EVENT_NAME__
+    ) -> bool:
+        """
+        Check if an event exists.
+
+        Args:
+            event_type (type): The event type
+            event_name (str): The event name
+
+        Returns:
+            bool: True if the event exists, False otherwise.
+        """
+        return _EventBroadcaster.get_instance().has_event(event_type, event_name)
 
 
 def events() -> EventBroadcaster:

@@ -323,3 +323,10 @@ class TestRx(BaseTestCase):
         event(int).publish_if(2, lambda _: False)
         sleep(1)
         self.assertEqual(val.get(), None)
+
+    def test_has_events(self) -> None:
+        self.assertFalse(events().has_event(str))
+        event(str).publish("test")
+        self.assertTrue(events().has_event(str))
+        events().clear_event(str)
+        self.assertFalse(events().has_event(str))
