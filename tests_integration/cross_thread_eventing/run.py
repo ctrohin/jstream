@@ -1,6 +1,10 @@
 from threading import Thread
 from time import sleep
 from typing import Any
+import sys
+import unittest
+
+sys.path.append("../../")
 
 from jstreams.eventing import managed_events, on_event, event
 
@@ -70,6 +74,9 @@ def publish_events(events: list[Any], event_type: type) -> None:
         event(event_type).publish(event_type(ev))
 
 
+tc = unittest.TestCase()
+
+
 # We create two threads that will publish events of different types. The first thread
 # will publish int events and the second thread will publish str events. We use
 # the Thread class from the threading module to create the threads. We use the
@@ -95,7 +102,7 @@ print(str_subscriber.values)
 
 
 # We can now verify that the events were processed correctly.
-assert managed_subscriber.int_values == {1, 2, 3}
-assert managed_subscriber.str_values == {"a", "b", "c"}
-assert int_subscriber.values == {1, 2, 3}
-assert str_subscriber.values == {"a", "b", "c"}
+tc.assertEqual(managed_subscriber.int_values, {1, 2, 3})
+tc.assertEqual(managed_subscriber.str_values, {"a", "b", "c"})
+tc.assertEqual(int_subscriber.values, {1, 2, 3})
+tc.assertEqual(str_subscriber.values, {"a", "b", "c"})
