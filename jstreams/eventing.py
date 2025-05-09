@@ -1,3 +1,4 @@
+import inspect
 from threading import Lock
 from typing import Any, Callable, Generic, Optional, TypeVar, Union, overload
 
@@ -28,6 +29,7 @@ M = TypeVar("M")
 N = TypeVar("N")
 V = TypeVar("V")
 
+ClsT = TypeVar("ClsT", bound=type)
 __DEFAULT_EVENT_NAME__ = "__default__"
 # Attribute name for storing event listener metadata on function objects
 # Using a somewhat unique name to minimize collision chances.
@@ -495,57 +497,107 @@ def on_event(
     return decorator
 
 
-def managed_events() -> Callable[[T], T]:
-    def decorator(cls: F) -> F:
-        """
-        Class decorator that automatically subscribes methods marked with `@on_event`
-        to their respective events and manages their subscriptions.
+def managed_events() -> Callable[[ClsT], ClsT]:
+    """
+    Class decorator that automatically subscribes methods marked with `@on_event`
+    to their respective events and manages their subscriptions.
 
-        It wraps the class's `__init__` method to set up subscriptions after
-        the instance is initialized. It also adds a `cancel_all_managed_events`
-        method to the class for explicit cleanup of all subscriptions made through
-        this mechanism for an instance (including those from superclasses if they
-        also use `@managed_events()`).
+    It wraps the class's `__init__` method to set up subscriptions after
+    the instance is initialized. Subscriptions are made for `@on_event` decorated
+    methods found in the class itself and its base classes.
+
+    A `dispose_managed_events()` method is added to the class for explicit cleanup
+    of all subscriptions made through this mechanism for an instance.
+
+    The decorated class also becomes a context manager, so using an instance
+    in a `with` statement will automatically call `dispose_managed_events()`
+    on exit.
+    """
+
+    def decorator(cls: ClsT) -> ClsT:
+        """
+        Inner decorator function that modifies the class.
         """
         original_init = cls.__init__  # type: ignore[misc]
 
-        def new_init(self: Any, *args: Any, **kwargs: Any) -> None:
+        def new_init(self: object, *args: Any, **kwargs: Any) -> None:
+            # Call the original __init__ first. This allows base class initializers
+            # (potentially also decorated by managed_events) to run and set up their part.
             original_init(self, *args, **kwargs)
 
+            # Initialize instance-specific storage for subscriptions and setup tracking.
+            # These are initialized here to ensure they exist before any method tries to use them.
             if not hasattr(self, "_managed_event_subscriptions"):
-                self._managed_event_subscriptions: list[  # type: ignore[misc]
+                self._managed_event_subscriptions: list[  # type: ignore[misc,attr-defined]
                     ObservableSubscription[Any]
                 ] = []
+            if not hasattr(self, "_already_setup_managed_handlers"):
+                # Stores (function_object, event_type, event_name) to avoid double setup
+                # for the same handler on the same instance, especially with inheritance.
+                self._already_setup_managed_handlers: set[  # type: ignore[attr-defined,misc]
+                    tuple[Callable[..., Any], type, str]
+                ] = set()
 
-            # Iterate over members defined in the current class `cls` being decorated
-            for name, member_in_cls_dict in cls.__dict__.items():
-                if callable(member_in_cls_dict) and hasattr(
-                    member_in_cls_dict, _EVENT_LISTENERS_METADATA_ATTR
-                ):
-                    instance_method_obj = getattr(
-                        self, name
-                    )  # Get the bound method from the instance
-                    event_info_list = getattr(
-                        member_in_cls_dict, _EVENT_LISTENERS_METADATA_ATTR
-                    )
+            # Discover and subscribe event handlers from this class and its bases.
+            # Iterate over all methods of the instance (including inherited ones).
+            for _name, method_obj in inspect.getmembers(
+                self, predicate=inspect.ismethod
+            ):
+                # The metadata is stored on the original function object, not the bound method.
+                func_obj = method_obj.__func__
+                if hasattr(func_obj, _EVENT_LISTENERS_METADATA_ATTR):
+                    event_info_list = getattr(func_obj, _EVENT_LISTENERS_METADATA_ATTR)
                     for etype, ename in event_info_list:
-                        subscription = event(etype, ename).subscribe(
-                            instance_method_obj
-                        )
-                        self._managed_event_subscriptions.append(subscription)
+                        handler_key = (func_obj, etype, ename)
+                        if handler_key not in self._already_setup_managed_handlers:  # type: ignore[attr-defined]
+                            # 'method_obj' is the bound method (e.g., self.method_name)
+                            subscription = event(etype, ename).subscribe(method_obj)
+                            self._managed_event_subscriptions.append(subscription)  # type: ignore[attr-defined]
+                            self._already_setup_managed_handlers.add(handler_key)  # type: ignore[attr-defined]
 
-        def cancel_all_managed_events(self_instance: Any) -> None:
+        cls.__init__ = new_init  # type: ignore[misc]
+
+        # Define and add the explicit cleanup method
+        def dispose_managed_events(self_instance: object) -> None:
             if hasattr(self_instance, "_managed_event_subscriptions"):
-                for sub in self_instance._managed_event_subscriptions:
+                subscriptions = getattr(self_instance, "_managed_event_subscriptions")
+                for sub in subscriptions:
                     try:
                         sub.cancel()
                     except Exception:  # pragma: no cover
                         pass  # Best effort to cancel
-                self_instance._managed_event_subscriptions.clear()
+                subscriptions.clear()
+            if hasattr(self_instance, "_already_setup_managed_handlers"):
+                getattr(self_instance, "_already_setup_managed_handlers").clear()
 
-        cls.__init__ = new_init  # type: ignore[misc]
-        cls.__del__ = cancel_all_managed_events  # type: ignore[attr-defined]
+        setattr(cls, "dispose_managed_events", dispose_managed_events)
+
+        # Add context manager methods for automatic cleanup
+        if not hasattr(cls, "__enter__"):
+            setattr(cls, "__enter__", lambda self_instance: self_instance)
+        if not hasattr(cls, "__exit__"):
+            setattr(
+                cls,
+                "__exit__",
+                lambda self_instance, exc_type, exc_val, exc_tb: getattr(
+                    self_instance, "dispose_managed_events"
+                )(),
+            )
 
         return cls
 
     return decorator
+
+
+def dispose_managed_events(obj: Any) -> None:
+    """
+    Dispose managed events for the given object, if the object has one.
+
+    Args:
+        obj (Any): The object to dispose managed events for.
+    """
+    if hasattr(obj, "dispose_managed_events"):
+        try:
+            obj.dispose_managed_events()
+        except BaseException as _:
+            pass
