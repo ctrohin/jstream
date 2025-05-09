@@ -329,3 +329,11 @@ class TestRx(BaseTestCase):
         self.assertTrue(events().has_event(str))
         events().clear_event(str)
         self.assertFalse(events().has_event(str))
+
+    def test_subscribe_once(self) -> None:
+        elements = []
+        event(str).subscribe_once(elements.append)
+        event(str).publish("test")
+        event(str).publish("test2")
+        sleep(1)
+        self.assertListEqual(elements, ["test"])

@@ -2472,6 +2472,19 @@ def optional(val: Optional[T]) -> Opt[T]:
     return Opt(val)
 
 
+def nullable(val: Optional[T]) -> Opt[T]:
+    """
+    Helper method, equivalent to Opt.of_nullable(val)
+
+    Args:
+        val (Optional[T]): The value
+
+    Returns:
+        Opt[T]: The optional
+    """
+    return Opt.of_nullable(val)
+
+
 def pair_stream(left: Iterable[T], right: Iterable[V]) -> Stream[Pair[T, V]]:
     """
     Create a pair stream by zipping two iterables. The resulting stream will have the length

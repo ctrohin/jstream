@@ -1,4 +1,4 @@
-from jstreams.stream import Stream, Opt, stream, optional, pair_stream
+from jstreams.stream import Stream, Opt, stream, optional, pair_stream, nullable
 
 from jstreams.class_operations import ClassOps
 
@@ -269,6 +269,7 @@ from jstreams.eventing import (
     on_event,
     managed_events,
     dispose_managed_events,
+    wait_for_event,  # Add wait_for_event to exports
 )
 
 from jstreams.annotations import (
@@ -522,4 +523,6 @@ __all__ = [
     "on_event",
     "managed_events",
     "dispose_managed_events",
+    "wait_for_event",
+    "nullable",
 ]

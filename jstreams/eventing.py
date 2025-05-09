@@ -1,9 +1,10 @@
 import inspect
-from threading import Lock
+from threading import Lock, Event as ThreadingEvent
 from typing import Any, Callable, Generic, Optional, TypeVar, Union, overload
 
 from jstreams.predicate import Predicate
 from jstreams.rx import (
+    RX,
     DisposeHandler,
     ObservableSubscription,
     Pipe,
@@ -125,6 +126,31 @@ class _Event(Generic[T]):
             self.publish(event_payload)
             return True
         return False
+
+    def subscribe_once(
+        self,
+        on_publish: Callable[[T], Any],
+        on_dispose: DisposeHandler = None,
+    ) -> EventSubscription[T]:
+        """
+        Subscribes to the event channel for only the very next event.
+        The subscription is automatically canceled after the first event is received.
+
+        Args:
+            on_publish (Callable[[T], Any]): The function to call when the next event is published.
+            on_dispose (DisposeHandler, optional): A function to call when the subscription is disposed
+                                                (either after the event or if canceled manually).
+                                                Defaults to None.
+
+        Returns:
+            EventSubscription[T]: An object representing the subscription.
+        """
+        # Uses RX.take(1) to limit to one event
+        return EventSubscription(
+            self.pipe(RX.take(T, 1)).subscribe(  # type: ignore[misc]
+                on_publish, on_dispose=on_dispose, asynchronous=True
+            )
+        )
 
     @overload
     def pipe(
@@ -451,6 +477,15 @@ class EventBroadcaster:
         """
         return _EventBroadcaster.get_instance().has_event(event_type, event_name)
 
+    def get_event_types(self) -> list[type]:
+        """
+        Get all event types.
+
+        Returns:
+            list[type]: A list of all event types.
+        """
+        return list(_EventBroadcaster.get_instance()._subjects.keys())
+
 
 def events() -> EventBroadcaster:
     """
@@ -662,3 +697,32 @@ def dispose_managed_events(obj: Any) -> None:
             obj.dispose_managed_events()
         except BaseException as _:
             pass
+
+
+def wait_for_event(
+    event_type: type[T],
+    event_name: str = __DEFAULT_EVENT_NAME__,
+    timeout: Optional[float] = None,
+    condition: Optional[Callable[[T], bool]] = None,
+) -> Opt[T]:
+    received_signal = ThreadingEvent()
+    payload_holder: list[T] = []  # Use list for closure modification
+    payload_lock = Lock()
+
+    def _on_event(data: T) -> None:
+        with payload_lock:
+            if not payload_holder:  # Process only the first valid event
+                if condition is None or condition(data):
+                    payload_holder.append(data)
+                    received_signal.set()
+
+    subscription = event(event_type, event_name).subscribe(_on_event)
+
+    try:
+        if not received_signal.wait(timeout):
+            return Opt.empty()  # Timeout
+
+        with payload_lock:
+            return Opt.of_nullable(payload_holder[0] if payload_holder else None)
+    finally:
+        subscription.cancel()
