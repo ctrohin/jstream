@@ -61,6 +61,7 @@ class EventSubscription(Generic[T]):
         NOTE: Pause/resume will have no effect once the subscription is canceled.
         """
         self.__subscription.cancel()
+        self.__subscription.dispose()
 
     def is_paused(self) -> bool:
         """

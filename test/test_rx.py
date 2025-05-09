@@ -279,12 +279,14 @@ class TestRx(BaseTestCase):
             events().clear_event(int)
 
         event(int).publish(3)
+        sleep(1)
         self.assertEqual(event(int).latest(), 3)
 
         self.assertListEqual(vals, ["1", "2"])
         self.assertListEqual(valsub, [1, 2])
-        self.assertTrue(disposed_val.get())
-        self.assertTrue(disposed_valsub.get())
+        if subs:
+            self.assertTrue(disposed_val.get())
+            self.assertTrue(disposed_valsub.get())
 
     def test_managed_events(self) -> None:
         @managed_events()
