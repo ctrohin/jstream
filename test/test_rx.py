@@ -275,7 +275,6 @@ class TestRx(BaseTestCase):
             subpipe.cancel()
             subval.cancel()
             subpipe.dispose()
-            subval.dispose()
         else:
             events().clear_event(int)
 

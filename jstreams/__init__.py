@@ -263,7 +263,13 @@ from jstreams.scheduler import (
     Duration,
 )
 
-from jstreams.eventing import events, event
+from jstreams.eventing import (
+    events,
+    event,
+    on_event,
+    managed_events,
+    dispose_managed_events,
+)
 
 from jstreams.annotations import (
     builder,
@@ -513,4 +519,7 @@ __all__ = [
     "take_until",
     "drop_until",
     "find_last",
+    "on_event",
+    "managed_events",
+    "dispose_managed_events",
 ]

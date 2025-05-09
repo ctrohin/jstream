@@ -36,6 +36,41 @@ __DEFAULT_EVENT_NAME__ = "__default__"
 _EVENT_LISTENERS_METADATA_ATTR = "_jstreams_event_listeners_metadata_"
 
 
+class EventSubscription(Generic[T]):
+    slots = ("__subscription",)
+
+    def __init__(self, subscription: ObservableSubscription[T]) -> None:
+        self.__subscription = subscription
+
+    def pause(self) -> None:
+        """
+        Pause the subscription. While paused, the subscription will not receive any incoming events.
+        """
+        self.__subscription.pause()
+
+    def resume(self) -> None:
+        """
+        Resume the subscription. When resumed, the subscription will start receiving upcoming events.
+        """
+        self.__subscription.resume()
+
+    def cancel(self) -> None:
+        """
+        Cancel the subscription. Once canceled, the subscription will no longer receive events.
+        NOTE: Pause/resume will have no effect once the subscription is canceled.
+        """
+        self.__subscription.cancel()
+
+    def is_paused(self) -> bool:
+        """
+        Checks if the subscription is paused.
+
+        Returns:
+            bool: True if the subscription is paused, False if the subscription is active.
+        """
+        return self.__subscription.is_paused()
+
+
 class _Event(Generic[T]):
     __slots__ = ["__subject"]
 
@@ -55,7 +90,7 @@ class _Event(Generic[T]):
         self,
         on_publish: Callable[[T], Any],
         on_dispose: DisposeHandler = None,
-    ) -> ObservableSubscription[T]:
+    ) -> EventSubscription[T]:
         """
         Subscribes to events published on this channel.
 
@@ -66,11 +101,13 @@ class _Event(Generic[T]):
                                                 Defaults to None.
 
         Returns:
-            ObservableSubscription[T]: An object representing the subscription, which can be used
-                                    to cancel the subscription later (`.cancel()`).
+            EventSubscription[T]: An object representing the subscription, which can be used
+                                    to pause, resume or cancel the subscription later.
         """
-        return self.__subject.subscribe(
-            on_publish, on_dispose=on_dispose, asynchronous=True
+        return EventSubscription(
+            self.__subject.subscribe(
+                on_publish, on_dispose=on_dispose, asynchronous=True
+            )
         )
 
     def publish_if(
