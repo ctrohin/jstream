@@ -1,6 +1,6 @@
 from typing import Callable, Generic, Optional, TypeVar, Union, cast, overload
 
-from jstreams.stream import Stream
+from jstreams.stream import Opt, Stream
 from jstreams.predicate import Predicate
 from jstreams.utils import require_non_null
 
@@ -373,6 +373,15 @@ class Match(Generic[T]):
             ]
         )
 
+    def __of_list(self, cases: list[Optional[Case[T, V]]]) -> Opt[V]:
+        return (
+            Stream(cases)
+            .non_null()
+            .map(require_non_null)
+            .find_first(lambda c: c.matches(self.__value))  # Short-circuits
+            .map(lambda c: c.result())  # Get result only for the matched case
+        )
+
     def of_list(self, cases: list[Optional[Case[T, V]]]) -> Optional[V]:
         """
         Evaluates the provided cases against the stored value and returns the result
@@ -388,13 +397,26 @@ class Match(Generic[T]):
             An Optional containing the result (V) of the first matching case.
             Returns None if no case matches the stored value.
         """
-        return (
-            Stream(cases)
-            .non_null()
-            .map(require_non_null)
-            .find_first(lambda c: c.matches(self.__value))  # Short-circuits
-            .map(lambda c: c.result())  # Get result only for the matched case
-            .get_actual()  # Return Optional[V]
+        return self.__of_list(cases).get_actual()
+
+    def of_list_exhaustive(self, cases: list[Optional[Case[T, V]]]) -> V:
+        """
+        Evaluates the provided cases against the stored value and returns the result
+        of the first matching case. Raises MatchError if no case matches.
+
+        Args:
+            cases: The list of cases.
+
+        Returns:
+            The result (V) of the first matching case.
+
+        Raises:
+            MatchError: If no case matches the stored value.
+        """
+        return self.__of_list(cases).or_else_raise_from(
+            lambda: ValueError(
+                f"No case matched value: {self.__value}. Match was not exhaustive."
+            )
         )
 
 

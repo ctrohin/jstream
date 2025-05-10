@@ -80,3 +80,35 @@ class TestMatch(BaseTestCase):
             case(is_not_none, "Not none"),
         )
         self.assertEqual(val, "Not none", "Case should be isNotNone")
+
+    def test_match_exhaustive(self) -> None:
+        val = match(5).of_list_exhaustive(
+            [
+                case(1, "test1"),
+                case(2, "test2"),
+                case(3, "test3"),
+                case(4, "test4"),
+                case(5, "test5"),
+            ]
+        )
+        self.assertEqual(val, "test5", "Value should be correct")
+
+    def test_match_exhaustive_no_match(self) -> None:
+        self.assertRaises(
+            ValueError,
+            lambda: match(6).of_list_exhaustive(
+                [
+                    case(1, "test1"),
+                    case(2, "test2"),
+                    case(3, "test3"),
+                    case(4, "test4"),
+                    case(5, "test5"),
+                ]
+            ),
+        )
+
+    def test_match_exhaustive_no_match_empty(self) -> None:
+        self.assertRaises(
+            ValueError,
+            lambda: match(6).of_list_exhaustive([]),
+        )

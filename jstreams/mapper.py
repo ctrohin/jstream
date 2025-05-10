@@ -40,6 +40,19 @@ class Mapper(ABC, Generic[T, V]):
             return mapper
         return _WrapMapper(mapper)
 
+    @staticmethod
+    def constant(value: K) -> "Mapper[Any, K]":
+        """
+        Returns a mapper that always returns the given constant value.
+
+        Args:
+            value (K): The constant value to be returned by the mapper.
+
+        Returns:
+            Mapper[Any, K]: A mapper that returns the constant value.
+        """
+        return _WrapMapper(lambda _: value)
+
 
 class MapperWith(ABC, Generic[T, K, V]):
     @abstractmethod
