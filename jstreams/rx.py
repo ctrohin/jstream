@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+import logging
 from threading import Lock
 from typing import (
     Callable,
@@ -393,16 +394,23 @@ class _ObservableBase(Subscribable[T]):
                 .each(lambda s: self._push_to_subscription(s, val))
             )
 
+    def __push_value(self, sub: ObservableSubscription[Any], val: T) -> None:
+        try:
+            sub.on_next(val)
+        except Exception as e:
+            if sub.on_error is not None:
+                try:
+                    sub.on_error(e)
+                except Exception as e:
+                    # Log uncaught exceptions in the error handler
+                    logging.getLogger("observable").error(e)
+
     def _push_to_subscription(self, sub: ObservableSubscription[Any], val: T) -> None:
         if not sub.is_paused():
-            try:
-                if sub.is_async():
-                    _ObservableBase._thread_pool.submit(sub.on_next, val)
-                else:
-                    sub.on_next(val)
-            except Exception as e:
-                if sub.on_error is not None:
-                    sub.on_error(e)
+            if sub.is_async():
+                _ObservableBase._thread_pool.submit(lambda: self.__push_value(sub, val))
+            else:
+                self.__push_value(sub, val)
 
     def subscribe(
         self,
@@ -1114,7 +1122,79 @@ class DropUntil(BaseFilteringOperator[T]):
         return False
 
 
+_SENTINEL = object()
+
+
+class DistinctUntilChanged(BaseFilteringOperator[T]):
+    __slots__ = ("__key_selector", "__prev_key")
+
+    def __init__(self, key_selector: Optional[Callable[[T], K]] = None) -> None:
+        self.__key_selector = key_selector
+        self.__prev_key: Any = _SENTINEL  # Stores the key of the previous item
+        super().__init__(self.__is_distinct)
+
+    def init(self) -> None:
+        """Called when the operator is (re)initialized, e.g., when a pipe is cloned."""
+        self.__prev_key = _SENTINEL
+
+    def __is_distinct(self, val: T) -> bool:
+        current_key = self.__key_selector(val) if self.__key_selector else val
+
+        if self.__prev_key is _SENTINEL:
+            self.__prev_key = current_key
+            return True
+
+        is_new: bool = self.__prev_key != current_key
+        if is_new:
+            self.__prev_key = current_key
+        return is_new
+
+
+class Tap(BaseMappingOperator[T, T]):
+    __slots__ = ("__action",)
+
+    def __init__(self, action: Callable[[T], None]) -> None:
+        self.__action = action
+        super().__init__(self.__perform_action_and_return)
+
+    def __perform_action_and_return(self, val: T) -> T:
+        self.__action(val)
+        return val
+
+
 class RX:
+    @staticmethod
+    def of_type(typ: type[T]) -> RxOperator[T, T]:
+        """
+        Allows only values of the given type to flow through
+
+        Args:
+            typ (type[T]): The type of the values that will pass throgh
+
+        Returns:
+            RxOperator[T, T]: A OfType operator
+        """
+        return Filter(lambda v: isinstance(v, typ))
+
+    @staticmethod
+    def tap(action: Callable[[T], Any]) -> RxOperator[T, T]:
+        """
+        Performs a side-effect action for each item in the stream without
+        modifying the item.
+        ...
+        """
+        return Tap(action)
+
+    @staticmethod
+    def distinct_until_changed(
+        key_selector: Optional[Callable[[T], Any]] = None,
+    ) -> RxOperator[T, T]:
+        """
+        Emits only items from an Observable that are distinct from their immediate
+        predecessor, based on the item itself or a key selected by key_selector.
+        """
+        return DistinctUntilChanged(key_selector)
+
     @staticmethod
     def filter(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
         """
@@ -1367,3 +1447,35 @@ def rx_drop_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
         RxOperator[T, T]: A DropUntil operator
     """
     return RX.drop_until(predicate)
+
+
+def rx_distinct_until_changed(
+    key_selector: Optional[Callable[[T], Any]] = None,
+) -> RxOperator[T, T]:
+    """
+    Emits only items from an Observable that are distinct from their immediate
+    predecessor, based on the item itself or a key selected by key_selector.
+    """
+    return RX.distinct_until_changed(key_selector)
+
+
+def rx_tap(action: Callable[[T], Any]) -> RxOperator[T, T]:
+    """
+    Performs a side-effect action for each item in the stream without
+    modifying the item.
+    ...
+    """
+    return RX.tap(action)
+
+
+def rx_of_type(typ: type[T]) -> RxOperator[T, T]:
+    """
+    Allows only values of the given type to flow through
+
+    Args:
+        typ (type[T]): The type of the values that will pass throgh
+
+    Returns:
+        RxOperator[T, T]: A OfType operator
+    """
+    return RX.of_type(typ)

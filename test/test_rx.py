@@ -339,3 +339,35 @@ class TestRx(BaseTestCase):
         event(str).publish("test2")
         sleep(1)
         self.assertListEqual(elements, ["test"])
+
+    def test_distinct_until_changed(self) -> None:
+        elements = []
+        event(str).pipe(RX.distinct_until_changed()).subscribe(elements.append)
+        event(str).publish("test")
+        event(str).publish("test")
+        event(str).publish("test2")
+        sleep(1)
+        self.assertListEqual(elements, ["test", "test2"])
+
+    def test_distinct_until_changed_with_key(self) -> None:
+        elements = []
+        event(str).pipe(RX.distinct_until_changed(lambda s: s[0])).subscribe(
+            elements.append
+        )
+        event(str).publish("test")
+        event(str).publish("test2")
+        event(str).publish("best")
+        sleep(1)
+        self.assertListEqual(elements, ["test", "best"])
+        event(str).publish("test3")
+        event(str).publish("test4")
+        sleep(1)
+        self.assertListEqual(elements, ["test", "best", "test3"])
+
+    def test_tap(self) -> None:
+        elements = []
+        event(str).pipe(RX.tap(elements.append)).subscribe(lambda _: None)
+        event(str).publish("test")
+        event(str).publish("test2")
+        sleep(1)
+        self.assertListEqual(elements, ["test", "test2"])
