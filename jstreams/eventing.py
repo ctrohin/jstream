@@ -400,26 +400,37 @@ class _EventBroadcaster:
             )
         return self
 
+    def __event_is_present(self, event_type: type, event_name: str) -> bool:
+        return event_type in self._subjects and event_name in self._subjects[event_type]
+
     def has_event(
         self, event_type: type, event_name: str = __DEFAULT_EVENT_NAME__
     ) -> bool:
-        with self._event_lock:
-            return (
-                event_type in self._subjects
-                and event_name in self._subjects[event_type]
-            )
+        # Try to find the event without locking
+        found = self.__event_is_present(event_type, event_name)
+        # If we can't find the event, try with locking
+        if not found:
+            with self._event_lock:
+                return self.__event_is_present(event_type, event_name)
+        return found
 
     def get_event(
         self, event_type: type[T], event_name: str = __DEFAULT_EVENT_NAME__
     ) -> _Event[T]:
-        with self._event_lock:
-            if event_type not in self._subjects:
-                self._subjects[event_type] = {}
-            if event_name not in self._subjects[event_type]:
-                self._subjects[event_type][event_name] = _Event(
-                    SingleValueSubject(None)
-                )
+        # Check if we have the event without locking
+        if self.__event_is_present(event_type, event_name):
+            # And return it
             return self._subjects[event_type][event_name]
+        else:
+            # Otherwise, lock and create the subject if needed
+            with self._event_lock:
+                if event_type not in self._subjects:
+                    self._subjects[event_type] = {}
+                if event_name not in self._subjects[event_type]:
+                    self._subjects[event_type][event_name] = _Event(
+                        SingleValueSubject(None)
+                    )
+                return self._subjects[event_type][event_name]
 
     @staticmethod
     def get_instance() -> "_EventBroadcaster":

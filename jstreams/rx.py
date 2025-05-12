@@ -1,6 +1,5 @@
-from concurrent.futures import ThreadPoolExecutor
 import logging
-from threading import Lock
+from threading import Lock, Thread
 from typing import (
     Callable,
     Generic,
@@ -364,12 +363,8 @@ class Piped(abc.ABC, Generic[T, V]):
         pass
 
 
-MAX_EXECUTORS = 10
-
-
 class _ObservableBase(Subscribable[T]):
     __slots__ = ("__subscriptions", "_parent", "_last_val")
-    _thread_pool = ThreadPoolExecutor(max_workers=MAX_EXECUTORS)
 
     def __init__(self) -> None:
         self.__subscriptions: list[ObservableSubscription[Any]] = []
@@ -408,7 +403,7 @@ class _ObservableBase(Subscribable[T]):
     def _push_to_subscription(self, sub: ObservableSubscription[Any], val: T) -> None:
         if not sub.is_paused():
             if sub.is_async():
-                _ObservableBase._thread_pool.submit(lambda: self.__push_value(sub, val))
+                Thread(target=lambda: self.__push_value(sub, val)).start()
             else:
                 self.__push_value(sub, val)
 
