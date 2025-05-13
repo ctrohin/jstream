@@ -62,6 +62,7 @@ from jstreams.rx import (
     RxOperator,
     BaseFilteringOperator,
     BaseMappingOperator,
+    rx_distinct_until_changed,
     rx_reduce,
     rx_filter,
     rx_map,
@@ -71,12 +72,21 @@ from jstreams.rx import (
     rx_drop_while,
     rx_drop_until,
     rx_drop,
+    rx_buffer,
+    rx_buffer_count,
+    rx_debounce,
+    rx_throttle,
     TakeWhile,
     TakeUntil,
     Drop,
     DropUntil,
     DropWhile,
     Take,
+    Buffer,
+    BufferCount,
+    Debounce,
+    Throttle,
+    DistinctUntilChanged,
     RX,
 )
 
@@ -150,6 +160,7 @@ from jstreams.utils import (
     Value,
     extract,
     identity,
+    to_nullable,
 )
 
 from jstreams.predicate import (
@@ -525,4 +536,15 @@ __all__ = [
     "dispose_managed_events",
     "wait_for_event",
     "nullable",
+    "rx_distinct_until_changed",
+    "rx_buffer",
+    "rx_buffer_count",
+    "rx_debounce",
+    "rx_throttle",
+    "Buffer",
+    "BufferCount",
+    "Debounce",
+    "Throttle",
+    "DistinctUntilChanged",
+    "to_nullable",
 ]

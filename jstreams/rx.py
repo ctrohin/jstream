@@ -1188,6 +1188,128 @@ class Ignore(BaseFilteringOperator[T]):
         pass  # No specific state to reset
 
 
+class Debounce(BaseFilteringOperator[T]):
+    __slots__ = ("__timespan", "__last_emitted")
+
+    def __init__(self, timespan: float) -> None:
+        """
+        Emits a value from the source Observable only after a particular timespan has passed without another source emission.
+
+        Args:
+            timespan (float): The timespan in seconds to wait for inactivity before emitting.
+        """
+        self.__timespan = timespan
+        self.__last_emitted: Optional[float] = None
+        super().__init__(self.__debounce)
+
+    def init(self) -> None:
+        self.__last_emitted = None
+
+    def __debounce(self, val: T) -> bool:
+        import time
+
+        current_time = time.time()
+        if self.__last_emitted is None or (
+            current_time - self.__last_emitted >= self.__timespan
+        ):
+            self.__last_emitted = current_time
+            return True
+        return False
+
+
+class Throttle(BaseFilteringOperator[T]):
+    __slots__ = ("__timespan", "__last_emitted")
+
+    def __init__(self, timespan: float) -> None:
+        """
+        Emits a value from the source Observable, then ignores subsequent source emissions for a particular timespan.
+
+        Args:
+            timespan (float): The timespan in seconds to wait before allowing another emission.
+        """
+        self.__timespan = timespan
+        self.__last_emitted: Optional[float] = None
+        super().__init__(self.__throttle)
+
+    def init(self) -> None:
+        self.__last_emitted = None
+
+    def __throttle(self, val: T) -> bool:
+        import time
+
+        current_time = time.time()
+        if self.__last_emitted is None or (
+            current_time - self.__last_emitted >= self.__timespan
+        ):
+            self.__last_emitted = current_time
+            return True
+        return False
+
+
+class Buffer(BaseMappingOperator[T, list[T]]):
+    __slots__ = ("__timespan", "__buffer", "__last_checked")
+
+    def __init__(self, timespan: float) -> None:
+        """
+        Buffers the source Observable for a specific timespan then emits the buffered values as a list.
+
+        Args:
+            timespan (float): The timespan in seconds for which to buffer values.
+        """
+        self.__timespan = timespan
+        self.__buffer: list[T] = []
+        self.__last_checked: Optional[float] = None
+        super().__init__(self.__emit_buffer)
+
+    def init(self) -> None:
+        self.__buffer = []
+        self.__last_checked = None
+
+    def __emit_buffer(self, val: T) -> list[T]:
+        import time
+
+        current_time = time.time()
+        if self.__last_checked is None:
+            self.__last_checked = current_time
+
+        self.__buffer.append(val)
+
+        if current_time - self.__last_checked >= self.__timespan:
+            self.__last_checked = current_time
+            emitted_buffer = self.__buffer
+            self.__buffer = []
+            return emitted_buffer
+        else:
+            return []  # Return an empty list if the buffer should not emit yet
+
+
+class BufferCount(BaseMappingOperator[T, list[T]]):
+    __slots__ = ("__count", "__buffer")
+
+    def __init__(self, count: int) -> None:
+        """
+        Buffers a specified number of values from the source Observable and emits them as a list.
+
+        Args:
+            count (int): The number of values to buffer before emitting.
+        """
+        self.__count = count
+        self.__buffer: list[T] = []
+        super().__init__(self.__emit_buffer)
+
+    def init(self) -> None:
+        self.__buffer = []
+
+    def __emit_buffer(self, val: T) -> list[T]:
+        self.__buffer.append(val)
+        if len(self.__buffer) >= self.__count:
+            emitted_buffer = self.__buffer
+            self.__buffer = []
+            return emitted_buffer
+        else:
+            return []  # Return an empty list if the buffer is not full yet
+
+
 class RX:
     @staticmethod
     def of_type(typ: type[T]) -> RxOperator[T, T]:
@@ -1364,6 +1486,46 @@ class RX:
         """
         return Ignore(predicate)
 
+    @staticmethod
+    def debounce(timespan: float) -> RxOperator[T, T]:
+        """
+        Emits a value from the source Observable only after a particular timespan has passed without another source emission.
+
+        Args:
+            timespan (float): The timespan in seconds to wait for inactivity before emitting.
+        """
+        return Debounce(timespan)
+
+    @staticmethod
+    def throttle(timespan: float) -> RxOperator[T, T]:
+        """
+        Emits a value from the source Observable, then ignores subsequent source emissions for a particular timespan.
+
+        Args:
+            timespan (float): The timespan in seconds to wait before allowing another emission.
+        """
+        return Throttle(timespan)
+
+    @staticmethod
+    def buffer(timespan: float) -> RxOperator[T, list[T]]:
+        """
+        Buffers the source Observable for a specific timespan then emits the buffered values as a list.
+
+        Args:
+            timespan (float): The timespan in seconds for which to buffer values.
+        """
+        return Buffer(timespan)
+
+    @staticmethod
+    def buffer_count(count: int) -> RxOperator[T, list[T]]:
+        """
+        Buffers a specified number of values from the source Observable and emits them as a list.
+
+        Args:
+            count (int): The number of values to buffer before emitting.
+        """
+        return BufferCount(count)
+
 
 def rx_reduce(reducer: Callable[[T, T], T]) -> RxOperator[T, T]:
     """
@@ -1531,3 +1693,43 @@ def rx_ignore_all() -> RxOperator[T, T]:
         RxOperator[T, T]: An IgnoreElements operator.
     """
     return RX.ignore_all()
+
+
+def rx_debounce(timespan: float) -> RxOperator[T, T]:
+    """
+    Emits a value from the source Observable only after a particular timespan has passed without another source emission.
+
+    Args:
+        timespan (float): The timespan in seconds to wait for inactivity before emitting.
+    """
+    return RX.debounce(timespan)
+
+
+def rx_throttle(timespan: float) -> RxOperator[T, T]:
+    """
+    Emits a value from the source Observable, then ignores subsequent source emissions for a particular timespan.
+
+    Args:
+        timespan (float): The timespan in seconds to wait before allowing another emission.
+    """
+    return RX.throttle(timespan)
+
+
+def rx_buffer(timespan: float) -> RxOperator[T, list[T]]:
+    """
+    Buffers the source Observable for a specific timespan then emits the buffered values as a list.
+
+    Args:
+        timespan (float): The timespan in seconds for which to buffer values.
+    """
+    return RX.buffer(timespan)
+
+
+def rx_buffer_count(count: int) -> RxOperator[T, list[T]]:
+    """
+    Buffers a specified number of values from the source Observable and emits them as a list.
+
+    Args:
+        count (int): The number of values to buffer before emitting.
+    """
+    return RX.buffer_count(count)
