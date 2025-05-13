@@ -1,6 +1,7 @@
 from typing import Any
 from baseTest import BaseTestCase
 from jstreams import Try
+from jstreams.try_opt import raises
 from jstreams.utils import Value
 
 
@@ -293,3 +294,7 @@ class TestTry(BaseTestCase):
         Try.with_resource(lambda: res).mute().and_then(lambda _: self.throw()).get()
         self.assertTrue(res.enter_called)
         self.assertTrue(res.exit_called)
+
+    def test_raises(self) -> None:
+        self.assertTrue(raises(self.throw, ValueError))
+        self.assertFalse(raises(self.noThrow, ValueError))

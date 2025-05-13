@@ -1,6 +1,7 @@
 #/bin/sh
 rm -rf tests_integration/__pycache__
 for dir in tests_integration/*; do 
+    echo "Running $dir integration test.."
     (cd "$dir" && python3 run.py); 
     if [ $? -eq 0 ]
     then

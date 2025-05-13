@@ -14,6 +14,7 @@ from typing import (
 )
 
 from jstreams.noop import noop
+from jstreams.predicate import is_identity
 from jstreams.stream import Opt
 from jstreams.utils import require_non_null
 
@@ -94,6 +95,19 @@ def catch_with(
     except Exception as e:
         _log_exception(e, logger)
         return None
+
+
+__FAILURE_OBJECT__: Final[object] = object()
+
+
+def raises(fn: Callable[[], Any], exception_type: type[Exception]) -> bool:
+    return (
+        Try(fn)
+        .recover_from(exception_type, lambda _: __FAILURE_OBJECT__)
+        .get()
+        .map(is_identity(__FAILURE_OBJECT__))
+        .or_else(False)
+    )
 
 
 class Try(Generic[T]):

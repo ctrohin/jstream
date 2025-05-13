@@ -84,7 +84,16 @@ def default_state(typ: type[T], value: Optional[T] = None) -> Optional[T]:
 
 
 def null_state(typ: type[T]) -> Optional[T]:
-    return None
+    """
+    Returns a null state for the given type. This method is meant to be used when a state
+    is not set but the typing context needs to know which type will be used.
+    This is used to indicate that the state is not set.
+    Args:
+        typ (type[T]): The type of the state
+    Returns:
+        Optional[T]: The null state
+    """
+    return default_state(typ)
 
 
 def use_state(

@@ -41,6 +41,7 @@ from jstreams.try_opt import (
     catch,
     catch_with,
     try_with_resource,
+    raises,
 )
 
 from jstreams.rx import (
@@ -547,4 +548,5 @@ __all__ = [
     "Throttle",
     "DistinctUntilChanged",
     "to_nullable",
+    "raises",
 ]
