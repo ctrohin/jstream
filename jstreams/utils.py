@@ -308,3 +308,18 @@ class Value(Generic[T]):
 
 def type_of(obj: T) -> type[T]:
     return type(obj)
+
+
+def to_nullable(value: T) -> Optional[T]:
+    """
+    Converts the given value to a nullable type.
+    This is a placeholder function that does not perform any actual conversion.
+    It is meant to be used as a type hint for nullable values.
+    This function is useful for type hinting and code readability.
+
+    Args:
+        value (T): The value to convert
+    Returns:
+        Optional[T]: The nullable value
+    """
+    return value
