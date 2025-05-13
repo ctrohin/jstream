@@ -13,6 +13,7 @@ from typing import (
 import uuid
 from copy import deepcopy
 
+from jstreams.predicate import not_strict
 from jstreams.stream import Stream
 import abc
 
@@ -1157,6 +1158,36 @@ class Tap(BaseMappingOperator[T, T]):
         return val
 
 
+class IgnoreAll(BaseFilteringOperator[T]):
+    """
+    Discards all items emitted by the source Observable.
+    It's useful when you're only interested in the `complete` or `error`
+    notifications from the stream, not the values themselves.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            lambda _: False
+        )  # Always return False to filter out all elements
+
+    def init(self) -> None:
+        pass  # No specific state to reset
+
+
+class Ignore(BaseFilteringOperator[T]):
+    """
+    Discards all items emitted by the source Observable that match the given predicate.
+    This operator is useful when you want to ignore specific values
+    while still allowing others to pass through. It functions as the inverse of the filter operator.
+    """
+
+    def __init__(self, predicate: Callable[[T], bool]) -> None:
+        super().__init__(not_strict(predicate))
+
+    def init(self) -> None:
+        pass  # No specific state to reset
+
+
 class RX:
     @staticmethod
     def of_type(typ: type[T]) -> RxOperator[T, T]:
@@ -1318,6 +1349,21 @@ class RX:
         """
         return DropUntil(predicate)
 
+    @staticmethod
+    def ignore_all() -> RxOperator[T, T]:
+        """
+        Discards all items emitted by the source Observable.
+        Useful when only `complete` or `error` notifications are of interest.
+        """
+        return IgnoreAll()
+
+    @staticmethod
+    def ignore(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
+        """
+        Discards all items emitted by the source Observable that match the given predicate.
+        """
+        return Ignore(predicate)
+
 
 def rx_reduce(reducer: Callable[[T, T], T]) -> RxOperator[T, T]:
     """
@@ -1474,3 +1520,14 @@ def rx_of_type(typ: type[T]) -> RxOperator[T, T]:
         RxOperator[T, T]: A OfType operator
     """
     return RX.of_type(typ)
+
+
+def rx_ignore_all() -> RxOperator[T, T]:
+    """
+    Discards all items emitted by the source Observable.
+    Useful when only `complete` or `error` notifications are of interest.
+
+    Returns:
+        RxOperator[T, T]: An IgnoreElements operator.
+    """
+    return RX.ignore_all()

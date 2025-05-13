@@ -371,3 +371,35 @@ class TestRx(BaseTestCase):
         event(str).publish("test2")
         sleep(1)
         self.assertListEqual(elements, ["test", "test2"])
+
+    def test_ignore_all(self) -> None:
+        elements = []
+        event(str).pipe(RX.ignore_all()).subscribe(elements.append)
+        event(str).publish("test")
+        event(str).publish("test2")
+        sleep(1)
+        self.assertListEqual(elements, [])
+
+    def test_ignore(self) -> None:
+        elements = []
+        event(str).pipe(RX.ignore(lambda _: True)).subscribe(elements.append)
+        event(str).publish("test")
+        event(str).publish("test2")
+        sleep(1)
+        self.assertListEqual(elements, [])
+
+        elements = []
+        event(str, "1").pipe(RX.ignore(lambda _: False)).subscribe(elements.append)
+        event(str, "1").publish("test")
+        event(str, "1").publish("test2")
+        sleep(1)
+        self.assertListEqual(elements, ["test", "test2"])
+
+        elements = []
+        event(str, "2").pipe(RX.ignore(lambda e: e.startswith("t"))).subscribe(
+            elements.append
+        )
+        event(str, "2").publish("test")
+        event(str, "2").publish("best")
+        sleep(1)
+        self.assertListEqual(elements, ["best"])

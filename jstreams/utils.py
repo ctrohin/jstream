@@ -304,3 +304,7 @@ class Value(Generic[T]):
 
     def get(self) -> Optional[T]:
         return self.__value
+
+
+def type_of(obj: T) -> type[T]:
+    return type(obj)
