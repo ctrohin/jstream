@@ -298,3 +298,77 @@ class TestTry(BaseTestCase):
     def test_raises(self) -> None:
         self.assertTrue(raises(self.throw, ValueError))
         self.assertFalse(raises(self.noThrow, ValueError))
+
+    def test_retry_if_false(self) -> None:
+        class Mock:
+            def __init__(self, tries: int):
+                self.tries = tries
+                self.current_try = 1
+                self.error = None
+
+            def do(self) -> None:
+                if self.current_try < self.tries:
+                    self.current_try += 1
+                    raise ValueError("Test")
+                return "TestValue"
+
+            def register_error(self, e: Exception) -> None:
+                self.error = e
+
+        mock = Mock(3)
+
+        self.assertIsNone(
+            Try(mock.do)
+            .retry_if(lambda _: False, 2, 0.1)
+            .on_failure(mock.register_error)
+            .get()
+            .get_actual(),
+        )
+        self.assertEqual(mock.current_try, 2)
+        self.assertIsNotNone(mock.error)
+
+    def test_retry_if_true(self) -> None:
+        class Mock:
+            def __init__(self, tries: int):
+                self.tries = tries
+                self.current_try = 1
+                self.error = None
+
+            def do(self) -> None:
+                if self.current_try < self.tries:
+                    self.current_try += 1
+                    raise ValueError("Test")
+                return "TestValue"
+
+            def register_error(self, e: Exception) -> None:
+                self.error = e
+
+        mock = Mock(3)
+
+        self.assertIsNotNone(
+            Try(mock.do)
+            .retry_if(lambda _: True, 2, 0.1)
+            .on_failure(mock.register_error)
+            .get()
+            .get_actual(),
+        )
+        self.assertEqual(mock.current_try, 3)
+        self.assertIsNone(mock.error)
+
+    def test_on_success(self) -> None:
+        val1 = Value(False)
+        val2 = Value(False)
+        Try(self.noThrow).on_success(lambda _: val1.set(True)).on_success(
+            lambda _: val2.set(True)
+        ).get()
+        self.assertTrue(val1.get())
+        self.assertTrue(val2.get())
+
+    def test_on_success_when_failure(self) -> None:
+        val1 = Value(False)
+        val2 = Value(False)
+        Try(self.throw).on_success(lambda _: val1.set(True)).on_success(
+            lambda _: val2.set(True)
+        ).get()
+        self.assertFalse(val1.get())
+        self.assertFalse(val2.get())

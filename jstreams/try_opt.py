@@ -29,6 +29,12 @@ UNCAUGHT_EXCEPTION_LOGGER_NAME: Final[str] = "uncaught_exception_logger"
 _default_logger: Final[Logger] = logging.getLogger(UNCAUGHT_EXCEPTION_LOGGER_NAME)
 
 
+class _TryOrElseTryBothFailedError(Exception):
+    """Internal exception to signal failure of both original and fallback Try operations."""
+
+    pass
+
+
 class ErrorLog(Protocol):
     """Protocol for a minimal logger interface expecting an error method."""
 
@@ -128,6 +134,8 @@ class Try(Generic[T]):
         "__failure_exception_supplier",
         "__recovery_supplier",
         "__retries",
+        "__retry_predicate",
+        "__on_success_chain",
         "__retries_delay",
         "__is_resource",
         "__recovery_suppliers",
@@ -143,6 +151,7 @@ class Try(Generic[T]):
         self.__fn = fn
         self.__is_resource = is_resource
         self.__then_chain: list[Callable[[T], Any]] = []
+        self.__on_success_chain: list[Callable[[Optional[T]], Any]] = []
         self.__finally_chain: list[Callable[[Optional[T]], Any]] = []
         self.__on_failure_chain: list[Callable[[Exception], Any]] = []
         self.__error_log: Optional[ErrorLogger] = None
@@ -154,6 +163,7 @@ class Try(Generic[T]):
         ] = None
         self.__recovery_suppliers: dict[type, Callable[[Any], T]] = {}
         self.__retries: int = 0
+        self.__retry_predicate: Optional[Callable[[Exception], bool]] = None
         self.__retries_delay: float = 0.0
 
     def mute(self) -> "Try[T]":
@@ -169,21 +179,39 @@ class Try(Generic[T]):
         self.__error_message = error_message
         return self
 
+    def retry_if(
+        self,
+        predicate: Callable[[Exception], bool],
+        retries: int,
+        delay_between: float = 0.0,
+    ) -> "Try[T]":
+        """
+        Configures the operation to retry on failure if the predicate is met.
+
+        Args:
+            predicate: A function that takes the caught exception and returns True if a retry should be attempted.
+            retries: The number of times to retry after the initial failure.
+            delay_between: The delay in seconds between retries. Defaults to 0.
+        """
+        require_non_null(predicate, "Retry predicate cannot be None.")
+        if retries < 0:
+            raise ValueError("Number of retries cannot be negative.")
+        if delay_between < 0:
+            raise ValueError("Delay between retries cannot be negative.")
+        self.__retry_predicate = predicate
+        self.__retries = retries
+        self.__retries_delay = delay_between
+        return self
+
     def retry(self, retries: int, delay_between: float = 0.0) -> "Try[T]":
         """
-        Configures the operation to retry on failure.
+        Configures the operation to retry on any failure.
 
         Args:
             retries: The number of times to retry after the initial failure.
             delay_between: The delay in seconds between retries. Defaults to 0.
         """
-        if retries < 0:
-            raise ValueError("Number of retries cannot be negative.")
-        if delay_between < 0:
-            raise ValueError("Delay between retries cannot be negative.")
-        self.__retries = retries
-        self.__retries_delay = delay_between
-        return self
+        return self.retry_if(lambda _: True, retries, delay_between)
 
     def and_then(self, fn: Callable[[T], Any]) -> "Try[T]":
         """
@@ -192,6 +220,16 @@ class Try(Generic[T]):
         Failures in 'and_then' functions will propagate and cause the Try to fail.
         """
         self.__then_chain.append(fn)
+        return self
+
+    def on_success(self, fn: Callable[[Optional[T]], Any]) -> "Try[T]":
+        """
+        Adds a function to be executed if the primary operation (including `and_then` chain)
+        succeeds. The function receives the successful result.
+        Exceptions in these handlers are caught and logged.
+        """
+        require_non_null(fn, "On success function cannot be None.")
+        self.__on_success_chain.append(fn)
         return self
 
     def on_failure(self, fn: Callable[[Exception], Any]) -> "Try[T]":
@@ -267,9 +305,17 @@ class Try(Generic[T]):
             except Exception as e:
                 last_exception = e
                 if attempt < self.__retries:  # Check if more retries are available
-                    if self.__retries_delay > 0:
-                        sleep(self.__retries_delay)
-                    # Continue to the next retry iteration
+                    # Check predicate if defined, default to True if not (e.g. direct call to retry())
+                    should_retry = (
+                        self.__retry_predicate(e) if self.__retry_predicate else True
+                    )
+                    if should_retry:
+                        if self.__retries_delay > 0:
+                            sleep(self.__retries_delay)
+                        continue  # Continue to the next retry iteration
+                    else:  # Predicate returned false, do not retry further
+                        self.__handle_exception(e)
+                        break  # Exit retry loop
                 else:
                     # No more retries left, handle the final exception
                     self.__handle_exception(e)
@@ -279,6 +325,12 @@ class Try(Generic[T]):
                     catch(val.__exit__, self.__error_log)  # type: ignore[attr-defined]
 
         # --- After the loop (either break on success or finish on failure) ---
+        if last_exception is None:
+            # Operation (primary fn + then_chain) succeeded
+            # val holds the result of type T
+            for success_fn in self.__on_success_chain:
+                catch(lambda: success_fn(val), self.__error_log)
+
         # Execute the finally chain once, passing the result if successful
         self.__finally(val if last_exception is None else None)
 
@@ -364,6 +416,50 @@ class Try(Generic[T]):
         for ex_type in exception_types:
             self.__recovery_suppliers[ex_type] = recovery_supplier
         return self
+
+    def or_else_try(self, fallback_supplier: Callable[[], "Try[T]"]) -> "Try[T]":
+        """
+        If this Try operation fails (after all retries and recovery attempts),
+        executes an alternative Try operation provided by the fallback_supplier.
+
+        Args:
+            fallback_supplier: A function that returns a new Try[T] instance to be executed.
+
+        Returns:
+            A new Try[T] instance that encapsulates the "try-original-then-try-fallback" logic.
+        """
+        require_non_null(fallback_supplier, "Fallback supplier cannot be None.")
+        original_try = self  # Capture the current (original) Try instance
+
+        def combined_operation() -> T:
+            original_opt_result = original_try.get()
+            if original_opt_result.is_present():
+                return original_opt_result.get()  # Opt.get() raises ValueError if empty
+
+            # Original Try failed (after its retries, recovery, etc.)
+            # Now try the fallback
+            fallback_try_instance = fallback_supplier()
+            if not isinstance(fallback_try_instance, Try):
+                err_msg = "Fallback supplier did not return a Try instance."
+                _log_exception(
+                    TypeError(err_msg),
+                    original_try.__error_log or _default_logger,
+                    "Invalid fallback in or_else_try",
+                )
+                raise _TryOrElseTryBothFailedError(err_msg)
+
+            fallback_opt_result = fallback_try_instance.get()
+            if fallback_opt_result.is_present():
+                return fallback_opt_result.get()
+
+            raise _TryOrElseTryBothFailedError(
+                "Both original Try and fallback Try failed to produce a value."
+            )
+
+        new_try = Try(combined_operation)
+        if original_try.__error_log:  # Propagate logger to the new Try
+            new_try.with_logger(original_try.__error_log)
+        return new_try
 
     def has_failed(self) -> bool:
         """
