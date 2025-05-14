@@ -372,3 +372,16 @@ class TestTry(BaseTestCase):
         ).get()
         self.assertFalse(val1.get())
         self.assertFalse(val2.get())
+
+    def test_on_success_recover(self) -> None:
+        val = Value(False)
+        recovered = (
+            Try(self.throw)
+            .mute()
+            .on_success(lambda _: val.set(True))
+            .recover(lambda e: "Test")
+            .get()
+            .get_actual()
+        )
+        self.assertFalse(val.get())
+        self.assertEqual(recovered, "Test")

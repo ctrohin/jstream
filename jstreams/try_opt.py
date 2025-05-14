@@ -167,6 +167,11 @@ class Try(Generic[T]):
         self.__retries_delay: float = 0.0
 
     def mute(self) -> "Try[T]":
+        """
+        Mutes the error logging for this Try instance.
+        This is useful when you want to suppress error messages
+        but still want to handle exceptions in a custom way.
+        """
         return self.with_logger(noop())
 
     def with_logger(self, logger: ErrorLogger) -> "Try[T]":
