@@ -114,7 +114,9 @@ def _deserialize_value(target_type: Any, data_value: Any) -> Any:
     return data_value
 
 
-def serializable(ignore_unknown_fields: bool = True) -> Callable[[type[_T]], type[_T]]:
+def json_serializable(
+    ignore_unknown_fields: bool = True,
+) -> Callable[[type[_T]], type[_T]]:
     """
     A class decorator that adds a to_dict() method to the decorated class.
     This method serializes an instance into a dictionary, including attributes
@@ -294,7 +296,7 @@ def serializable(ignore_unknown_fields: bool = True) -> Callable[[type[_T]], typ
             Returns a string representation of the instance.
             This is useful for debugging and logging.
             """
-            return f"{self.__class__.__name__}({self.to_dict()})"
+            return f"{self.__class__.__name__}({self.to_dict()})"  # type: ignore[attr-defined]
 
         # Add the to_dict method to the class.
         setattr(cls, "to_dict", to_dict)
@@ -307,7 +309,7 @@ def serializable(ignore_unknown_fields: bool = True) -> Callable[[type[_T]], typ
     return decorator
 
 
-def deserialize(class_type: type[_T], data: dict[str, Any]) -> _T:
+def json_deserialize(class_type: type[_T], data: dict[str, Any]) -> _T:
     """
     Deserialize a dictionary into an instance of the specified class type.
     This function is a convenience wrapper around the from_dict method of the class.
@@ -317,7 +319,7 @@ def deserialize(class_type: type[_T], data: dict[str, Any]) -> _T:
     return class_type.from_dict(data)  # type: ignore
 
 
-def serialize(obj: Any) -> dict[str, Any]:
+def json_serialize(obj: Any) -> dict[str, Any]:
     """
     Serialize an object into a dictionary.
     This function is a convenience wrapper around the to_dict method of the object.
