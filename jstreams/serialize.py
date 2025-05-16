@@ -608,6 +608,19 @@ def json_deserialize(class_type: type[_T], data: dict[str, Any]) -> _T:
     return class_type.from_dict(data)  # type: ignore
 
 
+def json_deserialize_list(class_type: type[_T], data: list[dict[str, Any]]) -> list[_T]:
+    """
+    Deserialize a list of dictionaries into a list of instances of the specified class type.
+    """
+    if not hasattr(class_type, "from_dict"):
+        raise TypeError(f"{class_type.__name__} does not have a from_dict method.")
+    for item in data:
+        if not isinstance(item, dict):
+            raise TypeError(f"Expected a dictionary, got {type(item)}")
+
+    return [class_type.from_dict(item) for item in data]  # type: ignore
+
+
 def json_serialize(obj: Any) -> dict[str, Any]:
     """
     Serialize an object into a dictionary.
@@ -616,6 +629,19 @@ def json_serialize(obj: Any) -> dict[str, Any]:
     if not hasattr(obj, "to_dict"):
         raise TypeError(f"{obj.__class__.__name__} does not have a to_dict method.")
     return obj.to_dict()  # type: ignore
+
+
+def json_serialize_list(obj: list[Any]) -> list[dict[str, Any]]:
+    """
+    Serialize an list of objects into a list of dictionaries.
+    This function is a convenience wrapper around the to_dict method of the object.
+    """
+    for item in obj:
+        if not hasattr(item, "to_dict"):
+            raise TypeError(
+                f"{item.__class__.__name__} does not have a to_dict method."
+            )
+    return [item.to_dict() for item in obj]
 
 
 P = ParamSpec("P")
@@ -636,6 +662,27 @@ def json_serialize_return() -> Callable[  # Type of the decorator factory
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> dict[str, Any]:
             result = func(*args, **kwargs)
             return json_serialize(result)
+
+        return wrapper
+
+    return decorator
+
+
+def json_serialize_return_list() -> Callable[  # Type of the decorator factory
+    [Callable[P, list[R]]],  # It accepts a callable func(P) -> list[R]
+    Callable[
+        P, list[dict[str, Any]]
+    ],  # It returns a new callable func(P) -> list[dict]
+]:
+    """
+    Decorator factory to serialize the return value of a function using json_serialize.
+    The decorated function will have its return value processed by json_serialize.
+    """
+
+    def decorator(func: Callable[P, list[R]]) -> Callable[P, list[dict[str, Any]]]:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> list[dict[str, Any]]:
+            result = func(*args, **kwargs)
+            return [json_serialize(item) for item in result]
 
         return wrapper
 
