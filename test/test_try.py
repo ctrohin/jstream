@@ -191,7 +191,7 @@ class TestTry(BaseTestCase):
                 self.error_message = msg
 
         mockLogger = MockLogger()
-        Try(self.throw).with_logger(mockLogger).with_error_message("Test").get()
+        Try(self.throw).mute().with_logger(mockLogger).with_error_message("Test").get()
         self.assertTrue(mockLogger.error_called)
         self.assertEqual(mockLogger.error_message, "Test")
 
@@ -319,6 +319,7 @@ class TestTry(BaseTestCase):
 
         self.assertIsNone(
             Try(mock.do)
+            .mute()
             .retry_if(lambda _: False, 2, 0.1)
             .on_failure(mock.register_error)
             .get()
@@ -367,7 +368,7 @@ class TestTry(BaseTestCase):
     def test_on_success_when_failure(self) -> None:
         val1 = Value(False)
         val2 = Value(False)
-        Try(self.throw).on_success(lambda _: val1.set(True)).on_success(
+        Try(self.throw).mute().on_success(lambda _: val1.set(True)).on_success(
             lambda _: val2.set(True)
         ).get()
         self.assertFalse(val1.get())

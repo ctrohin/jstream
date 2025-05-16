@@ -428,7 +428,6 @@ def json_serializable(
                 if translate_snake_to_camel:
                     sanitized_key = _camel_to_snake(key_from_data)
                 attr_name = reverse_aliases_map.get(sanitized_key, sanitized_key)
-                print("attr_name", attr_name)
 
                 if attr_name in init_params and init_params[attr_name].name != "self":
                     param = init_params[attr_name]
