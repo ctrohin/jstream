@@ -25,9 +25,9 @@ _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
 
 # Pre-compiled regex for _camel_to_snake for performance
-_CAMEL_TO_SNAKE_PAT1: re.Pattern = re.compile(r"(.)([A-Z][a-z]+)")
-_CAMEL_TO_SNAKE_PAT2: re.Pattern = re.compile(r"__([A-Z])")
-_CAMEL_TO_SNAKE_PAT3: re.Pattern = re.compile(r"([a-z0-9])([A-Z])")
+_CAMEL_TO_SNAKE_PAT1 = re.compile(r"(.)([A-Z][a-z]+)")
+_CAMEL_TO_SNAKE_PAT2 = re.compile(r"__([A-Z])")
+_CAMEL_TO_SNAKE_PAT3 = re.compile(r"([a-z0-9])([A-Z])")
 
 
 def _snake_to_camel(snake_str: str) -> str:
