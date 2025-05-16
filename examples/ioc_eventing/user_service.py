@@ -92,7 +92,7 @@ class AddUsersThread(Thread):
             event(AddUserEvent).publish(AddUserEvent(user))
 
 
-class RevmoveUersThread(Thread):
+class RemoveUersThread(Thread):
     # Since we need to inject the UserService into the RevmoveUersThread, we use the @inject_args decorator
     @inject_args({"user_service": UserService})
     def __init__(self, user_service: UserService):
@@ -111,4 +111,4 @@ class RevmoveUersThread(Thread):
 
 if __name__ == "__main__":
     AddUsersThread().start()
-    RevmoveUersThread().start()
+    RemoveUersThread().start()

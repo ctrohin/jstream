@@ -1,10 +1,12 @@
 from datetime import date, datetime
 from enum import Enum
+import re
 from types import MappingProxyType
 from typing import (
     Any,
     Callable,
     Optional,
+    ParamSpec,
     TypeVar,
     Iterable,
     Union,
@@ -21,6 +23,46 @@ from uuid import UUID
 _T = TypeVar("_T")
 # Covariant TypeVar for SerializableObject protocol
 _T_co = TypeVar("_T_co", covariant=True)
+
+# Pre-compiled regex for _camel_to_snake for performance
+_CAMEL_TO_SNAKE_PAT1: re.Pattern = re.compile(r"(.)([A-Z][a-z]+)")
+_CAMEL_TO_SNAKE_PAT2: re.Pattern = re.compile(r"__([A-Z])")
+_CAMEL_TO_SNAKE_PAT3: re.Pattern = re.compile(r"([a-z0-9])([A-Z])")
+
+
+def _snake_to_camel(snake_str: str) -> str:
+    """Converts a snake_case string to camelCase."""
+    if not snake_str:
+        return snake_str
+
+    # Optimized handling of leading underscores
+    first_char_index = 0
+    s_len = len(snake_str)
+    while first_char_index < s_len and snake_str[first_char_index] == "_":
+        first_char_index += 1
+
+    leading_underscores = snake_str[:first_char_index]
+    name_part = snake_str[first_char_index:]
+
+    if not name_part:  # True if original string was all underscores or empty
+        return snake_str
+    # If snake_str was empty, it's returned at the top.
+    # If it was all underscores (e.g., "___"), leading_underscores="___", name_part="".
+    # It will correctly return "___".
+
+    components = name_part.split("_")
+    camel_case_part = components[0] + "".join(x.title() for x in components[1:])
+    return leading_underscores + camel_case_part
+
+
+def _camel_to_snake(camel_str: str) -> str:
+    """Converts a camelCase string to snake_case."""
+    if not camel_str:
+        return camel_str
+    name = _CAMEL_TO_SNAKE_PAT1.sub(r"\1_\2", camel_str)
+    name = _CAMEL_TO_SNAKE_PAT2.sub(r"_\1", name)
+    name = _CAMEL_TO_SNAKE_PAT3.sub(r"\1_\2", name)
+    return name.lower()
 
 
 # Define a Protocol for objects that have to_dict and from_dict methods.
@@ -168,7 +210,7 @@ def _deserialize_value(target_type: Any, data_value: Any) -> Any:
     return data_value
 
 
-def json_serializable(
+def json_standard_serializable(
     ignore_unknown_fields: bool = True,
     aliases: Optional[dict[str, str]] = None,
     omit_none: bool = False,
@@ -177,9 +219,48 @@ def json_serializable(
     post_deserialize_hook_name: Optional[str] = "__post_deserialize__",
 ) -> Callable[[type[_T]], type[_T]]:
     """
+    Alias for json_serializable with translate_snake_to_camel set to True.
+    This decorator is used to create a JSON serializable class.
+
+    Args:
+        ignore_unknown_fields (bool, optional): _description_. Defaults to True.
+        aliases (Optional[dict[str, str]], optional): _description_. Defaults to None.
+        omit_none (bool, optional): _description_. Defaults to False.
+        custom_serializers (Optional[dict[str, Callable[[Any], Any]]], optional): _description_. Defaults to None.
+        custom_deserializers (Optional[dict[str, Callable[[Any], Any]]], optional): _description_. Defaults to None.
+        post_deserialize_hook_name (Optional[str], optional): _description_. Defaults to "__post_deserialize__".
+
+    Returns:
+        Callable[[type[_T]], type[_T]]: _description_
+    """
+    return json_serializable(
+        ignore_unknown_fields=ignore_unknown_fields,
+        aliases=aliases,
+        omit_none=omit_none,
+        custom_serializers=custom_serializers,
+        custom_deserializers=custom_deserializers,
+        post_deserialize_hook_name=post_deserialize_hook_name,
+        translate_snake_to_camel=True,
+    )
+
+
+def json_serializable(
+    ignore_unknown_fields: bool = True,
+    aliases: Optional[dict[str, str]] = None,
+    omit_none: bool = False,
+    custom_serializers: Optional[dict[str, Callable[[Any], Any]]] = None,
+    custom_deserializers: Optional[dict[str, Callable[[Any], Any]]] = None,
+    post_deserialize_hook_name: Optional[str] = "__post_deserialize__",
+    translate_snake_to_camel: bool = False,
+) -> Callable[[type[_T]], type[_T]]:
+    """
     A class decorator that adds a to_dict() method to the decorated class.
     This method serializes an instance into a dictionary, including attributes
     from both __dict__ (standard instance attributes) and __slots__ (if used).
+    The decorator also provides a from_dict() class method for deserialization.
+    This method takes a dictionary and populates the instance's attributes
+    based on the provided data. It uses type hints to determine the expected
+    types of the attributes and attempts to deserialize the data accordingly.
 
     Serialization is recursive:
     - Objects that have a 'to_dict' method (e.g., other @serializable instances)
@@ -198,10 +279,40 @@ def json_serializable(
     - Start with double underscores (e.g., __private_attribute, which undergoes
       name mangling to _ClassName__private_attribute and is thus also excluded).
     This helps in respecting encapsulation and not serializing internal state.
+    It also supports:
+    - Aliasing of attributes during deserialization.
+    - Handling of unknown fields (fields not defined in the class).
+    - Custom deserializer functions for specific fields.
+    - Post-deserialization hook method that can be called after deserialization.
+    The decorator can be applied to any class, including those that use
+    dataclasses, namedtuples, or other custom structures.
+
+    Args:
+        ignore_unknown_fields (bool): If True, unknown fields in the input data
+            will be ignored during deserialization.
+        aliases (Optional[dict[str, str]]): A dictionary mapping attribute names
+            to their aliases. This allows for renaming attributes during
+            serialization/deserialization.  Defaults to None.
+        omit_none (bool): If True, attributes with None values will be omitted
+            from the serialized output. Defaults to False.
+        custom_serializers (Optional[dict[str, Callable[[Any], Any]]]): A dictionary
+            mapping attribute names to custom serializer functions. These functions
+            will be called to serialize the corresponding attribute. Defaults to None.
+        custom_deserializers (Optional[dict[str, Callable[[Any], Any]]]): A dictionary
+            mapping attribute names to custom deserializer functions. These functions
+            will be called to deserialize the corresponding attribute. Defaults to None.
+        post_deserialize_hook_name (Optional[str]): The name of a method to be called
+            after deserialization. This method should be defined in the class and
+            will be called with no arguments. Defaults to "__post_deserialize__".
+        translate_snake_to_camel (bool): If True, attribute names will be converted
+            from snake_case to camelCase during serialization. Defaults to False.
     """
 
     def decorator(cls: type[_T]) -> type[_T]:
         def to_dict(self: _T) -> dict[str, Any]:
+            return _to_dict_convert_name(self, convert_names=True)
+
+        def _to_dict_convert_name(self: _T, convert_names: bool) -> dict[str, Any]:
             serialized_data: dict[str, Any] = {}
             aliases_map_local = aliases or {}
             custom_serializers_map_local = custom_serializers or {}
@@ -276,6 +387,8 @@ def json_serializable(
                         continue
 
                     output_key = aliases_map_local.get(attr_name, attr_name)
+                    if translate_snake_to_camel and convert_names:
+                        output_key = _snake_to_camel(output_key)
                     serialized_data[output_key] = processed_value
 
             return serialized_data
@@ -311,7 +424,11 @@ def json_serializable(
 
             # Prepare arguments for __init__ by deserializing them
             for key_from_data, value_from_data in data.items():
-                attr_name = reverse_aliases_map.get(key_from_data, key_from_data)
+                sanitized_key = key_from_data
+                if translate_snake_to_camel:
+                    sanitized_key = _camel_to_snake(key_from_data)
+                attr_name = reverse_aliases_map.get(sanitized_key, sanitized_key)
+                print("attr_name", attr_name)
 
                 if attr_name in init_params and init_params[attr_name].name != "self":
                     param = init_params[attr_name]
@@ -411,8 +528,8 @@ def json_serializable(
 
             # Both self and other should have to_dict if decorated by serializable
             # and self.__class__ is the same as other.__class__
-            self_dict = self.to_dict()  # type: ignore[attr-defined]
-            other_dict = other.to_dict()  # type: ignore[attr-defined]
+            self_dict = self._to_dict_convert_name(False)  # type: ignore[attr-defined]
+            other_dict = other._to_dict_convert_name(False)  # type: ignore[attr-defined]
             return self_dict == other_dict  # type: ignore[no-any-return]
 
         def __str__(self: _T) -> str:
@@ -420,10 +537,11 @@ def json_serializable(
             Returns a string representation of the instance.
             This is useful for debugging and logging.
             """
-            return f"{self.__class__.__name__}({self.to_dict()})"  # type: ignore[attr-defined]
+            return f"{self.__class__.__name__}({self._to_dict_convert_name(False)})"  # type: ignore[attr-defined]
 
         # Add the to_dict method to the class.
         setattr(cls, "to_dict", to_dict)
+        setattr(cls, "_to_dict_convert_name", _to_dict_convert_name)
         setattr(cls, "from_dict", classmethod(from_dict))
         setattr(cls, "__eq__", __eq__)
         setattr(cls, "__str__", __str__)
@@ -451,3 +569,27 @@ def json_serialize(obj: Any) -> dict[str, Any]:
     if not hasattr(obj, "to_dict"):
         raise TypeError(f"{obj.__class__.__name__} does not have a to_dict method.")
     return obj.to_dict()  # type: ignore
+
+
+P = ParamSpec("P")
+# TypeVar for the original return type of a callable
+R = TypeVar("R")
+
+
+def json_serialize_return() -> Callable[  # Type of the decorator factory
+    [Callable[P, R]],  # It accepts a callable func(P) -> R
+    Callable[P, dict[str, Any]],  # It returns a new callable func(P) -> dict
+]:
+    """
+    Decorator factory to serialize the return value of a function using json_serialize.
+    The decorated function will have its return value processed by json_serialize.
+    """
+
+    def decorator(func: Callable[P, R]) -> Callable[P, dict[str, Any]]:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> dict[str, Any]:
+            result = func(*args, **kwargs)
+            return json_serialize(result)
+
+        return wrapper
+
+    return decorator

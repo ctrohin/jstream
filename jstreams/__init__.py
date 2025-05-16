@@ -297,6 +297,14 @@ from jstreams.annotations import (
     default_on_error,
 )
 
+from jstreams.serialize import (
+    json_serializable,
+    json_deserialize,
+    json_serialize,
+    json_standard_serializable,
+    json_serialize_return,
+)
+
 __all__ = [
     "each",
     "dict_update",
@@ -549,4 +557,9 @@ __all__ = [
     "DistinctUntilChanged",
     "to_nullable",
     "raises",
+    "json_serializable",
+    "json_deserialize",
+    "json_serialize",
+    "json_standard_serializable",
+    "json_serialize_return",
 ]

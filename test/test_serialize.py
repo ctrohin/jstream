@@ -3,7 +3,13 @@ from enum import Enum
 from typing import Any, Optional
 from uuid import UUID, uuid4
 from baseTest import BaseTestCase
-from jstreams.serialize import json_deserialize, json_serializable, json_serialize
+from jstreams.serialize import (
+    json_deserialize,
+    json_serializable,
+    json_serialize,
+    json_serialize_return,
+    json_standard_serializable,
+)
 
 
 class TestSerialize(BaseTestCase):
@@ -551,3 +557,105 @@ class TestSerialize(BaseTestCase):
         self.assertEqual(
             deserialized.complex_obj.internal_value, MyComplexField(50).internal_value
         )
+
+    def test_custom_field_serializers_deserializers_camel(self) -> None:
+        def custom_int_serializer(value: int) -> str:
+            return f"custom_serialized_{value}"
+
+        def custom_int_deserializer(data_value: str) -> int:
+            return int(data_value.replace("custom_serialized_", ""))
+
+        def custom_obj_serializer(obj: Any) -> dict:  # Simplified custom object
+            return {"wrapper_value": obj.internal_value * 2}
+
+        def custom_obj_deserializer(data: dict) -> Any:  # Simplified custom object
+            class TempObj:
+                def __init__(self, val):
+                    self.internal_value = val
+
+                def __eq__(self, other):
+                    return (
+                        isinstance(other, TempObj)
+                        and self.internal_value == other.internal_value
+                    )
+
+            return TempObj(data["wrapper_value"] // 2)
+
+        class MyComplexField:
+            def __init__(self, internal_value: int):
+                self.internal_value = internal_value
+
+            def __eq__(self, other):
+                return (
+                    isinstance(other, MyComplexField)
+                    and self.internal_value == other.internal_value
+                )
+
+        @json_serializable(
+            custom_serializers={
+                "custom_field_int": custom_int_serializer,
+                "complex_obj": custom_obj_serializer,
+            },
+            custom_deserializers={
+                "custom_field_int": custom_int_deserializer,
+                "complex_obj": custom_obj_deserializer,
+            },
+            translate_snake_to_camel=True,
+        )
+        class CustomHandlerClass:
+            regular_field: str
+            custom_field_int: int
+            complex_obj: MyComplexField
+
+            def __init__(
+                self,
+                regular_field: str,
+                custom_field_int: int,
+                complex_obj: MyComplexField,
+            ) -> None:
+                self.regular_field = regular_field
+                self.custom_field_int = custom_field_int
+                self.complex_obj = complex_obj
+
+        instance = CustomHandlerClass("hello", 123, MyComplexField(50))
+        serialized = json_serialize(instance)
+
+        self.assertEqual(serialized["regularField"], "hello")
+        self.assertEqual(serialized["customFieldInt"], "custom_serialized_123")
+        self.assertEqual(serialized["complexObj"], {"wrapper_value": 100})
+
+        deserialized = json_deserialize(CustomHandlerClass, serialized)
+        self.assertEqual(deserialized.regular_field, "hello")
+        self.assertEqual(deserialized.custom_field_int, 123)
+        self.assertEqual(
+            deserialized.complex_obj.internal_value, MyComplexField(50).internal_value
+        )
+
+    def test_camel_case_deserialize(self) -> None:
+        @json_standard_serializable()
+        class CamelClass:
+            def __init__(self, my_field: str, another_field: int) -> None:
+                self.my_field = my_field
+                self.another_field = another_field
+
+        data = {"myField": "value", "anotherField": 42}
+        instance = json_deserialize(CamelClass, data)
+        self.assertEqual(instance.my_field, "value")
+        self.assertEqual(instance.another_field, 42)
+
+    def test_json_serialize_return(self) -> None:
+        @json_serializable()
+        class SimpleClass:
+            def __init__(self, value: int) -> None:
+                self.value = value
+
+        @json_serialize_return()
+        def produce_object() -> SimpleClass:
+            return SimpleClass(10)
+
+        serialized = produce_object()
+        self.assertEqual(serialized, {"value": 10})
+        deserialized = json_deserialize(SimpleClass, serialized)
+        self.assertIsInstance(deserialized, SimpleClass)
+        self.assertEqual(deserialized.value, 10)
+        self.assertEqual(deserialized, SimpleClass(10))
