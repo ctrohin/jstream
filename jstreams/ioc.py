@@ -1257,6 +1257,8 @@ class InjectedVariable(Generic[T]):
 
 
 class _InspectedElement:
+    __slots__ = ("element_name", "element_type", "is_optional")
+
     def __init__(
         self, element_name: str, element_type: type, is_optional: bool
     ) -> None:
