@@ -1,7 +1,6 @@
 from datetime import date, datetime
 from enum import Enum
 import re
-from types import MappingProxyType
 from typing import (
     Any,
     Callable,
@@ -28,6 +27,10 @@ _T_co = TypeVar("_T_co", covariant=True)
 _CAMEL_TO_SNAKE_PAT1 = re.compile(r"(.)([A-Z][a-z]+)")
 _CAMEL_TO_SNAKE_PAT2 = re.compile(r"__([A-Z])")
 _CAMEL_TO_SNAKE_PAT3 = re.compile(r"([a-z0-9])([A-Z])")
+
+# Caches for _deserialize_value to speed up repeated type checks
+_ENUM_TYPE_CACHE: dict[type, bool] = {}
+_HAS_CALLABLE_FROM_DICT_CACHE: dict[type, bool] = {}
 
 
 def _snake_to_camel(snake_str: str) -> str:
@@ -77,9 +80,8 @@ class SerializableObject(Protocol[_T_co]):
 
 def _process_value(value: Any) -> Any:
     """Helper function to recursively process values for serialization."""
-    if isinstance(value, SerializableObject) and callable(
-        getattr(value, "to_dict", None)
-    ):
+    # If the object conforms to SerializableObject, isinstance check is sufficient due to @runtime_checkable
+    if isinstance(value, SerializableObject):
         # If the object conforms to SerializableObject and has a callable to_dict
         return value.to_dict()
     elif isinstance(value, (datetime, date)):
@@ -105,9 +107,9 @@ def _deserialize_value(target_type: Any, data_value: Any) -> Any:
     """
     if target_type is Any:  # No specific type hint, return as is
         return data_value
-    actual_type_to_check = (
-        get_origin(target_type) if get_origin(target_type) else target_type
-    )
+
+    origin = get_origin(target_type)
+    actual_type_to_check = origin or target_type
 
     # 1. Handle specific known types first
     if actual_type_to_check is datetime and isinstance(data_value, str):
@@ -126,14 +128,22 @@ def _deserialize_value(target_type: Any, data_value: Any) -> Any:
         except ValueError:
             pass
     if inspect.isclass(actual_type_to_check) and issubclass(actual_type_to_check, Enum):
-        try:
-            # Attempt to create enum member from value
-            return actual_type_to_check(data_value)
-        except ValueError:
-            # If data_value is not a valid value for the enum,
-            # it might be the enum member name (less common for JSON).
-            # For now, we only support creation by value.
-            pass
+        # Optimized Enum check using cache
+        is_enum_class = _ENUM_TYPE_CACHE.get(actual_type_to_check)
+        if is_enum_class is None:
+            is_enum_class = inspect.isclass(actual_type_to_check) and issubclass(
+                actual_type_to_check, Enum
+            )
+            _ENUM_TYPE_CACHE[actual_type_to_check] = is_enum_class
+
+        if is_enum_class:
+            try:
+                # Attempt to create enum member from value
+                return actual_type_to_check(data_value)
+            except ValueError:
+                # If data_value is not a valid value for the enum,
+                # it might be the enum member name (less common for JSON).
+                pass
     origin = get_origin(target_type)
     args = get_args(target_type)
 
@@ -186,12 +196,22 @@ def _deserialize_value(target_type: Any, data_value: Any) -> Any:
 
     # Check for a class that has from_dict (could be target_type itself if not a generic)
     # This handles direct SerializableObject types.
-    # Note: `origin` is None for non-generic types like `MyClass`.
-    if (
-        hasattr(actual_type_to_check, "from_dict")
-        and callable(getattr(actual_type_to_check, "from_dict"))
-        and isinstance(data_value, dict)
-    ):
+    # Optimized check for from_dict capability using cache
+    has_callable_from_dict = _HAS_CALLABLE_FROM_DICT_CACHE.get(actual_type_to_check)
+    if has_callable_from_dict is None:
+        if inspect.isclass(
+            actual_type_to_check
+        ):  # hasattr/getattr are safer on classes
+            from_dict_method = getattr(actual_type_to_check, "from_dict", None)
+            has_callable_from_dict = callable(from_dict_method)
+        else:
+            has_callable_from_dict = (
+                False  # Not a class, so can't have classmethod from_dict
+            )
+        _HAS_CALLABLE_FROM_DICT_CACHE[actual_type_to_check] = has_callable_from_dict
+
+    if has_callable_from_dict and isinstance(data_value, dict):
+        # actual_type_to_check is known to have a callable from_dict
         return actual_type_to_check.from_dict(data_value)
 
     # If data_value is already an instance of the target type (after considering origin)
@@ -309,6 +329,50 @@ def json_serializable(
     """
 
     def decorator(cls: type[_T]) -> type[_T]:
+        # --- Caching introspection results at decoration time ---
+        # Use a unique prefix for cached attributes to avoid potential collisions.
+        cached_type_hints_attr = f"_jstreams_cached_type_hints_{cls.__name__}"
+        cached_init_params_attr = f"_jstreams_cached_init_params_{cls.__name__}"
+        cached_reverse_aliases_attr = f"_jstreams_cached_reverse_aliases_{cls.__name__}"
+        cached_slots_attr = f"_jstreams_cached_slots_{cls.__name__}"
+
+        # Cache type hints
+        if not hasattr(cls, cached_type_hints_attr):
+            try:
+                hints = get_type_hints(cls)
+                setattr(cls, cached_type_hints_attr, hints)
+            except Exception:  # get_type_hints can fail in some edge cases
+                setattr(cls, cached_type_hints_attr, {})
+
+        # Cache __init__ parameters
+        if not hasattr(cls, cached_init_params_attr):
+            try:
+                init_sig = inspect.signature(cls.__init__)
+                setattr(cls, cached_init_params_attr, init_sig.parameters)
+            except (ValueError, TypeError):  # Not inspectable
+                setattr(cls, cached_init_params_attr, {})
+
+        # Cache reverse aliases
+        if not hasattr(cls, cached_reverse_aliases_attr):
+            setattr(
+                cls,
+                cached_reverse_aliases_attr,
+                {v: k for k, v in (aliases or {}).items()},
+            )
+
+        # Cache __slots__ as a set for efficient lookup
+        if not hasattr(cls, cached_slots_attr):
+            if hasattr(cls, "__slots__"):
+                defined_slots = cls.__slots__  # type: ignore[attr-defined]
+                if isinstance(defined_slots, str):
+                    setattr(cls, cached_slots_attr, {defined_slots})
+                else:  # Assuming iterable
+                    setattr(cls, cached_slots_attr, set(defined_slots))
+            else:
+                setattr(cls, cached_slots_attr, set())  # Empty set if no slots
+
+        # --- End Caching ---
+
         def to_dict(self: _T) -> dict[str, Any]:
             return _to_dict_convert_name(self, convert_names=True)
 
@@ -398,29 +462,18 @@ def json_serializable(
             Creates an instance of the class from a dictionary.
             Recursively deserializes nested objects based on type hints.
             """
-            try:
-                all_type_hints = get_type_hints(cls_target)
-            except Exception:  # get_type_hints can fail in some edge cases
-                all_type_hints = {}
-            aliases_map_local = aliases or {}
-            reverse_aliases_map = {v1: k for k, v1 in aliases_map_local.items()}
+            # Retrieve cached introspection results
+            all_type_hints = getattr(cls_target, cached_type_hints_attr)
+            init_params = getattr(cls_target, cached_init_params_attr)
+            reverse_aliases_map = getattr(cls_target, cached_reverse_aliases_attr)
+            cls_slots = getattr(
+                cls_target, cached_slots_attr
+            )  # Retrieve cached slots set
+
             custom_deserializers_map_local = custom_deserializers or {}
 
             init_kwargs: dict[str, Any] = {}
             extra_data: dict[str, Any] = {}  # For data not used in __init__
-
-            init_params: Union[
-                MappingProxyType[str, inspect.Parameter], dict[str, inspect.Parameter]
-            ] = {}
-            # Inspect __init__ signature to find parameters
-            try:
-                init_sig = inspect.signature(cls_target.__init__)
-                init_params = init_sig.parameters
-            except (
-                ValueError,
-                TypeError,
-            ):  # Some built-ins or C extensions might not be inspectable
-                pass
 
             # Prepare arguments for __init__ by deserializing them
             for key_from_data, value_from_data in data.items():
@@ -461,13 +514,8 @@ def json_serializable(
             # Set any remaining attributes from `extra_data` using setattr
             for attr_name_from_extra, original_value_from_data in extra_data.items():
                 is_known_attribute = False  # Known via slots or type hints
-                if hasattr(cls_target, "__slots__"):
-                    defined_slots = cls_target.__slots__  # type: ignore[attr-defined]
-                    if isinstance(defined_slots, str):
-                        defined_slots = [defined_slots]
-                    if attr_name_from_extra in defined_slots:
-                        # Set attribute if it's a known slot or a regular attribute
-                        is_known_attribute = True
+                if attr_name_from_extra in cls_slots:  # Use cached slots
+                    is_known_attribute = True
 
                 if not is_known_attribute and attr_name_from_extra in all_type_hints:
                     is_known_attribute = True
