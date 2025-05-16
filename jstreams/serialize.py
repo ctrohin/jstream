@@ -1,3 +1,4 @@
+import sys
 from datetime import date, datetime
 from enum import Enum
 import re
@@ -5,7 +6,6 @@ from typing import (
     Any,
     Callable,
     Optional,
-    ParamSpec,
     TypeVar,
     Iterable,
     Union,
@@ -644,7 +644,14 @@ def json_serialize_list(obj: list[Any]) -> list[dict[str, Any]]:
     return [item.to_dict() for item in obj]
 
 
-P = ParamSpec("P")
+if sys.version_info >= (3, 10):
+    from typing import ParamSpec
+
+    P = ParamSpec("P")
+else:
+    from typing_extensions import ParamSpec
+
+    P = ParamSpec("P")
 # TypeVar for the original return type of a callable
 R = TypeVar("R")
 
