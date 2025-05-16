@@ -410,7 +410,7 @@ class TestSerialize(BaseTestCase):
             OPTION_A = "val_a"
             OPTION_B = "val_b"
 
-        @json_serializable(omit_none=True)
+        @json_serializable()
         class AdvancedTypesClass:
             def __init__(
                 self,
@@ -437,9 +437,7 @@ class TestSerialize(BaseTestCase):
         self.assertEqual(serialized["d"], today.isoformat())
         self.assertEqual(serialized["u"], str(my_uuid))
         self.assertEqual(serialized["e"], "val_a")
-        self.assertNotIn(
-            "e_opt", serialized
-        )  # It's None and omit_none is False by default
+        self.assertIsNone(serialized["e_opt"])
 
         deserialized = json_deserialize(AdvancedTypesClass, serialized)
         self.assertEqual(deserialized.dt, now)
@@ -552,4 +550,4 @@ class TestSerialize(BaseTestCase):
         self.assertEqual(deserialized.custom_field_int, 123)
         self.assertEqual(
             deserialized.complex_obj.internal_value, MyComplexField(50).internal_value
-        )  # Relies on __eq__ in MyComplexField and TempObj
+        )
