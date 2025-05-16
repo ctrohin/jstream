@@ -1,4 +1,7 @@
-from typing import Optional
+from datetime import date, datetime
+from enum import Enum
+from typing import Any, Optional
+from uuid import UUID, uuid4
 from baseTest import BaseTestCase
 from jstreams.serialize import json_deserialize, json_serializable, json_serialize
 
@@ -331,3 +334,222 @@ class TestSerialize(BaseTestCase):
         # deserialize(None, {}) would likely fail earlier at get_type_hints or inspect.signature
         # For deserialize, the first argument must be a type.
         self.assertRaises(AttributeError, lambda: json_deserialize(None, {"a": 1}))
+
+    def test_field_aliases(self) -> None:
+        @json_serializable(
+            aliases={"python_name": "jsonName", "another_attr": "otherJsonAttr"}
+        )
+        class AliasedClass:
+            def __init__(self, python_name: str, another_attr: int) -> None:
+                self.python_name = python_name
+                self.another_attr = another_attr
+
+            regular_field: Optional[str] = None
+
+        instance = AliasedClass("value1", 100)
+        instance.regular_field = "untouched"
+
+        serialized = json_serialize(instance)
+        self.assertEqual(
+            serialized,
+            {"jsonName": "value1", "otherJsonAttr": 100, "regular_field": "untouched"},
+        )
+
+        deserialized = json_deserialize(
+            AliasedClass,
+            {
+                "jsonName": "value2",
+                "otherJsonAttr": 200,
+                "regular_field": "new_untouched",
+            },
+        )
+        self.assertEqual(deserialized.python_name, "value2")
+        self.assertEqual(deserialized.another_attr, 200)
+        self.assertEqual(deserialized.regular_field, "new_untouched")
+        self.assertEqual(instance.python_name, "value1")  # Original instance unchanged
+
+    def test_omit_none_values(self) -> None:
+        @json_serializable(omit_none=True)
+        class OmitNoneClass:
+            def __init__(
+                self,
+                name: str,
+                value: Optional[int] = None,
+                description: Optional[str] = None,
+            ) -> None:
+                self.name = name
+                self.value = value
+                self.description = description
+
+        instance_with_none = OmitNoneClass("Test", description="Has description")
+        serialized_with_none_omitted = json_serialize(instance_with_none)
+        self.assertEqual(
+            serialized_with_none_omitted,
+            {"name": "Test", "description": "Has description"},
+        )
+
+        instance_all_values = OmitNoneClass("TestFull", 123, "Full desc")
+        serialized_all_values = json_serialize(instance_all_values)
+        self.assertEqual(
+            serialized_all_values,
+            {"name": "TestFull", "value": 123, "description": "Full desc"},
+        )
+
+        @json_serializable(omit_none=False)  # Default behavior
+        class KeepNoneClass:
+            def __init__(self, name: str, value: Optional[int] = None) -> None:
+                self.name = name
+                self.value = value
+
+        instance_keep_none = KeepNoneClass("TestKeep")
+        serialized_keep_none = json_serialize(instance_keep_none)
+        self.assertEqual(serialized_keep_none, {"name": "TestKeep", "value": None})
+
+    def test_datetime_date_uuid_enum_handling(self) -> None:
+        class MyEnum(Enum):
+            OPTION_A = "val_a"
+            OPTION_B = "val_b"
+
+        @json_serializable(omit_none=True)
+        class AdvancedTypesClass:
+            def __init__(
+                self,
+                dt: datetime,
+                d: date,
+                u: UUID,
+                e: MyEnum,
+                e_opt: Optional[MyEnum] = None,
+            ) -> None:
+                self.dt = dt
+                self.d = d
+                self.u = u
+                self.e = e
+                self.e_opt = e_opt
+
+        now = datetime.now()
+        today = date.today()
+        my_uuid = uuid4()
+
+        instance = AdvancedTypesClass(now, today, my_uuid, MyEnum.OPTION_A)
+        serialized = json_serialize(instance)
+
+        self.assertEqual(serialized["dt"], now.isoformat())
+        self.assertEqual(serialized["d"], today.isoformat())
+        self.assertEqual(serialized["u"], str(my_uuid))
+        self.assertEqual(serialized["e"], "val_a")
+        self.assertNotIn(
+            "e_opt", serialized
+        )  # It's None and omit_none is False by default
+
+        deserialized = json_deserialize(AdvancedTypesClass, serialized)
+        self.assertEqual(deserialized.dt, now)
+        self.assertEqual(deserialized.d, today)
+        self.assertEqual(deserialized.u, my_uuid)
+        self.assertEqual(deserialized.e, MyEnum.OPTION_A)
+        self.assertIsNone(deserialized.e_opt)
+
+        # Test with optional enum present
+        instance_with_opt_enum = AdvancedTypesClass(
+            now, today, my_uuid, MyEnum.OPTION_A, MyEnum.OPTION_B
+        )
+        serialized_with_opt_enum = json_serialize(instance_with_opt_enum)
+        self.assertEqual(serialized_with_opt_enum["e_opt"], "val_b")
+        deserialized_with_opt_enum = json_deserialize(
+            AdvancedTypesClass, serialized_with_opt_enum
+        )
+        self.assertEqual(deserialized_with_opt_enum.e_opt, MyEnum.OPTION_B)
+
+    def test_post_deserialize_hook(self) -> None:
+        hook_called_flag = False
+
+        @json_serializable(post_deserialize_hook_name="custom_hook")
+        class HookedClass:
+            name: str
+            derived_value: Optional[str] = None
+
+            def __init__(self, name: str) -> None:
+                self.name = name
+
+            def custom_hook(self) -> None:
+                nonlocal hook_called_flag
+                hook_called_flag = True
+                self.derived_value = f"Derived from {self.name}"
+
+        data = {"name": "HookTest"}
+        deserialized = json_deserialize(HookedClass, data)
+
+        self.assertTrue(hook_called_flag)
+        self.assertEqual(deserialized.name, "HookTest")
+        self.assertEqual(deserialized.derived_value, "Derived from HookTest")
+
+    def test_custom_field_serializers_deserializers(self) -> None:
+        def custom_int_serializer(value: int) -> str:
+            return f"custom_serialized_{value}"
+
+        def custom_int_deserializer(data_value: str) -> int:
+            return int(data_value.replace("custom_serialized_", ""))
+
+        def custom_obj_serializer(obj: Any) -> dict:  # Simplified custom object
+            return {"wrapper_value": obj.internal_value * 2}
+
+        def custom_obj_deserializer(data: dict) -> Any:  # Simplified custom object
+            class TempObj:
+                def __init__(self, val):
+                    self.internal_value = val
+
+                def __eq__(self, other):
+                    return (
+                        isinstance(other, TempObj)
+                        and self.internal_value == other.internal_value
+                    )
+
+            return TempObj(data["wrapper_value"] // 2)
+
+        class MyComplexField:
+            def __init__(self, internal_value: int):
+                self.internal_value = internal_value
+
+            def __eq__(self, other):
+                return (
+                    isinstance(other, MyComplexField)
+                    and self.internal_value == other.internal_value
+                )
+
+        @json_serializable(
+            custom_serializers={
+                "custom_field_int": custom_int_serializer,
+                "complex_obj": custom_obj_serializer,
+            },
+            custom_deserializers={
+                "custom_field_int": custom_int_deserializer,
+                "complex_obj": custom_obj_deserializer,
+            },
+        )
+        class CustomHandlerClass:
+            regular_field: str
+            custom_field_int: int
+            complex_obj: MyComplexField
+
+            def __init__(
+                self,
+                regular_field: str,
+                custom_field_int: int,
+                complex_obj: MyComplexField,
+            ) -> None:
+                self.regular_field = regular_field
+                self.custom_field_int = custom_field_int
+                self.complex_obj = complex_obj
+
+        instance = CustomHandlerClass("hello", 123, MyComplexField(50))
+        serialized = json_serialize(instance)
+
+        self.assertEqual(serialized["regular_field"], "hello")
+        self.assertEqual(serialized["custom_field_int"], "custom_serialized_123")
+        self.assertEqual(serialized["complex_obj"], {"wrapper_value": 100})
+
+        deserialized = json_deserialize(CustomHandlerClass, serialized)
+        self.assertEqual(deserialized.regular_field, "hello")
+        self.assertEqual(deserialized.custom_field_int, 123)
+        self.assertEqual(
+            deserialized.complex_obj.internal_value, MyComplexField(50).internal_value
+        )  # Relies on __eq__ in MyComplexField and TempObj

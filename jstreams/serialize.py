@@ -1,3 +1,5 @@
+from datetime import date, datetime
+from enum import Enum
 from types import MappingProxyType
 from typing import (
     Any,
@@ -12,20 +14,22 @@ from typing import (
     get_args,
 )
 import inspect
+from uuid import UUID
 
 # TypeVar to represent the class being decorated.
 _T = TypeVar("_T")
+# Covariant TypeVar for SerializableObject protocol
+_T_co = TypeVar("_T_co", covariant=True)
 
 
 # Define a Protocol for objects that have to_dict and from_dict methods.
 # Define a Protocol for objects that have a to_dict method.
 # This helps in type checking the duck-typed call to value.to_dict().
 @runtime_checkable
-class SerializableObject(Protocol):
+class SerializableObject(Protocol[_T_co]):
     def to_dict(self) -> dict[str, Any]: ...
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Any:  # Return Any, actual type is _T
-        ...
+    def from_dict(cls: type[_T_co], data: dict[str, Any]) -> _T_co: ...
 
 
 def _process_value(value: Any) -> Any:
@@ -35,6 +39,12 @@ def _process_value(value: Any) -> Any:
     ):
         # If the object conforms to SerializableObject and has a callable to_dict
         return value.to_dict()
+    elif isinstance(value, (datetime, date)):
+        return value.isoformat()
+    elif isinstance(value, UUID):
+        return str(value)
+    elif isinstance(value, Enum):
+        return value.value  # Serialize Enums to their value
     elif isinstance(value, list):
         return [_process_value(item) for item in value]
     elif isinstance(value, tuple):
@@ -52,7 +62,35 @@ def _deserialize_value(target_type: Any, data_value: Any) -> Any:
     """
     if target_type is Any:  # No specific type hint, return as is
         return data_value
+    actual_type_to_check = (
+        get_origin(target_type) if get_origin(target_type) else target_type
+    )
 
+    # 1. Handle specific known types first
+    if actual_type_to_check is datetime and isinstance(data_value, str):
+        try:
+            return datetime.fromisoformat(data_value)
+        except ValueError:
+            pass  # Fall through if not a valid ISO format string
+    if actual_type_to_check is date and isinstance(data_value, str):
+        try:
+            return date.fromisoformat(data_value)
+        except ValueError:
+            pass
+    if actual_type_to_check is UUID and isinstance(data_value, str):
+        try:
+            return UUID(data_value)
+        except ValueError:
+            pass
+    if inspect.isclass(actual_type_to_check) and issubclass(actual_type_to_check, Enum):
+        try:
+            # Attempt to create enum member from value
+            return actual_type_to_check(data_value)
+        except ValueError:
+            # If data_value is not a valid value for the enum,
+            # it might be the enum member name (less common for JSON).
+            # For now, we only support creation by value.
+            pass
     origin = get_origin(target_type)
     args = get_args(target_type)
 
@@ -74,9 +112,14 @@ def _deserialize_value(target_type: Any, data_value: Any) -> Any:
             except (TypeError, ValueError, AttributeError, KeyError):
                 # If deserialization with this arg_type fails, try the next one.
                 continue
-        # If no type in Union matches or successfully deserializes, return raw data_value.
-        # This might be the correct behavior if data_value is already of a compatible simple type.
-        return data_value
+
+        # If no type in Union matches or successfully deserializes,
+        # and data_value was not None (or None was not allowed), return raw data_value.
+        # This might be the correct behavior if data_value is already of a compatible simple type
+        # that wasn't explicitly in the Union's args but is assignable.
+        if data_value is not None or not any(arg is type(None) for arg in args):
+            return data_value
+        return None  # Should have been caught by 'if data_value is None' earlier if None was allowed
 
     if origin in (list, tuple) and args:  # Handles list[X], tuple[X, Y, ...]
         item_type = args[0]  # Assuming list[X] or tuple[X, ...]
@@ -101,7 +144,6 @@ def _deserialize_value(target_type: Any, data_value: Any) -> Any:
     # Check for a class that has from_dict (could be target_type itself if not a generic)
     # This handles direct SerializableObject types.
     # Note: `origin` is None for non-generic types like `MyClass`.
-    actual_type_to_check = origin if origin else target_type
     if (
         hasattr(actual_type_to_check, "from_dict")
         and callable(getattr(actual_type_to_check, "from_dict"))
@@ -109,13 +151,29 @@ def _deserialize_value(target_type: Any, data_value: Any) -> Any:
     ):
         return actual_type_to_check.from_dict(data_value)
 
-    # If it's a basic type, or no special handling matched, return data_value.
-    # This assumes data_value is already of the correct basic type (e.g. int, str).
+    # If data_value is already an instance of the target type (after considering origin)
+    if actual_type_to_check is not Any and isinstance(data_value, actual_type_to_check):
+        return data_value
+
+    # Attempt basic type coercion if target_type is a basic type and data_value is not already that type
+    if actual_type_to_check in (int, float, str, bool) and not isinstance(
+        data_value, actual_type_to_check
+    ):
+        try:
+            return actual_type_to_check(data_value)
+        except (ValueError, TypeError):
+            # Coercion failed, fall through to return original data_value
+            pass
     return data_value
 
 
 def json_serializable(
     ignore_unknown_fields: bool = True,
+    aliases: dict[str, str] | None = None,
+    omit_none: bool = False,
+    custom_serializers: dict[str, Callable[[Any], Any]] | None = None,
+    custom_deserializers: dict[str, Callable[[Any], Any]] | None = None,
+    post_deserialize_hook_name: str | None = "__post_deserialize__",
 ) -> Callable[[type[_T]], type[_T]]:
     """
     A class decorator that adds a to_dict() method to the decorated class.
@@ -127,6 +185,12 @@ def json_serializable(
       are serialized by calling their to_dict() method.
     - Lists and tuples are iterated, and their items are processed recursively.
     - Dictionaries are iterated, and their values are processed recursively.
+    - Supports field aliasing for serialization and deserialization.
+    - Can omit fields with None values during serialization.
+    - Supports custom serializer functions for specific fields.
+    - Supports custom deserializer functions for specific fields.
+    - Can call a post-deserialization hook method on the instance.
+    - Enhanced to handle common types like datetime, date, Enum, UUID.
 
     By convention, attributes are excluded from serialization if their names:
     - Start with a single underscore (e.g., _protected_attribute).
@@ -138,6 +202,8 @@ def json_serializable(
     def decorator(cls: type[_T]) -> type[_T]:
         def to_dict(self: _T) -> dict[str, Any]:
             serialized_data: dict[str, Any] = {}
+            aliases_map_local = aliases or {}
+            custom_serializers_map_local = custom_serializers or {}
 
             # This map will store all potential attributes to serialize,
             # gathered from __dict__ and __slots__.
@@ -193,11 +259,23 @@ def json_serializable(
                             # Skip it for serialization.
                             continue
 
-            for key, value in attributes_map.items():
-                if not key.startswith(
+            for attr_name, raw_value in attributes_map.items():
+                if not attr_name.startswith(
                     "_"
                 ):  # Exclude "private" or "protected" attributes
-                    serialized_data[key] = _process_value(value)
+                    processed_value: Any
+                    if attr_name in custom_serializers_map_local:
+                        processed_value = custom_serializers_map_local[attr_name](
+                            raw_value
+                        )
+                    else:
+                        processed_value = _process_value(raw_value)
+
+                    if omit_none and processed_value is None:
+                        continue
+
+                    output_key = aliases_map_local.get(attr_name, attr_name)
+                    serialized_data[output_key] = processed_value
 
             return serialized_data
 
@@ -210,6 +288,9 @@ def json_serializable(
                 all_type_hints = get_type_hints(cls_target)
             except Exception:  # get_type_hints can fail in some edge cases
                 all_type_hints = {}
+            aliases_map_local = aliases or {}
+            reverse_aliases_map = {v1: k for k, v1 in aliases_map_local.items()}
+            custom_deserializers_map_local = custom_deserializers or {}
 
             init_kwargs: dict[str, Any] = {}
             extra_data: dict[str, Any] = {}  # For data not used in __init__
@@ -228,18 +309,31 @@ def json_serializable(
                 pass
 
             # Prepare arguments for __init__ by deserializing them
-            for key, value in data.items():
-                if key in init_params and init_params[key].name != "self":
-                    param = init_params[key]
+            for key_from_data, value_from_data in data.items():
+                attr_name = reverse_aliases_map.get(key_from_data, key_from_data)
+
+                if attr_name in init_params and init_params[attr_name].name != "self":
+                    param = init_params[attr_name]
                     # Determine the type hint for the __init__ parameter
                     param_type_hint = param.annotation
                     if param_type_hint is inspect.Parameter.empty:
                         # If __init__ param has no type hint, try class-level hint
-                        param_type_hint = all_type_hints.get(key, Any)
+                        param_type_hint = all_type_hints.get(attr_name, Any)
 
-                    init_kwargs[key] = _deserialize_value(param_type_hint, value)
+                    if attr_name in custom_deserializers_map_local:
+                        init_kwargs[attr_name] = custom_deserializers_map_local[
+                            attr_name
+                        ](value_from_data)
+
+                    else:
+                        init_kwargs[attr_name] = _deserialize_value(
+                            param_type_hint, value_from_data
+                        )
                 else:
-                    extra_data[key] = value
+                    # Store with original (potentially aliased) key if it's not an init param,
+                    # or de-aliased name if it was an init param but not used (e.g. **kwargs)
+                    # For simplicity, always use de-aliased name for extra_data keys.
+                    extra_data[attr_name] = value_from_data
 
             # Instantiate the object using prepared __init__ arguments
             # This assumes __init__ can handle the provided kwargs.
@@ -248,32 +342,61 @@ def json_serializable(
             instance = cls_target(**init_kwargs)
 
             # Set any remaining attributes from `extra_data` using setattr
-            for key, value in extra_data.items():
-                is_slot = False
+            for attr_name_from_extra, original_value_from_data in extra_data.items():
+                is_known_attribute = False  # Known via slots or type hints
                 if hasattr(cls_target, "__slots__"):
                     defined_slots = cls_target.__slots__  # type: ignore[attr-defined]
                     if isinstance(defined_slots, str):
                         defined_slots = [defined_slots]
-                    if key in defined_slots:
-                        is_slot = True
+                    if attr_name_from_extra in defined_slots:
+                        # Set attribute if it's a known slot or a regular attribute
+                        is_known_attribute = True
 
-                # Set attribute if it's a known slot or a regular attribute
-                if is_slot or hasattr(instance, key):
-                    attr_type_hint = all_type_hints.get(key, Any)
-                    deserialized_value = _deserialize_value(attr_type_hint, value)
+                if not is_known_attribute and attr_name_from_extra in all_type_hints:
+                    is_known_attribute = True
+
+                if is_known_attribute:
+                    attr_type_hint = all_type_hints.get(attr_name_from_extra, Any)
+                    final_value: Any
+                    if attr_name_from_extra in custom_deserializers_map_local:
+                        final_value = custom_deserializers_map_local[
+                            attr_name_from_extra
+                        ](original_value_from_data)
+                    else:
+                        final_value = _deserialize_value(
+                            attr_type_hint, original_value_from_data
+                        )
                     try:
-                        setattr(instance, key, deserialized_value)
+                        setattr(instance, attr_name_from_extra, final_value)
                     except (
                         AttributeError
                     ):  # e.g., property without setter, or __slots__ issue
                         # Optionally log: f"Warning: Could not set attribute '{key}' on '{cls_target.__name__}'"
                         pass
-                elif not ignore_unknown_fields:
-                    # If the attribute is not a serializable attribute, try to set it anyway
+                elif (
+                    not ignore_unknown_fields
+                ):  # Attribute is not known, but we are not ignoring unknown fields
+                    # Attempt to set it. Deserialize with Any, which processes collections/SerializableObjects
+                    # but otherwise uses the value as-is.
+                    value_to_set = _deserialize_value(Any, original_value_from_data)
                     try:
-                        setattr(instance, key, value)
+                        setattr(instance, attr_name_from_extra, value_to_set)
                     except AttributeError:
                         pass
+
+            # Call post-deserialization hook if it exists
+            if post_deserialize_hook_name and hasattr(
+                instance, post_deserialize_hook_name
+            ):
+                hook_method = getattr(instance, post_deserialize_hook_name)
+                if callable(hook_method):
+                    try:
+                        hook_method()
+                    except Exception:
+                        # Optionally log or handle exception from hook
+                        # print(f"Warning: Error in post_deserialize_hook '{post_deserialize_hook_name}': {e}")
+                        pass
+
             return instance
 
         def __eq__(self: _T, other: Any) -> bool:
