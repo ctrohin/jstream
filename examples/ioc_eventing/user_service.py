@@ -1,6 +1,7 @@
 from threading import Thread
 from time import sleep
 import sys
+from typing import Optional
 
 sys.path.append(".")
 
@@ -52,7 +53,7 @@ class UserService:
     def get_users(self) -> list[User]:
         return self.users
 
-    def get_user_by_name(self, name: str) -> User | None:
+    def get_user_by_name(self, name: str) -> Optional[User]:
         for user in self.users:
             if user.name == name:
                 return user

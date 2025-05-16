@@ -4,6 +4,7 @@ from types import MappingProxyType
 from typing import (
     Any,
     Callable,
+    Optional,
     TypeVar,
     Iterable,
     Union,
@@ -169,11 +170,11 @@ def _deserialize_value(target_type: Any, data_value: Any) -> Any:
 
 def json_serializable(
     ignore_unknown_fields: bool = True,
-    aliases: dict[str, str] | None = None,
+    aliases: Optional[dict[str, str]] = None,
     omit_none: bool = False,
-    custom_serializers: dict[str, Callable[[Any], Any]] | None = None,
-    custom_deserializers: dict[str, Callable[[Any], Any]] | None = None,
-    post_deserialize_hook_name: str | None = "__post_deserialize__",
+    custom_serializers: Optional[dict[str, Callable[[Any], Any]]] = None,
+    custom_deserializers: Optional[dict[str, Callable[[Any], Any]]] = None,
+    post_deserialize_hook_name: Optional[str] = "__post_deserialize__",
 ) -> Callable[[type[_T]], type[_T]]:
     """
     A class decorator that adds a to_dict() method to the decorated class.
