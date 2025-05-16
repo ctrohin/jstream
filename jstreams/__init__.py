@@ -303,6 +303,8 @@ from jstreams.serialize import (
     json_serialize,
     json_standard_serializable,
     json_serialize_return,
+    json_deserialize_list,
+    json_serialize_return_list,
 )
 
 __all__ = [
@@ -562,4 +564,7 @@ __all__ = [
     "json_serialize",
     "json_standard_serializable",
     "json_serialize_return",
+    "json_serialize_return_list",
+    "json_deserialize_list",
+    "json_serialize_return_list",
 ]
