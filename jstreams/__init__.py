@@ -280,7 +280,7 @@ from jstreams.eventing import (
     event,
     on_event,
     managed_events,
-    dispose_managed_events,
+    dispose_managed_events_from,
     wait_for_event,  # Add wait_for_event to exports
 )
 
@@ -544,7 +544,7 @@ __all__ = [
     "find_last",
     "on_event",
     "managed_events",
-    "dispose_managed_events",
+    "dispose_managed_events_from",
     "wait_for_event",
     "nullable",
     "rx_distinct_until_changed",

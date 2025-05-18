@@ -1003,8 +1003,8 @@ def autowired(
         Callable[[Callable[..., T]], Callable[..., T]]: The decorator function.
     """
 
-    def wrapper(func: Callable[..., T]) -> Callable[..., T]:
-        def wrapped(*args: Any, **kwds: Any) -> T:
+    def wrapper(func: Callable[..., T]) -> Callable[..., T]:  # pylint: disable=unused-argument
+        def wrapped(*args: Any, **kwds: Any) -> T:  # pylint: disable=unused-argument
             return injector().get(class_name, qualifier)
 
         return wrapped
@@ -1012,7 +1012,7 @@ def autowired(
     return wrapper
 
 
-def return_wired(class_name: type[T]) -> T:
+def return_wired(class_name: type[T]) -> T:  # pylint: disable=unused-argument
     """
     Placeholder function used for type hinting within methods decorated with `@autowired`.
     It signals that the method's return value will be provided by the injector.
@@ -1027,7 +1027,7 @@ def return_wired(class_name: type[T]) -> T:
     return cast(T, NoOp)
 
 
-def return_wired_optional(class_name: type[T]) -> Optional[T]:
+def return_wired_optional(class_name: type[T]) -> Optional[T]:  # pylint: disable=unused-argument
     """
     Placeholder function used for type hinting within methods decorated with `@autowired_optional`.
     It signals that the method's return value will be provided by the injector and might be None.
@@ -1068,8 +1068,8 @@ def autowired_optional(
         Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]: The decorator function.
     """
 
-    def wrapper(func: Callable[..., Optional[T]]) -> Callable[..., Optional[T]]:
-        def wrapped(*args: Any, **kwds: Any) -> Optional[T]:
+    def wrapper(func: Callable[..., Optional[T]]) -> Callable[..., Optional[T]]:  # pylint: disable=unused-argument
+        def wrapped(*args: Any, **kwds: Any) -> Optional[T]:  # pylint: disable=unused-argument
             return injector().find(class_name, qualifier)
 
         return wrapped

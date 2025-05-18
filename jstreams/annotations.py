@@ -12,7 +12,7 @@ from typing import (
     get_type_hints,
 )
 
-from jstreams import Predicate
+from jstreams.predicate import Predicate
 
 NoneType = type(None)
 T = TypeVar("T")
@@ -55,11 +55,11 @@ def builder() -> Callable[[type[T]], type[T]]:
                         )
                     if field_name in get_type_hints(cls):
 
-                        def setter(value: Any) -> "Builder":
+                        def setter_mth(value: Any) -> "Builder":
                             self._fields[field_name] = value
                             return self
 
-                        return setter
+                        return setter_mth
 
                 raise AttributeError(
                     f"'{cls.__name__}.{type(self).__name__}' object has no attribute '{name}'"
@@ -86,7 +86,7 @@ def getter() -> Callable[[type[T]], type[T]]:
     """
 
     def decorator(cls: type[T]) -> type[T]:
-        for field_name, field_type in get_type_hints(cls).items():
+        for field_name, _ in get_type_hints(cls).items():
             if not field_name.startswith("_"):
 
                 def getter_method(self: Any, name: str = field_name) -> Any:
@@ -111,7 +111,7 @@ def setter() -> Callable[[type[T]], type[T]]:
     """
 
     def decorator(cls: type[T]) -> type[T]:
-        for field_name, field_type in get_type_hints(cls).items():
+        for field_name, _ in get_type_hints(cls).items():
             if not field_name.startswith("_"):
 
                 def setter_method(
@@ -200,19 +200,17 @@ def locked() -> Callable[[type[T]], type[T]]:
                                     return value(*args, **kwargs)
 
                             return wrapped_method
-                        else:
-                            # If it's a regular attribute or a non-bound method/function, return directly
-                            return value
-                    except AttributeError:
+                        # If it's a regular attribute or a non-bound method/function, return directly
+                        return value
+                    except AttributeError as exc:
                         # If getattr on original fails, try the original class's __getattr__ if it exists
                         if original_getattr is not None:
                             # Call the original __getattr__ within the lock
                             return original_getattr(self._original_instance, name)
-                        else:
-                            # If no original __getattr__, raise the AttributeError
-                            raise AttributeError(
-                                f"'{cls.__name__}' object (wrapped) has no attribute '{name}'"
-                            )
+                        # If no original __getattr__, raise the AttributeError
+                        raise AttributeError(
+                            f"'{cls.__name__}' object (wrapped) has no attribute '{name}'"
+                        ) from exc
 
             def __setattr__(self, name: str, value: Any) -> None:
                 """Sets an attribute on the original instance, acquiring the lock."""

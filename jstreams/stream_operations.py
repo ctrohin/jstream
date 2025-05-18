@@ -40,7 +40,7 @@ def extract_non_null_list(val: dict[K, Optional[T]], keys: Iterable[K]) -> list[
         Stream(keys)
         .map(val.get)
         .filter(is_not_none)
-        .map(lambda e: require_non_null(e))
+        .map(lambda e: require_non_null(e))  # pylint: disable=unnecessary-lambda
         .to_list()
     )
 
@@ -58,6 +58,6 @@ def not_null_elements(iterable: Iterable[Optional[T]]) -> Iterable[T]:
     return (
         Stream(iterable)
         .filter(is_not_none)
-        .map(lambda e: require_non_null(e))
+        .map(lambda e: require_non_null(e))  # pylint: disable=unnecessary-lambda
         .to_list()
     )

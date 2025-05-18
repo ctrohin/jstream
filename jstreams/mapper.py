@@ -112,8 +112,8 @@ class _WrapMapperWith(MapperWith[T, K, V]):
     def __init__(self, mapper: Callable[[T, K], V]) -> None:
         self.__mapper = mapper
 
-    def map(self, value: T, withValue: K) -> V:
-        return self.__mapper(value, withValue)
+    def map(self, value: T, with_value: K) -> V:
+        return self.__mapper(value, with_value)
 
     def __eq__(self, value: Any) -> bool:
         if not isinstance(value, _WrapMapperWith):

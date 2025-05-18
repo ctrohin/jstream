@@ -54,7 +54,10 @@ class Pipe(Generic[T, V]):
     __slots__ = ("__operators",)
 
     def __init__(
-        self, input_type: type[T], output_type: type[V], ops: list[RxOperator[Any, Any]]
+        self,
+        input_type: type[T],  # pylint: disable=unused-argument
+        output_type: type[V],  # pylint: disable=unused-argument
+        ops: list[RxOperator[Any, Any]],
     ) -> None:
         super().__init__()
         self.__operators: list[RxOperator[Any, Any]] = ops
@@ -157,7 +160,7 @@ class _ObservableParent(Generic[T]):
 class _OnNext(Generic[T]):
     def on_next(self, val: Optional[T]) -> None:
         if not hasattr(self, "__lock"):
-            self.__lock = Lock()
+            self.__lock = Lock()  # pylint: disable=attribute-defined-outside-init
         with self.__lock:
             self._on_next(val)
 
@@ -397,9 +400,9 @@ class _ObservableBase(Subscribable[T]):
             if sub.on_error is not None:
                 try:
                     sub.on_error(e)
-                except Exception as e:
+                except Exception as exc:
                     # Log uncaught exceptions in the error handler
-                    logging.getLogger("observable").error(e)
+                    logging.getLogger("observable").error(exc)
 
     def _push_to_subscription(self, sub: ObservableSubscription[Any], val: T) -> None:
         if not sub.is_paused():
@@ -489,7 +492,7 @@ class _ObservableBase(Subscribable[T]):
 
 
 class _Observable(_ObservableBase[T], _ObservableParent[T]):
-    def __init__(self) -> None:
+    def __init__(self) -> None:  # pylint: disable=useless-parent-delegation
         super().__init__()
 
 
@@ -601,9 +604,6 @@ class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
 
 
 class Observable(_Observable[T]):
-    def __init__(self) -> None:
-        super().__init__()
-
     @overload
     def pipe(
         self,
@@ -840,7 +840,7 @@ class Single(Flowable[T]):
 
 
 class SingleValueSubject(Single[T], _OnNext[T]):
-    def __init__(self, value: Optional[T]) -> None:
+    def __init__(self, value: Optional[T]) -> None:  # pylint: disable=useless-parent-delegation
         super().__init__(value)
 
     def _on_next(self, val: Optional[T]) -> None:
@@ -860,7 +860,7 @@ class BehaviorSubject(SingleValueSubject[T]):
 
 
 class PublishSubject(SingleValueSubject[T]):
-    def __init__(self, typ: type[T]) -> None:
+    def __init__(self, typ: type[T]) -> None:  # pylint: disable=unused-argument
         super().__init__(None)
 
     def _push(self) -> None:
@@ -947,7 +947,7 @@ class Reduce(BaseFilteringOperator[T]):
 
 
 class Filter(BaseFilteringOperator[T]):
-    def __init__(self, predicate: Callable[[T], bool]) -> None:
+    def __init__(self, predicate: Callable[[T], bool]) -> None:  # pylint: disable=useless-parent-delegation
         """
         Allows only values that match the given predicate to flow through
 
@@ -958,7 +958,7 @@ class Filter(BaseFilteringOperator[T]):
 
 
 class Map(BaseMappingOperator[T, V]):
-    def __init__(self, mapper: Callable[[T], V]) -> None:
+    def __init__(self, mapper: Callable[[T], V]) -> None:  # pylint: disable=useless-parent-delegation
         """
         Maps a value to a differnt value/form using the mapper function
 
@@ -969,7 +969,7 @@ class Map(BaseMappingOperator[T, V]):
 
 
 class Take(BaseFilteringOperator[T]):
-    def __init__(self, typ: type[T], count: int) -> None:
+    def __init__(self, typ: type[T], count: int) -> None:  # pylint: disable=unused-argument
         """
         Allows only the first "count" values to flow through
 
@@ -984,7 +984,7 @@ class Take(BaseFilteringOperator[T]):
     def init(self) -> None:
         self.__currently_pushed = 0
 
-    def __take(self, val: T) -> bool:
+    def __take(self, _: T) -> bool:
         if self.__currently_pushed >= self.__count:
             return False
         self.__currently_pushed += 1
@@ -1046,7 +1046,7 @@ class TakeUntil(BaseFilteringOperator[T]):
 
 
 class Drop(BaseFilteringOperator[T]):
-    def __init__(self, typ: type[T], count: int) -> None:
+    def __init__(self, typ: type[T], count: int) -> None:  # pylint: disable=unused-argument
         """
         Blocks the first "count" values, then allows all remaining values to pass through
 
@@ -1061,7 +1061,7 @@ class Drop(BaseFilteringOperator[T]):
     def init(self) -> None:
         self.__currently_dropped = 0
 
-    def __drop(self, val: T) -> bool:
+    def __drop(self, _: T) -> bool:
         if self.__currently_dropped < self.__count:
             self.__currently_dropped += 1
             return False
@@ -1205,7 +1205,7 @@ class Debounce(BaseFilteringOperator[T]):
     def init(self) -> None:
         self.__last_emitted = None
 
-    def __debounce(self, val: T) -> bool:
+    def __debounce(self, _: T) -> bool:
         import time
 
         current_time = time.time()
@@ -1234,7 +1234,7 @@ class Throttle(BaseFilteringOperator[T]):
     def init(self) -> None:
         self.__last_emitted = None
 
-    def __throttle(self, val: T) -> bool:
+    def __throttle(self, _: T) -> bool:
         import time
 
         current_time = time.time()
@@ -1279,8 +1279,7 @@ class Buffer(BaseMappingOperator[T, list[T]]):
             emitted_buffer = self.__buffer
             self.__buffer = []
             return emitted_buffer
-        else:
-            return []  # Return an empty list if the buffer should not emit yet
+        return []  # Return an empty list if the buffer should not emit yet
 
 
 class BufferCount(BaseMappingOperator[T, list[T]]):
@@ -1306,8 +1305,7 @@ class BufferCount(BaseMappingOperator[T, list[T]]):
             emitted_buffer = self.__buffer
             self.__buffer = []
             return emitted_buffer
-        else:
-            return []  # Return an empty list if the buffer is not full yet
+        return []  # Return an empty list if the buffer is not full yet
 
 
 class RX:
@@ -1609,7 +1607,7 @@ def rx_take_until(
     Returns:
         RxOperator[T, T]: A TakeUntil operator
     """
-    return RX.take_until(predicate)
+    return RX.take_until(predicate, include_stop_value)
 
 
 def rx_drop(typ: type[T], count: int) -> RxOperator[T, T]:

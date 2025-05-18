@@ -500,7 +500,7 @@ class Opt(Generic[T]):
             return self
         return self.__get_none()
 
-    def cast(self, class_type: type[V]) -> "Opt[V]":
+    def cast(self, class_type: type[V]) -> "Opt[V]":  # pylint: disable=unused-argument
         """
         Equivalent of Opt.map(lambda val: cast(classType, val))
 
@@ -570,13 +570,11 @@ class Opt(Generic[T]):
             inner_opt = self.__val  # self.__val is Opt[U] here
             if isinstance(inner_opt, Opt):
                 return inner_opt  # Return the inner Opt[U]
-            else:
-                # This case shouldn't happen if type hints are correct,
-                # but defensively return empty if the contained value isn't an Opt.
-                # Or perhaps raise a TypeError? Returning empty seems safer.
-                return cast(Opt[U], self.__get_none())
-        else:
-            return cast(Opt[U], self.__get_none())  # Outer Opt was empty
+            # This case shouldn't happen if type hints are correct,
+            # but defensively return empty if the contained value isn't an Opt.
+            # Or perhaps raise a TypeError? Returning empty seems safer.
+            return cast(Opt[U], self.__get_none())
+        return cast(Opt[U], self.__get_none())  # Outer Opt was empty
 
     def flat_map(self, mapper: Callable[[T], "Opt[V]"]) -> "Opt[V]":
         """
@@ -593,9 +591,8 @@ class Opt(Generic[T]):
         """
         if self.is_empty():
             return cast(Opt[V], self.__get_none())
-        else:
-            # Type checker knows self.__val is T here
-            return mapper(require_non_null(self.__val))
+        # Type checker knows self.__val is T here
+        return mapper(require_non_null(self.__val))
 
     def zip(self, other: "Opt[V]") -> "Opt[Pair[T, V]]":
         """
@@ -613,8 +610,7 @@ class Opt(Generic[T]):
             return Opt(
                 Pair(require_non_null(self.__val), require_non_null(other.__val))
             )
-        else:
-            return cast(Opt[Pair[T, V]], self.__get_none())
+        return cast(Opt[Pair[T, V]], self.__get_none())
 
     def zip_with(self, other: "Opt[V]", zipper: Callable[[T, V], K]) -> "Opt[K]":
         """
@@ -635,8 +631,7 @@ class Opt(Generic[T]):
             return Opt(
                 zipper(require_non_null(self.__val), require_non_null(other.__val))
             )
-        else:
-            return cast(Opt[K], self.__get_none())
+        return cast(Opt[K], self.__get_none())
 
     def or_opt(self, other: "Opt[T]") -> "Opt[T]":
         """
@@ -666,15 +661,11 @@ class Opt(Generic[T]):
             pair_val = self.__val  # Type is Pair[A, B]
             if isinstance(pair_val, Pair):
                 return Pair(Opt(pair_val.left()), Opt(pair_val.right()))
-            else:
-                # Should not happen with correct types, return pair of empty
-                return Pair(
-                    cast(Opt[A], self.__get_none()), cast(Opt[B], self.__get_none())
-                )
-        else:
+            # Should not happen with correct types, return pair of empty
             return Pair(
                 cast(Opt[A], self.__get_none()), cast(Opt[B], self.__get_none())
             )
+        return Pair(cast(Opt[A], self.__get_none()), cast(Opt[B], self.__get_none()))
 
     @staticmethod
     def of(value: T) -> "Opt[T]":
@@ -811,12 +802,11 @@ class _FilterIterable(_GenericIterable[T]):
 
 
 class _CastIterable(Generic[T, V], Iterator[T], Iterable[T]):
-    __slots__ = ("__iterable", "__iterator", "__tp")
+    __slots__ = ("__iterable", "__iterator")
 
-    def __init__(self, it: Iterable[V], typ: type[T]) -> None:
+    def __init__(self, it: Iterable[V], typ: type[T]) -> None:  # pylint: disable=unused-argument
         self.__iterable = it
         self.__iterator = self.__iterable.__iter__()
-        self.__tp = typ
 
     def __iter__(self) -> Iterator[T]:
         self.__iterator = self.__iterable.__iter__()
@@ -1005,7 +995,7 @@ class _PeekIterable(_GenericIterable[T]):
         try:
             self.__action(obj)  # Perform the side-effect
         except Exception as e:
-            print(
+            print(  # pylint: disable=expression-not-assigned
                 f"Exception during Stream.peek: {e}"
             ) if self.__logger is None else self.__logger(e)
         return obj  # Return the original object
@@ -1221,12 +1211,8 @@ class _PairwiseIterable(Generic[T], Iterator[Pair[T, T]], Iterable[Pair[T, T]]):
     def __next__(self) -> Pair[T, T]:
         if not self._first_element_consumed:
             # Consume the very first element to establish the initial 'previous'
-            try:
-                self._previous = next(self._iterator)
-                self._first_element_consumed = True
-            except StopIteration:
-                # Stream had 0 or 1 element, so no pairs can be formed
-                raise StopIteration
+            self._previous = next(self._iterator)
+            self._first_element_consumed = True
 
         # Get the next element to form a pair with the previous one
         current = next(self._iterator)  # Raises StopIteration when done
@@ -1263,13 +1249,13 @@ class _SlidingWindowIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
                 element = next(self._iterator)
                 self._window.append(element)
 
-            except StopIteration:
+            except StopIteration as exc:
                 # Not enough elements to form a full window initially or remaining
                 if len(self._window) > 0 and len(self._window) < self._size:
                     # Option: yield partial window at the end? Or require full windows?
                     # Current StopIteration implies only full windows.
                     pass  # Let StopIteration be raised below if window is empty
-                raise StopIteration
+                raise StopIteration from exc
 
         # Yield the current full window
         result = list(self._window)  # Create list copy
@@ -1302,15 +1288,15 @@ class _RepeatIterable(Generic[T], Iterator[T], Iterable[T]):
     def __next__(self) -> T:
         try:
             return next(self._iterator)
-        except StopIteration:
+        except StopIteration as exc:
             # End of current cycle reached
             if self._n is not None:  # Finite repetitions
                 self._current_n += 1
                 if self._current_n >= self._n:
-                    raise StopIteration  # Max repetitions reached
+                    raise StopIteration from exc  # Max repetitions reached
             # Start next cycle
             if not self._buffered_elements:  # Handle empty source
-                raise StopIteration
+                raise StopIteration from exc
             self._iterator = iter(self._buffered_elements)
             return next(self._iterator)  # Get first element of next cycle
 
@@ -1333,14 +1319,11 @@ class _IntersperseIterable(Generic[T], Iterator[T], Iterable[T]):
         if self._needs_separator:
             self._needs_separator = False  # Reset flag after yielding separator
             return self._separator
-        else:
-            # Get the next actual element from the source
-            next_element = next(
-                self._iterator
-            )  # Raises StopIteration when source is done
-            # Set flag to insert separator *before* the *next* element
-            self._needs_separator = True
-            return next_element
+        # Get the next actual element from the source
+        next_element = next(self._iterator)  # Raises StopIteration when source is done
+        # Set flag to insert separator *before* the *next* element
+        self._needs_separator = True
+        return next_element
 
 
 class _UnfoldIterable(Generic[T, S], Iterator[T], Iterable[T]):
@@ -1453,11 +1436,11 @@ class _CycleIterable(Generic[T], Iterator[T], Iterable[T]):
 
         try:
             return next(self._iterator)
-        except StopIteration:
+        except StopIteration as exc:
             if self._n is not None:
                 self._current_n += 1
                 if self._current_n >= self._n:
-                    raise StopIteration
+                    raise StopIteration from exc
             # Reset for next cycle (will raise StopIteration if _elements is empty,
             # but we've guarded against that if n > 0)
             self._iterator = iter(self._elements)
@@ -1624,7 +1607,7 @@ class Stream(Generic[T]):
         """
         return Stream(flat_map(self.__arg, mapper_of(mapper)))
 
-    def flatten(self, typ: type[V]) -> "Stream[V]":
+    def flatten(self, typ: type[V]) -> "Stream[V]":  # pylint: disable=unused-argument
         """
         Flattens a stream of iterables.
         CAUTION: This method will actually iterate the entire iterable, so if you're using
@@ -2201,9 +2184,8 @@ class Stream(Generic[T]):
         if stop is None:
             # Mimic range(stop) behavior
             return Stream(range(start))
-        else:
-            # Mimic range(start, stop, step) behavior
-            return Stream(range(start, stop, step))
+        # Mimic range(start, stop, step) behavior
+        return Stream(range(start, stop, step))
 
     @staticmethod
     def iterate(initial_value: T, next_value_fn: Callable[[T], T]) -> "Stream[T]":

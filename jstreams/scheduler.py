@@ -10,13 +10,6 @@ from jstreams.stream import Opt
 from jstreams.thread import LoopingThread
 from jstreams.try_opt import Try
 
-"""
-Provides functionality for scheduling tasks to run periodically, daily, hourly,
-or after a specific duration. Includes a Duration class for time representation,
-a Job class for task encapsulation, and a singleton Scheduler class that manages
-and executes jobs. Decorators are provided for easy scheduling of functions.
-"""
-
 
 class Duration:
     """
@@ -285,8 +278,7 @@ class _Scheduler(LoopingThread):
             Try(lambda: int(os.environ.get("SCH_POLLING", "10"))).get().or_else(10)
         )
         # Ensure polling period is at least 1 second
-        if self.__polling_period < 1:
-            self.__polling_period = 1
+        self.__polling_period = max(self.__polling_period, 1)
 
         self.__logger: Optional[Callable[[Exception], Any]] = None
 
@@ -413,7 +405,7 @@ class _Scheduler(LoopingThread):
             try:
                 importlib.import_module(module)
             except ImportError as e:
-                self.__logger(e) if self.__logger is not None else print(
+                self.__logger(e) if self.__logger is not None else print(  # pylint: disable=expression-not-assigned
                     f"Warning: Could not import module '{module}' during scan: {e}"
                 )
 

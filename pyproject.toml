@@ -20,3 +20,23 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/ctrohin/jstream"
 Issues = "https://github.com/ctrohin/jstream/issues"
+
+[tool.pylint]
+disable = [
+    "C",
+    "R0801",
+    "R0917",
+    "W0640",
+    "R0903",
+    "R0914",
+    "R0913",
+    "R0902",
+    "R0911",
+    "R0912",
+    "W0718",
+    "W0212",
+    "W0108",
+    "R0901",
+    "R0904",
+    "R0915"
+]

@@ -360,7 +360,7 @@ class Collectors:
         """
         Returns a collector function that accumulates stream elements into a tuple.
         """
-        return lambda elements: tuple(elements)
+        return tuple
 
     @staticmethod
     def summing_float() -> Callable[[Iterable[float]], float]:

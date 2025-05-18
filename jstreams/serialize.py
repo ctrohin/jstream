@@ -81,21 +81,22 @@ class SerializableObject(Protocol[_T_co]):
 def _process_value(value: Any) -> Any:
     """Helper function to recursively process values for serialization."""
     # If the object conforms to SerializableObject, isinstance check is sufficient due to @runtime_checkable
+
     if isinstance(value, SerializableObject):
         # If the object conforms to SerializableObject and has a callable to_dict
         return value.to_dict()
-    elif isinstance(value, (datetime, date)):
+    if isinstance(value, (datetime, date)):
         return value.isoformat()
-    elif isinstance(value, UUID):
+    if isinstance(value, UUID):
         return str(value)
-    elif isinstance(value, Enum):
+    if isinstance(value, Enum):
         return value.value  # Serialize Enums to their value
-    elif isinstance(value, list):
+    if isinstance(value, list):
         return [_process_value(item) for item in value]
-    elif isinstance(value, tuple):
+    if isinstance(value, tuple):
         # Preserve tuple type by creating a new tuple with processed items
         return tuple(_process_value(item) for item in value)
-    elif isinstance(value, dict):
+    if isinstance(value, dict):
         return {k: _process_value(v) for k, v in value.items()}
     # Basic types (int, str, float, bool, None) and other unhandled types are returned as-is.
     return value
@@ -181,18 +182,16 @@ def _deserialize_value(target_type: Any, data_value: Any) -> Any:
                 _deserialize_value(item_type, item) for item in data_value
             ]
             return processed_list if origin is list else origin(processed_list)
-        else:
-            # Data doesn't match expected list type, return as is or raise error.
-            return data_value  # Or raise TypeError(f"Expected list for {target_type}, got {type(data_value)}")
+        # Data doesn't match expected list type, return as is or raise error.
+        return data_value  # Or raise TypeError(f"Expected list for {target_type}, got {type(data_value)}")
 
     if origin is dict and args and len(args) == 2:  # Handles dict[KeyType, ValueType]
         # key_type = args[0] # Assuming key_type is simple (e.g. str) for JSON-like dicts
         value_type = args[1]
         if isinstance(data_value, dict):
             return {k: _deserialize_value(value_type, v) for k, v in data_value.items()}
-        else:
-            # Data doesn't match expected dict type
-            return data_value  # Or raise TypeError
+        # Data doesn't match expected dict type
+        return data_value  # Or raise TypeError
 
     # Check for a class that has from_dict (could be target_type itself if not a generic)
     # This handles direct SerializableObject types.

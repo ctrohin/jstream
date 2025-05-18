@@ -81,6 +81,7 @@ class PredicateWith(ABC, Generic[T, K]):
     def __call__(self, value: T, with_value: K) -> bool:
         return self.apply(value, with_value)
 
+    @staticmethod
     def of(
         predicate: "Union[PredicateWith[T, K], Callable[[T, K], bool]]",
     ) -> "PredicateWith[T, K]":
@@ -115,8 +116,8 @@ class _WrapPredicateWith(PredicateWith[T, K]):
     def __init__(self, fn: Callable[[T, K], bool]) -> None:
         self.__predicate_fn = fn
 
-    def apply(self, value: T, withValue: K) -> bool:
-        return self.__predicate_fn(value, withValue)
+    def apply(self, value: T, with_value: K) -> bool:
+        return self.__predicate_fn(value, with_value)
 
 
 def predicate_of(predicate: Union[Predicate[T], Callable[[T], bool]]) -> Predicate[T]:

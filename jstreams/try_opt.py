@@ -32,8 +32,6 @@ _default_logger: Final[Logger] = logging.getLogger(UNCAUGHT_EXCEPTION_LOGGER_NAM
 class _TryOrElseTryBothFailedError(Exception):
     """Internal exception to signal failure of both original and fallback Try operations."""
 
-    pass
-
 
 class ErrorLog(Protocol):
     """Protocol for a minimal logger interface expecting an error method."""
@@ -318,13 +316,12 @@ class Try(Generic[T]):
                         if self.__retries_delay > 0:
                             sleep(self.__retries_delay)
                         continue  # Continue to the next retry iteration
-                    else:  # Predicate returned false, do not retry further
-                        self.__handle_exception(e)
-                        break  # Exit retry loop
-                else:
-                    # No more retries left, handle the final exception
+                    # Predicate returned false, do not retry further
                     self.__handle_exception(e)
-                    # Note: __handle_exception might raise if __failure_exception_supplier is set
+                    break  # Exit retry loop
+                # No more retries left, handle the final exception
+                self.__handle_exception(e)
+                # Note: __handle_exception might raise if __failure_exception_supplier is set
             finally:
                 if self.__is_resource and val is not None:
                     catch(val.__exit__, self.__error_log)  # type: ignore[attr-defined]
@@ -342,9 +339,8 @@ class Try(Generic[T]):
         if last_exception is None:
             # Operation succeeded
             return Opt(val)
-        else:
-            # Operation failed after retries
-            return self.__recover(last_exception)
+        # Operation failed after retries
+        return self.__recover(last_exception)
 
     def exec(self) -> None:
         """

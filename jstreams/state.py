@@ -79,7 +79,7 @@ def _state_manager() -> _StateManager:
     return _StateManager.instance
 
 
-def default_state(typ: type[T], value: Optional[T] = None) -> Optional[T]:
+def default_state(typ: type[T], value: Optional[T] = None) -> Optional[T]:  # pylint: disable=unused-argument
     return value
 
 

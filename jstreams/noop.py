@@ -9,7 +9,6 @@ class NoOpCls:
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initializes the Noop object (does nothing)."""
-        pass
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Allows the Noop object to be called as a function (does nothing)."""
@@ -21,11 +20,9 @@ class NoOpCls:
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Ignores attribute setting."""
-        pass
 
     def __delattr__(self, name: str) -> None:
         """Ignores attribute deletion."""
-        pass
 
     def __repr__(self) -> str:
         """Returns a string representation of the Noop object."""

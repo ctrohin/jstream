@@ -79,7 +79,7 @@ class _Event(Generic[T]):
     def __init__(self, subject: SingleValueSubject[T]) -> None:
         self.__subject = subject
 
-    def publish(self, event: T) -> None:
+    def publish(self, event: T) -> None:  # pylint: disable=redefined-outer-name
         """
         Publishes an event of type T to all current subscribers of this channel.
 
@@ -421,16 +421,15 @@ class _EventBroadcaster:
         if self.__event_is_present(event_type, event_name):
             # And return it
             return self._subjects[event_type][event_name]
-        else:
-            # Otherwise, lock and create the subject if needed
-            with self._event_lock:
-                if event_type not in self._subjects:
-                    self._subjects[event_type] = {}
-                if event_name not in self._subjects[event_type]:
-                    self._subjects[event_type][event_name] = _Event(
-                        SingleValueSubject(None)
-                    )
-                return self._subjects[event_type][event_name]
+        # Otherwise, lock and create the subject if needed
+        with self._event_lock:
+            if event_type not in self._subjects:
+                self._subjects[event_type] = {}
+            if event_name not in self._subjects[event_type]:
+                self._subjects[event_type][event_name] = _Event(
+                    SingleValueSubject(None)
+                )
+            return self._subjects[event_type][event_name]
 
     @staticmethod
     def get_instance() -> "_EventBroadcaster":
@@ -697,7 +696,7 @@ def managed_events() -> Callable[[ClsT], ClsT]:
     return decorator
 
 
-def dispose_managed_events(obj: Any) -> None:
+def dispose_managed_events_from(obj: Any) -> None:
     """
     Dispose managed events for the given object, if the object has one.
 
