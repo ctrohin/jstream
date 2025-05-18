@@ -1004,8 +1004,10 @@ def autowired(
     """
 
     def wrapper(func: Callable[..., T]) -> Callable[..., T]:  # pylint: disable=unused-argument
+        dependency = InjectedDependency(class_name, qualifier)
+
         def wrapped(*args: Any, **kwds: Any) -> T:  # pylint: disable=unused-argument
-            return injector().get(class_name, qualifier)
+            return dependency.get()
 
         return wrapped
 
@@ -1069,8 +1071,10 @@ def autowired_optional(
     """
 
     def wrapper(func: Callable[..., Optional[T]]) -> Callable[..., Optional[T]]:  # pylint: disable=unused-argument
+        optional_dependency = OptionalInjectedDependency(class_name, qualifier)
+
         def wrapped(*args: Any, **kwds: Any) -> Optional[T]:  # pylint: disable=unused-argument
-            return injector().find(class_name, qualifier)
+            return optional_dependency.get()
 
         return wrapped
 
