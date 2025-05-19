@@ -189,15 +189,6 @@ class _Event(Generic[T]):
         op1: RxOperator[T, A],
         op2: RxOperator[A, B],
         op3: RxOperator[B, C],
-        op4: RxOperator[C, V],
-    ) -> PipeObservable[T, V]: ...
-
-    @overload
-    def pipe(
-        self,
-        op1: RxOperator[T, A],
-        op2: RxOperator[A, B],
-        op3: RxOperator[B, C],
         op4: RxOperator[C, D],
         op5: RxOperator[D, V],
     ) -> PipeObservable[T, V]: ...

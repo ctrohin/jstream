@@ -1,7 +1,7 @@
 from typing import Callable, Generic, Optional, TypeVar, Union, cast, overload
 
 from jstreams.stream import Opt, Stream
-from jstreams.predicate import Predicate
+from jstreams.predicate import Predicate, predicate_of
 from jstreams.utils import require_non_null
 
 T = TypeVar("T")
@@ -34,7 +34,11 @@ class Case(Generic[T, V]):
                         - If a value, it's returned directly.
                         - If a callable, it's invoked to produce the result.
         """
-        self.__matching = matching
+        self.__matching = (
+            predicate_of(matching)
+            if (callable(matching) or isinstance(matching, Predicate))
+            else matching
+        )
         self.__resulting = resulting
 
     def matches(self, value: T) -> bool:
@@ -51,9 +55,6 @@ class Case(Generic[T, V]):
         if isinstance(match_condition, Predicate):
             # If it's a Predicate object, use its apply method
             return match_condition.apply(value)
-        if callable(match_condition):
-            # If it's a callable (likely a predicate function), call it
-            return match_condition(value)
         # Otherwise, perform direct equality check
         return value == match_condition
 
