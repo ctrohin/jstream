@@ -28,6 +28,17 @@ from jstreams.utils import (
     sort,
     to_float,
     to_int,
+    chunk,
+    flatten,
+    flatten_deep,
+    uniq,
+    key_by,
+    pick,
+    omit,
+    head,
+    tail,
+    last,
+    initial,  # Added initial as it was in the utils.py diff
 )
 
 
@@ -372,3 +383,139 @@ class TestHelpers(BaseTestCase):
         self.assertEqual(v1.get(), 20)
         v1.set(None)
         self.assertIsNone(v1.get())
+
+    def test_chunk(self):
+        self.assertEqual(chunk([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]])
+        self.assertEqual(chunk([1, 2, 3, 4], 2), [[1, 2], [3, 4]])
+        self.assertEqual(chunk([1, 2, 3], 1), [[1], [2], [3]])
+        self.assertEqual(chunk([1, 2, 3], 3), [[1, 2, 3]])
+        self.assertEqual(chunk([1, 2, 3], 4), [[1, 2, 3]])
+        self.assertEqual(chunk([], 2), [])
+        self.assertEqual(chunk(range(5), 2), [[0, 1], [2, 3], [4]])
+        self.assertThrowsExceptionOfType(lambda: chunk([1, 2], 0), ValueError)
+        self.assertThrowsExceptionOfType(lambda: chunk([1, 2], -1), ValueError)
+
+    def test_flatten(self):
+        self.assertEqual(flatten([[1, 2], [3, 4], [5]]), [1, 2, 3, 4, 5])
+        self.assertEqual(flatten([[1], [2], [3]]), [1, 2, 3])
+        self.assertEqual(flatten([[], [1], [], [2, 3]]), [1, 2, 3])
+        self.assertEqual(flatten([]), [])
+        self.assertEqual(flatten([[]]), [])
+        self.assertEqual(flatten([iter([1, 2]), iter([3, 4])]), [1, 2, 3, 4])
+
+    def test_flatten_deep(self):
+        self.assertEqual(
+            flatten_deep([1, [2, [3, [4, 5]], 6], 7]), [1, 2, 3, 4, 5, 6, 7]
+        )
+        self.assertEqual(flatten_deep([[1, 2], [3, 4]]), [1, 2, 3, 4])
+        self.assertEqual(flatten_deep([1, 2, 3]), [1, 2, 3])
+        self.assertEqual(flatten_deep([]), [])
+        self.assertEqual(flatten_deep([[], [[]], [[[]]]]), [])
+        self.assertEqual(
+            flatten_deep([1, "hello", [2, b"bytes", [3, bytearray(b"ba")]]]),
+            [1, "hello", 2, b"bytes", 3, bytearray(b"ba")],
+        )
+        self.assertEqual(
+            flatten_deep([iter([1, 2]), [3, iter([4, 5])]]), [1, 2, 3, 4, 5]
+        )
+
+    def test_uniq(self):
+        self.assertEqual(uniq([1, 2, 1, 3, 2, 4]), [1, 2, 3, 4])
+        self.assertEqual(uniq([1, 1, 1, 1, 1]), [1])
+        self.assertEqual(uniq([1, 2, 3]), [1, 2, 3])
+        self.assertEqual(uniq([]), [])
+        self.assertEqual(uniq(["a", "b", "a", "c"]), ["a", "b", "c"])
+        # Test with mixed types (if hashable)
+        self.assertEqual(uniq([1, "a", 1, "b", "a"]), [1, "a", "b"])
+        self.assertEqual(uniq(iter([1, 2, 1, 3, 2, 4])), [1, 2, 3, 4])
+
+    def test_key_by(self):
+        data = [
+            {"id": "a", "value": 1},
+            {"id": "b", "value": 2},
+            {"id": "a", "value": 3},  # This should overwrite the first 'a'
+        ]
+        self.assertEqual(
+            key_by(data, lambda x: x["id"]),
+            {
+                "a": {"id": "a", "value": 3},
+                "b": {"id": "b", "value": 2},
+            },
+        )
+        self.assertEqual(key_by([], lambda x: x["id"]), {})
+
+        class Item:
+            def __init__(self, key, val):
+                self.key = key
+                self.val = val
+
+            def __repr__(self):  # For easier debugging if test fails
+                return f"Item({self.key}, {self.val})"
+
+            def __eq__(self, other):
+                return (
+                    isinstance(other, Item)
+                    and self.key == other.key
+                    and self.val == other.val
+                )
+
+        items = [Item("x", 10), Item("y", 20), Item("x", 30)]
+        self.assertEqual(
+            key_by(items, lambda item: item.key),
+            {
+                "x": Item("x", 30),
+                "y": Item("y", 20),
+            },
+        )
+
+    def test_pick(self):
+        source = {"a": 1, "b": 2, "c": 3, "d": 4}
+        self.assertEqual(pick(source, ["a", "c", "e"]), {"a": 1, "c": 3})
+        self.assertEqual(pick(source, ["a", "d"]), {"a": 1, "d": 4})
+        self.assertEqual(pick(source, []), {})
+        self.assertEqual(pick(source, ["x", "y"]), {})
+        self.assertEqual(pick({}, ["a", "b"]), {})
+        self.assertEqual(pick(source, iter(["b", "d"])), {"b": 2, "d": 4})
+
+    def test_omit(self):
+        source = {"a": 1, "b": 2, "c": 3, "d": 4}
+        self.assertEqual(omit(source, ["b", "d", "e"]), {"a": 1, "c": 3})
+        self.assertEqual(omit(source, ["a", "c"]), {"b": 2, "d": 4})
+        self.assertEqual(omit(source, []), source)
+        self.assertEqual(omit(source, ["x", "y"]), source)
+        self.assertEqual(omit({}, ["a", "b"]), {})
+        self.assertEqual(omit(source, iter(["a", "c"])), {"b": 2, "d": 4})
+
+    def test_head(self):
+        self.assertEqual(head([1, 2, 3]), 1)
+        self.assertEqual(head(["a", "b"]), "a")
+        self.assertEqual(head([10]), 10)
+        self.assertIsNone(head([]))
+        self.assertEqual(head((1, 2)), 1)  # Test with tuple
+        self.assertIsNone(head(()))
+
+    def test_tail(self):
+        self.assertEqual(tail([1, 2, 3, 4]), [2, 3, 4])
+        self.assertEqual(tail(["a", "b", "c"]), ["b", "c"])
+        self.assertEqual(tail([10, 20]), [20])
+        self.assertEqual(tail([1]), [])
+        self.assertEqual(tail([]), [])
+        self.assertEqual(tail((1, 2, 3)), [2, 3])  # Test with tuple
+        self.assertEqual(tail((1,)), [])
+
+    def test_last(self):
+        self.assertEqual(last([1, 2, 3]), 3)
+        self.assertEqual(last(["a", "b"]), "b")
+        self.assertEqual(last([10]), 10)
+        self.assertIsNone(last([]))
+        self.assertEqual(last((1, 2)), 2)  # Test with tuple
+        self.assertIsNone(last(()))
+
+    def test_initial(self):
+        self.assertEqual(initial([1, 2, 3, 4]), [1, 2, 3])
+        self.assertEqual(initial(["a", "b", "c"]), ["a", "b"])
+        self.assertEqual(initial([10, 20]), [10])
+        self.assertEqual(initial([1]), [])
+        self.assertEqual(initial([]), [])
+        self.assertEqual(initial((1, 2, 3)), [1, 2])  # Test with tuple
+        self.assertEqual(initial((1,)), [])

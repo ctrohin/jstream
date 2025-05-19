@@ -374,7 +374,261 @@ class Match(Generic[T]):
             ]
         )
 
-    def __of_list(self, cases: list[Optional[Case[T, V]]]) -> Opt[V]:
+    @overload
+    def opt(self, case1: Case[T, V]) -> Opt[V]: ...
+
+    @overload
+    def opt(self, case1: Case[T, V], case2: Case[T, V]) -> Opt[V]: ...
+
+    @overload
+    def opt(
+        self, case1: Case[T, V], case2: Case[T, V], case3: Case[T, V]
+    ) -> Opt[V]: ...
+
+    @overload
+    def opt(
+        self, case1: Case[T, V], case2: Case[T, V], case3: Case[T, V], case4: Case[T, V]
+    ) -> Opt[V]: ...
+
+    @overload
+    def opt(
+        self,
+        case1: Case[T, V],
+        case2: Case[T, V],
+        case3: Case[T, V],
+        case4: Case[T, V],
+        case5: Case[T, V],
+    ) -> Opt[V]: ...
+
+    @overload
+    def opt(
+        self,
+        case1: Case[T, V],
+        case2: Case[T, V],
+        case3: Case[T, V],
+        case4: Case[T, V],
+        case5: Case[T, V],
+        case6: Case[T, V],
+    ) -> Opt[V]: ...
+
+    @overload
+    def opt(
+        self,
+        case1: Case[T, V],
+        case2: Case[T, V],
+        case3: Case[T, V],
+        case4: Case[T, V],
+        case5: Case[T, V],
+        case6: Case[T, V],
+        case7: Case[T, V],
+    ) -> Opt[V]: ...
+
+    @overload
+    def opt(
+        self,
+        case1: Case[T, V],
+        case2: Case[T, V],
+        case3: Case[T, V],
+        case4: Case[T, V],
+        case5: Case[T, V],
+        case6: Case[T, V],
+        case7: Case[T, V],
+        case8: Case[T, V],
+    ) -> Opt[V]: ...
+
+    @overload
+    def opt(
+        self,
+        case1: Case[T, V],
+        case2: Case[T, V],
+        case3: Case[T, V],
+        case4: Case[T, V],
+        case5: Case[T, V],
+        case6: Case[T, V],
+        case7: Case[T, V],
+        case8: Case[T, V],
+        case9: Case[T, V],
+    ) -> Opt[V]: ...
+
+    @overload
+    def opt(
+        self,
+        case1: Case[T, V],
+        case2: Case[T, V],
+        case3: Case[T, V],
+        case4: Case[T, V],
+        case5: Case[T, V],
+        case6: Case[T, V],
+        case7: Case[T, V],
+        case8: Case[T, V],
+        case9: Case[T, V],
+        case10: Case[T, V],
+    ) -> Opt[V]: ...
+
+    @overload
+    def opt(
+        self,
+        case1: Case[T, V],
+        case2: Case[T, V],
+        case3: Case[T, V],
+        case4: Case[T, V],
+        case5: Case[T, V],
+        case6: Case[T, V],
+        case7: Case[T, V],
+        case8: Case[T, V],
+        case9: Case[T, V],
+        case10: Case[T, V],
+        case11: Case[T, V],
+    ) -> Opt[V]: ...
+
+    @overload
+    def opt(
+        self,
+        case1: Case[T, V],
+        case2: Case[T, V],
+        case3: Case[T, V],
+        case4: Case[T, V],
+        case5: Case[T, V],
+        case6: Case[T, V],
+        case7: Case[T, V],
+        case8: Case[T, V],
+        case9: Case[T, V],
+        case10: Case[T, V],
+        case11: Case[T, V],
+        case12: Case[T, V],
+    ) -> Opt[V]: ...
+
+    @overload
+    def opt(
+        self,
+        case1: Case[T, V],
+        case2: Case[T, V],
+        case3: Case[T, V],
+        case4: Case[T, V],
+        case5: Case[T, V],
+        case6: Case[T, V],
+        case7: Case[T, V],
+        case8: Case[T, V],
+        case9: Case[T, V],
+        case10: Case[T, V],
+        case11: Case[T, V],
+        case12: Case[T, V],
+        case13: Case[T, V],
+    ) -> Opt[V]: ...
+
+    @overload
+    def opt(
+        self,
+        case1: Case[T, V],
+        case2: Case[T, V],
+        case3: Case[T, V],
+        case4: Case[T, V],
+        case5: Case[T, V],
+        case6: Case[T, V],
+        case7: Case[T, V],
+        case8: Case[T, V],
+        case9: Case[T, V],
+        case10: Case[T, V],
+        case11: Case[T, V],
+        case12: Case[T, V],
+        case13: Case[T, V],
+        case14: Case[T, V],
+    ) -> Opt[V]: ...
+
+    @overload
+    def opt(
+        self,
+        case1: Case[T, V],
+        case2: Case[T, V],
+        case3: Case[T, V],
+        case4: Case[T, V],
+        case5: Case[T, V],
+        case6: Case[T, V],
+        case7: Case[T, V],
+        case8: Case[T, V],
+        case9: Case[T, V],
+        case10: Case[T, V],
+        case11: Case[T, V],
+        case12: Case[T, V],
+        case13: Case[T, V],
+        case14: Case[T, V],
+        case15: Case[T, V],
+    ) -> Opt[V]: ...
+
+    # --- End Overloads ---
+
+    def opt(
+        self,
+        case1: Case[T, V],
+        case2: Optional[Case[T, V]] = None,
+        case3: Optional[Case[T, V]] = None,
+        case4: Optional[Case[T, V]] = None,
+        case5: Optional[Case[T, V]] = None,
+        case6: Optional[Case[T, V]] = None,
+        case7: Optional[Case[T, V]] = None,
+        case8: Optional[Case[T, V]] = None,
+        case9: Optional[Case[T, V]] = None,
+        case10: Optional[Case[T, V]] = None,
+        case11: Optional[Case[T, V]] = None,
+        case12: Optional[Case[T, V]] = None,
+        case13: Optional[Case[T, V]] = None,
+        case14: Optional[Case[T, V]] = None,
+        case15: Optional[Case[T, V]] = None,
+        case16: Optional[
+            Case[T, V]
+        ] = None,  # Added one more optional case for symmetry
+    ) -> Opt[V]:
+        """
+        Evaluates the provided cases against the stored value and returns the result
+        of the first matching case.
+
+        The cases are evaluated in the order they are provided. The evaluation stops
+        as soon as a matching case is found (short-circuiting).
+
+        Args:
+            case1: The first case (required).
+            case2..16: Optional subsequent cases.
+
+        Returns:
+            An Optional containing the result (V) of the first matching case.
+            Returns None if no case matches the stored value.
+        """
+        return self.opt_list(
+            [
+                case1,
+                case2,
+                case3,
+                case4,
+                case5,
+                case6,
+                case7,
+                case8,
+                case9,
+                case10,
+                case11,
+                case12,
+                case13,
+                case14,
+                case15,
+                case16,
+            ]
+        )
+
+    def opt_list(self, cases: list[Optional[Case[T, V]]]) -> Opt[V]:
+        """
+        Evaluates the provided cases against the stored value and returns the result
+        of the first matching case.
+
+        The cases are evaluated in the order they are provided. The evaluation stops
+        as soon as a matching case is found (short-circuiting).
+
+        Args:
+            cases: The list of cases
+
+        Returns:
+            An Opt containing the result (V) of the first matching case.
+            Returns an empty Opt if no case matches the stored value.
+        """
         return (
             Stream(cases)
             .non_null()
@@ -398,7 +652,7 @@ class Match(Generic[T]):
             An Optional containing the result (V) of the first matching case.
             Returns None if no case matches the stored value.
         """
-        return self.__of_list(cases).get_actual()
+        return self.opt_list(cases).get_actual()
 
     def of_list_exhaustive(self, cases: list[Optional[Case[T, V]]]) -> V:
         """
@@ -414,7 +668,7 @@ class Match(Generic[T]):
         Raises:
             MatchError: If no case matches the stored value.
         """
-        return self.__of_list(cases).or_else_raise_from(
+        return self.opt_list(cases).or_else_raise_from(
             lambda: ValueError(
                 f"No case matched value: {self.__value}. Match was not exhaustive."
             )
