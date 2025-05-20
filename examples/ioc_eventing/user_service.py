@@ -86,7 +86,7 @@ class AddUsersThread(Thread):
         for i in range(10):
             sleep(2)
             print(f"Adding user {i}")
-            user = User.all(name=f"user{i}", age=i, email=f"user{i}@gmail.com")
+            user = User.all(name=f"user{i}", age=i, email=f"user{i}@gmail.com")  # type: ignore[attr-defined]
             # We use the event function to publish the AddUserEvent
             # This will trigger the add_user method in the UserService
             event(AddUserEvent).publish(AddUserEvent(user))
