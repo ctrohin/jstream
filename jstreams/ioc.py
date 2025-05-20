@@ -740,6 +740,8 @@ def resolve(
                     setattr(cls, attr_name, dep)
                     # The remove it from the dependencies map
                     dependencies.pop(attr_name)
+                    if len(dependencies) == 0:
+                        cls.__getattribute__ = original_get_attribute  # type: ignore[method-assign]
                 return dep
             return original_get_attribute(self, attr_name)
 
@@ -1337,7 +1339,7 @@ def resolve_all() -> Callable[[type[T]], type[T]]:
                     setattr(cls, attr_name, dep)
                     # Then remove it from the dependencies map
                     dependencies.pop(attr_name)
-                    if len(dependencies.keys()) == 0:
+                    if len(dependencies) == 0:
                         cls.__getattribute__ = original_get_attribute  # type: ignore[method-assign]
                 return dep
             return original_get_attribute(self, attr_name)
