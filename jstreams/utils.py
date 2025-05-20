@@ -238,7 +238,7 @@ def cmp_to_key(mycmp: Callable[[C, C], int]) -> type:
     """Convert a cmp= function into a key= function"""
 
     class Key(Generic[C]):  # type: ignore[misc]
-        __slots__ = ["obj"]
+        __slots__ = ("obj",)
 
         def __init__(self, obj: C) -> None:
             self.obj = obj
@@ -299,7 +299,7 @@ def sort(target: list[T], comparator: Callable[[T, T], int]) -> list[T]:
 
 
 class Value(Generic[T]):
-    __slots__ = ["__value"]
+    __slots__ = ("__value",)
 
     def __init__(self, value: Optional[T]) -> None:
         self.__value = value

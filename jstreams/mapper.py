@@ -92,7 +92,7 @@ class MapperWith(ABC, Generic[T, K, V]):
 
 
 class _WrapMapper(Mapper[T, V]):
-    __slots__ = ["__mapper"]
+    __slots__ = ("__mapper",)
 
     def __init__(self, mapper: Callable[[T], V]) -> None:
         self.__mapper = mapper
@@ -107,7 +107,7 @@ class _WrapMapper(Mapper[T, V]):
 
 
 class _WrapMapperWith(MapperWith[T, K, V]):
-    __slots__ = ["__mapper"]
+    __slots__ = ("__mapper",)
 
     def __init__(self, mapper: Callable[[T, K], V]) -> None:
         self.__mapper = mapper

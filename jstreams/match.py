@@ -16,7 +16,7 @@ class Case(Generic[T, V]):
     or a Predicate object) and a resulting value or supplier function.
     """
 
-    __slots__ = ["__matching", "__resulting"]
+    __slots__ = ("__matching", "__resulting")
 
     def __init__(
         self,
@@ -85,8 +85,6 @@ class DefaultCase(Case[T, V]):
     provided to `Match.of()`.
     """
 
-    __slots__ = []
-
     def __init__(
         self,
         resulting: Union[V, Callable[[], V]],
@@ -119,7 +117,7 @@ class Match(Generic[T]):
         # result will be "greater than three"
     """
 
-    __slots__ = ["__value"]
+    __slots__ = ("__value",)
 
     def __init__(self, value: T) -> None:
         """

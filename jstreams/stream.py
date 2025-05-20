@@ -1142,7 +1142,7 @@ class _ScanIterable(Generic[T, V], Iterator[V], Iterable[V]):
 
 
 class _PairIterable(Generic[T, V], Iterator[Pair[T, V]], Iterable[Pair[T, V]]):
-    __slots__ = ["_it1", "_it2", "_iter1", "_iter2"]
+    __slots__ = ("_it1", "_it2", "_iter1", "_iter2")
 
     def __init__(self, it1: Iterable[T], it2: Iterable[V]) -> None:
         self._it1 = it1

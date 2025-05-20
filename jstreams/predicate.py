@@ -101,7 +101,7 @@ class PredicateWith(ABC, Generic[T, K]):
 
 
 class _WrapPredicate(Predicate[T]):
-    __slots__ = ["__predicate_fn"]
+    __slots__ = ("__predicate_fn",)
 
     def __init__(self, fn: Callable[[T], bool]) -> None:
         self.__predicate_fn = fn
@@ -111,7 +111,7 @@ class _WrapPredicate(Predicate[T]):
 
 
 class _WrapPredicateWith(PredicateWith[T, K]):
-    __slots__ = ["__predicate_fn"]
+    __slots__ = ("__predicate_fn",)
 
     def __init__(self, fn: Callable[[T, K], bool]) -> None:
         self.__predicate_fn = fn

@@ -29,7 +29,7 @@ class Reducer(ABC, Generic[T]):
 
 
 class _WrapReducer(Reducer[T]):
-    __slots__ = ["__reducer"]
+    __slots__ = ("__reducer",)
 
     def __init__(self, reducer: Callable[[T, T], T]) -> None:
         self.__reducer = reducer

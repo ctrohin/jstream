@@ -15,7 +15,7 @@ class Strategy(Enum):
 
 
 class Dependency:
-    __slots__ = ["__typ", "__qualifier", "_is_optional"]
+    __slots__ = ("__typ", "__qualifier", "_is_optional")
 
     def __init__(self, typ: type, qualifier: Optional[str] = None) -> None:
         self.__typ = typ
@@ -1119,7 +1119,7 @@ class InjectedDependency(Generic[T]):
                 conn.execute(query)
     """
 
-    __slots__ = ["__typ", "__quali", "__actual_value"]
+    __slots__ = ("__typ", "__quali", "__actual_value")
 
     def __init__(self, typ: type[T], qualifier: Optional[str] = None) -> None:
         """
@@ -1181,7 +1181,7 @@ class OptionalInjectedDependency(Generic[T]):
                     logger.info(msg)
     """
 
-    __slots__ = ["__typ", "__quali", "__actual_value"]
+    __slots__ = ("__typ", "__quali", "__actual_value")
 
     def __init__(self, typ: type[T], qualifier: Optional[str] = None) -> None:
         """
@@ -1234,7 +1234,7 @@ class InjectedVariable(Generic[T]):
                 return self.api_key_provider() # or self.api_key_provider.get()
     """
 
-    __slots__ = ["__typ", "__quali", "__actual_value"]
+    __slots__ = ("__typ", "__quali", "__actual_value")
 
     def __init__(self, typ: type[T], qualifier: str) -> None:
         """

@@ -12,7 +12,7 @@ K = TypeVar("K")
 class _TripletIterable(
     Generic[T, V, K], Iterator[Triplet[T, V, K]], Iterable[Triplet[T, V, K]]
 ):
-    __slots__ = ["_it1", "_it2", "_it3", "_iter1", "_iter2", "_iter3"]
+    __slots__ = ("_it1", "_it2", "_it3", "_iter1", "_iter2", "_iter3")
 
     def __init__(self, it1: Iterable[T], it2: Iterable[V], it3: Iterable[K]) -> None:
         self._it1 = it1

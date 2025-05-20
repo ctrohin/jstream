@@ -74,7 +74,7 @@ class EventSubscription(Generic[T]):
 
 
 class _Event(Generic[T]):
-    __slots__ = ["__subject"]
+    __slots__ = ("__subject",)
 
     def __init__(self, subject: SingleValueSubject[T]) -> None:
         self.__subject = subject

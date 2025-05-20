@@ -8,7 +8,7 @@ K = TypeVar("K")
 
 
 class Pair(Generic[T, V]):
-    __slots__ = ["__left", "__right"]
+    __slots__ = ("__left", "__right")
 
     def __init__(self, left: T, right: V) -> None:
         """
@@ -45,7 +45,7 @@ class Pair(Generic[T, V]):
 
 
 class Triplet(Generic[T, V, K], Pair[T, K]):
-    __slots__ = ["__middle"]
+    __slots__ = ("__middle",)
 
     def __init__(self, left: T, middle: V, right: K) -> None:
         """

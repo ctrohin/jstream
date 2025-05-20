@@ -26,7 +26,7 @@ class Duration:
         _minutes (int): Number of minutes in the duration (0-59 after normalization).
     """
 
-    __slots__ = ["_days", "_hours", "_minutes"]
+    __slots__ = ("_days", "_hours", "_minutes")
 
     def __init__(self, days: int = 0, hours: int = 0, minutes: int = 0) -> None:
         """
@@ -140,7 +140,7 @@ class _Job:
     the last run time, and whether it should run only once.
     """
 
-    __slots__ = [
+    __slots__ = (
         "name",
         "func",
         "period",
@@ -150,7 +150,7 @@ class _Job:
         "on_success",
         "on_error",
         "__logger",
-    ]
+    )
 
     def __init__(
         self,
