@@ -787,7 +787,7 @@ def resolve_variables(
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
 
-    return resolve(cast(dict[str, Union[type, Dependency, Variable]], variables))
+    return resolve(cast(dict[str, Union[type, Dependency, Variable]], variables), eager)
 
 
 def _get_dep(dep: Union[type, Dependency, Variable]) -> Any:
