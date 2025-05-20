@@ -682,6 +682,7 @@ def validate_dependencies(dependencies: dict[str, Any]) -> None:
 
 def resolve_dependencies(
     dependencies: dict[str, Union[type, Dependency]],
+    eager: bool = False,
 ) -> Callable[[type[T]], type[T]]:
     """
     Resolve dependencies decorator.
@@ -696,15 +697,19 @@ def resolve_dependencies(
 
     Args:
         dependencies (dict[str, Union[type, Dependency]]): A map of dependencies
+        eager (bool): Flag determining if the dependencies should be injected as soon as possible. Defaults to False.
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
-    return resolve(cast(dict[str, Union[type, Dependency, Variable]], dependencies))
+    return resolve(
+        cast(dict[str, Union[type, Dependency, Variable]], dependencies), eager
+    )
 
 
 def resolve(
     dependencies: dict[str, Union[type, Dependency, Variable]],
+    eager: bool = False,
 ) -> Callable[[type[T]], type[T]]:
     """
     Resolve dependencies decorator.
@@ -721,6 +726,8 @@ def resolve(
 
     Args:
         dependencies (dict[str, Union[type, Dependency, Variable]]): A map of dependencies
+        eager (bool): Flag determining if the dependencies should be injected as soon as possible. Defaults to False.
+
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class constructor
@@ -732,17 +739,23 @@ def resolve(
         original_get_attribute = cls.__getattribute__
 
         def __getattribute__(self, attr_name: str) -> Any:  # type: ignore[no-untyped-def]
-            if attr_name in dependencies:
-                quali = dependencies.get(attr_name, NoOpCls)
-                dep = _get_dep(quali)
-                if dep is not None:
-                    # If a dependency has been resolved, set it as an attribute of the class
-                    setattr(cls, attr_name, dep)
-                    # The remove it from the dependencies map
-                    dependencies.pop(attr_name)
-                    if len(dependencies) == 0:
-                        cls.__getattribute__ = original_get_attribute  # type: ignore[method-assign]
-                return dep
+            if eager:
+                for attr, quali in dependencies.items():
+                    setattr(cls, attr, _get_dep(quali))
+                    cls.__getattribute__ = original_get_attribute  # type: ignore[method-assign]
+                    return getattr(cls, attr_name)
+            else:
+                if attr_name in dependencies:
+                    quali = dependencies.get(attr_name, NoOpCls)
+                    dep = _get_dep(quali)
+                    if dep is not None:
+                        # If a dependency has been resolved, set it as an attribute of the class
+                        setattr(cls, attr_name, dep)
+                        # The remove it from the dependencies map
+                        dependencies.pop(attr_name)
+                        if len(dependencies) == 0:
+                            cls.__getattribute__ = original_get_attribute  # type: ignore[method-assign]
+                    return dep
             return original_get_attribute(self, attr_name)
 
         cls.__getattribute__ = __getattribute__  # type: ignore[method-assign]
@@ -753,6 +766,7 @@ def resolve(
 
 def resolve_variables(
     variables: dict[str, Variable],
+    eager: bool = False,
 ) -> Callable[[type[T]], type[T]]:
     """
     Resolve variables decorator.
@@ -767,6 +781,7 @@ def resolve_variables(
 
     Args:
         variables: dict[str, Variable]: A map of variable names to Variable definition
+        eager (bool): Flag determining if the dependencies should be injected as soon as possible. Defaults to False.
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class constructor
@@ -1296,7 +1311,7 @@ def _get_class_attributes(cls: type) -> list[_InspectedElement]:
     return return_members
 
 
-def resolve_all() -> Callable[[type[T]], type[T]]:
+def resolve_all(eager: bool = False) -> Callable[[type[T]], type[T]]:
     """
     Resolve all dependencies decorator.
     Allows class decoration for parameter injection.
@@ -1314,7 +1329,8 @@ def resolve_all() -> Callable[[type[T]], type[T]]:
 
     Will inject the dependency associated with 'ClassName' into the 'test_field' member,
     and the dependency associated with 'str' into the 'str_value' member, while 'int_value' will be left as is.
-
+    Args:
+        eager (bool): Flag determining if the dependencies should be injected as soon as possible. Defaults to False.
     Returns:
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
@@ -1331,17 +1347,23 @@ def resolve_all() -> Callable[[type[T]], type[T]]:
             )
 
         def __getattribute__(self, attr_name: str) -> Any:  # type: ignore[no-untyped-def]
-            if attr_name in dependencies:
-                quali = dependencies.get(attr_name, NoOpCls)
-                dep = _get_dep(quali)
-                if dep is not None:
-                    # If a dependency has been resolved, set it as an attribute of the class
-                    setattr(cls, attr_name, dep)
-                    # Then remove it from the dependencies map
-                    dependencies.pop(attr_name)
-                    if len(dependencies) == 0:
-                        cls.__getattribute__ = original_get_attribute  # type: ignore[method-assign]
-                return dep
+            if eager:
+                for attr, quali in dependencies.items():
+                    setattr(cls, attr, _get_dep(quali))
+                    cls.__getattribute__ = original_get_attribute  # type: ignore[method-assign]
+                    return getattr(cls, attr_name)
+            else:
+                if attr_name in dependencies:
+                    quali = dependencies.get(attr_name, NoOpCls)
+                    dep = _get_dep(quali)
+                    if dep is not None:
+                        # If a dependency has been resolved, set it as an attribute of the class
+                        setattr(cls, attr_name, dep)
+                        # Then remove it from the dependencies map
+                        dependencies.pop(attr_name)
+                        if len(dependencies) == 0:
+                            cls.__getattribute__ = original_get_attribute  # type: ignore[method-assign]
+                    return dep
             return original_get_attribute(self, attr_name)
 
         cls.__getattribute__ = __getattribute__  # type: ignore[method-assign]
