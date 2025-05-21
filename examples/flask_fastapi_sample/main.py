@@ -2,10 +2,13 @@
 from typing import Any
 from fastapi import FastAPI
 from users_view import UsersView
-from jstreams import InjectedDependency
+from jstreams import InjectedDependency, inject
 
 app = FastAPI()
 
+# FastAPI doesn't cope well with decorated routes, so in our case, we need to use an injected dependency object.
+# Using the InjectedDependency class is more economical than injector().get() or inject() since once the dependency
+# is resolved, it is also cached.
 users_view = InjectedDependency(UsersView)
 
 
@@ -35,6 +38,16 @@ def get_all_users() -> list[dict[str, Any]]:
     return users_view().get_users()
 
 
+# We can also use the InjectedDependency class as a default parameter for the route function.
 @app.get("/get_users_by_name/{name}")
-def get_users_by_name(name: str) -> list[dict[str, Any]]:
-    return users_view().get_users_by_name(name)
+def get_users_by_name(
+    name: str, users=InjectedDependency(UsersView)
+) -> list[dict[str, Any]]:
+    return users().get_users_by_name(name)
+
+
+# Or we can use inject() directly. This is also OK, as the default initializer for the parameter will
+# only be called once.
+@app.get("/get_users_by_name_alias/{name}")
+def get_users_by_name_alias(name: str, users=inject(UsersView)) -> list[dict[str, Any]]:
+    return users.get_users_by_name(name)

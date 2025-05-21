@@ -518,7 +518,19 @@ def injector() -> _Injector:
 
 
 def inject(class_name: type[T], qualifier: Optional[str] = None) -> T:
+    """
+    Syntax sugar for injector().get()
+    """
     return injector().get(class_name, qualifier)
+
+
+def inject_optional(
+    class_name: type[T], qualifier: Optional[str] = None
+) -> Optional[T]:
+    """
+    Syntax sugar for injector().find()
+    """
+    return injector().find(class_name, qualifier)
 
 
 def var(class_name: type[T], qualifier: str) -> T:
