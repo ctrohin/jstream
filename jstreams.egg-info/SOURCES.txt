@@ -17,6 +17,7 @@ jstreams/py.typed
 jstreams/reducer.py
 jstreams/rx.py
 jstreams/scheduler.py
+jstreams/serialize.py
 jstreams/state.py
 jstreams/stream.py
 jstreams/stream_factories.py
@@ -47,6 +48,7 @@ test/test_predicate.py
 test/test_profile.py
 test/test_rx.py
 test/test_scheduler.py
+test/test_serialize.py
 test/test_state.py
 test/test_static_synchronized.py
 test/test_stream.py

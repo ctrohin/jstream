@@ -9,6 +9,7 @@ jstreams is a Python library aiming to replicate the following:
 - a [task scheduler](https://github.com/ctrohin/jstream/wiki/Scheduler) with support for decorated functions and on-demand scheduling
 - an [eventing](https://github.com/ctrohin/jstream/wiki/Eventing) framework that supports event publishing an subscribing
 - [decorators](https://github.com/ctrohin/jstream/wiki/Decorators) such as `@builder`, `@setter`, `@getter`, `@synchronized` and `@synchronized_static`, `@required_args`, `@validate_args`,`@default_on_error` for reducing boilerplate code
+- a [serialization](https://github.com/ctrohin/jstream/wiki/Serialization) framework capable of deep serializiation and deserialization of objects based on type hints
 The library is implemented with type safety in mind.
 
 ## Installation
@@ -27,6 +28,11 @@ You can check out the full documentation with examples [here](https://github.com
 
 
 ## Changelog
+### v2025.5.3
+- Added serialization module
+- Performance improvements for dependency injection
+- Added Wiki [documentation](https://github.com/ctrohin/jstream/wiki)
+
 ### v2025.5.2
 - Fixed bugs in intersperse, scan, pairwise and sliding window
 - Added factory methods for Stream and Opt
