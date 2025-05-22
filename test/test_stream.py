@@ -1,10 +1,9 @@
-from typing import Iterator, Optional
+from typing import Optional
 from baseTest import BaseTestCase
 from jstreams import Stream
 from jstreams.collectors import Collectors
 from jstreams.stream import Opt
 from jstreams.stream_operations import (
-    extract_list,
     extract_list_strict,
     extract_non_null_list,
     not_null_elements,
