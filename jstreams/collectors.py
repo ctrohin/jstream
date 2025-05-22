@@ -435,3 +435,12 @@ class Collectors:
                 return Opt(None)
 
         return transform
+
+    @staticmethod
+    def to_sorted_list(
+        comparator: Callable[[T, T], int],
+    ) -> Callable[[Iterable[T]], list[T]]:
+        """
+        Returns a collector that gathers elements into a list and sorts them using the provided comparator.
+        """
+        return lambda iterable: sorted(iterable, key=cmp_to_key(comparator))

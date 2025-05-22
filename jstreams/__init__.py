@@ -6,6 +6,8 @@ from jstreams.stream_operations import (
     not_null_elements,
     extract_list,
     extract_non_null_list,
+    extract_list_strict,
+    extract_non_null_list_strict,
 )
 
 from jstreams.iterable_operations import (
@@ -591,4 +593,6 @@ __all__ = [
     "head",
     "tail",
     "last",
+    "extract_list_strict",
+    "extract_non_null_list_strict",
 ]

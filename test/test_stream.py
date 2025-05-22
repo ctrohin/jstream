@@ -5,6 +5,7 @@ from jstreams.collectors import Collectors
 from jstreams.stream import Opt
 from jstreams.stream_operations import (
     extract_list,
+    extract_list_strict,
     extract_non_null_list,
     not_null_elements,
 )
@@ -702,7 +703,8 @@ class TestStream(BaseTestCase):
     def test_stream_intersperse(self) -> None:
         self.assertEqual(Stream([1, 2, 3]).intersperse(0).to_list(), [1, 0, 2, 0, 3, 0])
         self.assertEqual(Stream(["a"]).intersperse("-").to_list(), ["a", "-"])
-        self.assertEqual(Stream([]).intersperse(0).to_list(), [])
+        empty_list: list[int] = []
+        self.assertEqual(Stream(empty_list).intersperse(0).to_list(), [])
 
     def test_stream_unfold(self) -> None:
         def counter_generator(current: int) -> Optional[Pair[int, int]]:
@@ -777,9 +779,9 @@ class TestStream(BaseTestCase):
         # zip stops at the shortest iterable
         expected = [Pair(1, "a"), Pair(2, "b")]
         self.assertEqual(s1.zip(s2).to_list(), expected)
-        expected = [Pair("a", 1), Pair("b", 2)]
+        expected1 = [Pair("a", 1), Pair("b", 2)]
         self.assertEqual(
-            Stream(s2).zip(s1.to_list()).to_list(), expected
+            Stream(s2).zip(s1.to_list()).to_list(), expected1
         )  # Order of operands for zip
 
         self.assertEqual(Stream([1, 2, 3]).zip([]).to_list(), [])
@@ -794,14 +796,16 @@ class TestStream(BaseTestCase):
             "test4": 4,
             "test5": 5,
         }
-        self.assertEqual(extract_list(obj, ["test"]), [1])
-        self.assertEqual(extract_list(obj, ["test2"]), [2])
-        self.assertEqual(extract_list(obj, ["test3", "test4"]), [3, 4])
-        self.assertEqual(extract_list(obj, ["test5", "test6"]), [5, None])
-        self.assertEqual(extract_list(obj, ["test5", "test6", "test"]), [5, None, 1])
+        self.assertEqual(extract_list_strict(obj, ["test"]), [1])
+        self.assertEqual(extract_list_strict(obj, ["test2"]), [2])
+        self.assertEqual(extract_list_strict(obj, ["test3", "test4"]), [3, 4])
+        self.assertEqual(extract_list_strict(obj, ["test5", "test6"]), [5, None])
+        self.assertEqual(
+            extract_list_strict(obj, ["test5", "test6", "test"]), [5, None, 1]
+        )
 
     def test_extract_non_null_list(self) -> None:
-        obj = {
+        obj: dict[str, Optional[int]] = {
             "test": 1,
             "test2": 2,
             "test3": 3,
@@ -825,3 +829,131 @@ class TestStream(BaseTestCase):
         self.assertEqual(not_null_elements([None, 1, None]), [1])
         self.assertEqual(not_null_elements([None, None, 1]), [1])
         self.assertEqual(not_null_elements([1, 2, 3]), [1, 2, 3])
+
+    def test_stream_map_indexed(self) -> None:
+        self.assertEqual(
+            Stream(["a", "b", "c"]).map_indexed(lambda i, x: f"{i}:{x}").to_list(),
+            ["0:a", "1:b", "2:c"],
+        )
+        self.assertEqual(Stream([]).map_indexed(lambda i, x: f"{i}:{x}").to_list(), [])
+        # Test re-iteration
+        s = Stream(["a", "b"]).map_indexed(lambda i, x: (i, x))
+        self.assertEqual(s.to_list(), [(0, "a"), (1, "b")])
+        self.assertEqual(
+            s.to_list(), [(0, "a"), (1, "b")]
+        )  # Should re-iterate correctly
+
+    def test_stream_filter_indexed(self) -> None:
+        self.assertEqual(
+            Stream(["a", "b", "c", "d"])
+            .filter_indexed(lambda i, x: i % 2 == 0)
+            .to_list(),
+            ["a", "c"],
+        )
+        self.assertEqual(
+            Stream(["a", "b", "c", "d"])
+            .filter_indexed(lambda i, x: x == "b" and i == 1)
+            .to_list(),
+            ["b"],
+        )
+        self.assertEqual(Stream([]).filter_indexed(lambda i, x: True).to_list(), [])
+        # Test re-iteration
+        s = Stream(["x", "y", "z"]).filter_indexed(lambda i, x: i > 0)
+        self.assertEqual(s.to_list(), ["y", "z"])
+        self.assertEqual(s.to_list(), ["y", "z"])
+
+    def test_stream_group_adjacent(self) -> None:
+        self.assertEqual(
+            Stream([1, 1, 2, 2, 2, 1, 3, 3]).group_adjacent(lambda x: x).to_list(),
+            [[1, 1], [2, 2, 2], [1], [3, 3]],
+        )
+        self.assertEqual(
+            Stream(["a", "A", "b", "B", "b"]).group_adjacent(str.lower).to_list(),
+            [["a", "A"], ["b", "B", "b"]],
+        )
+        self.assertEqual(Stream([]).group_adjacent(lambda x: x).to_list(), [])
+        self.assertEqual(
+            Stream([1, 2, 3, 4]).group_adjacent(lambda x: x).to_list(),
+            [[1], [2], [3], [4]],
+        )
+        self.assertEqual(
+            Stream([1, 1, 1, 1]).group_adjacent(lambda x: x).to_list(), [[1, 1, 1, 1]]
+        )
+        # Test re-iteration
+        s = Stream([1, 1, 2]).group_adjacent(lambda x: x)
+        self.assertEqual(s.to_list(), [[1, 1], [2]])
+        self.assertEqual(s.to_list(), [[1, 1], [2]])
+
+    def test_stream_windowed(self) -> None:
+        s = Stream([1, 2, 3, 4, 5])
+        self.assertEqual(s.windowed(3, 1, partial=False).to_list(), [[1, 2, 3]])
+        self.assertEqual(s.windowed(3, 1, partial=True).to_list(), [[1, 2, 3], [4, 5]])
+
+        self.assertEqual(s.windowed(2, 2, partial=False).to_list(), [[2, 3]])
+        self.assertEqual(s.windowed(2, 2, partial=True).to_list(), [[2, 3], [5]])
+
+        self.assertEqual(s.windowed(5, 1, partial=False).to_list(), [[1, 2, 3, 4, 5]])
+        self.assertEqual(s.windowed(5, 1, partial=True).to_list(), [[1, 2, 3, 4, 5]])
+
+        self.assertEqual(s.windowed(6, 1, partial=False).to_list(), [])
+        self.assertEqual(s.windowed(6, 1, partial=True).to_list(), [[1, 2, 3, 4, 5]])
+
+        self.assertEqual(Stream([1, 2]).windowed(3, 1, partial=False).to_list(), [])
+        self.assertEqual(
+            Stream([1, 2]).windowed(3, 1, partial=True).to_list(), [[1, 2]]
+        )
+
+        self.assertEqual(Stream([]).windowed(3, 1, partial=False).to_list(), [])
+        self.assertEqual(Stream([]).windowed(3, 1, partial=True).to_list(), [])
+
+        with self.assertRaises(ValueError):
+            Stream([]).windowed(0, 1)
+        with self.assertRaises(ValueError):
+            Stream([]).windowed(1, 0)
+
+        # Test re-iteration
+        re_s = Stream([1, 2, 3, 4]).windowed(2, 1, partial=False)
+        self.assertEqual(re_s.to_list(), [[1, 2], [3, 4]])
+        self.assertEqual(re_s.to_list(), [[1, 2], [3, 4]])
+
+    def test_stream_pad(self) -> None:
+        self.assertEqual(Stream([1, 2]).pad(5, 0).to_list(), [1, 2, 0, 0, 0])
+        self.assertEqual(Stream([1, 2, 3, 4, 5]).pad(3, 0).to_list(), [1, 2, 3, 4, 5])
+        self.assertEqual(Stream([1, 2, 3]).pad(3, 0).to_list(), [1, 2, 3])
+        self.assertEqual(Stream([]).pad(3, -1).to_list(), [-1, -1, -1])
+        self.assertEqual(
+            Stream([1]).pad(0, 9).to_list(), [1]
+        )  # Pad to 0 means no padding if already has elements
+        self.assertEqual(Stream([]).pad(0, 9).to_list(), [])
+
+        with self.assertRaises(ValueError):
+            Stream([]).pad(-1, 0)
+
+    def test_stream_flatten_opt(self) -> None:
+        self.assertEqual(
+            Stream(
+                [Opt.of(1), Opt.empty(), Opt.of(2), Opt.of_nullable(None), Opt.of(3)]
+            )
+            .flatten_opt()
+            .to_list(),
+            [1, 2, 3],
+        )
+        self.assertEqual(
+            Stream([Opt.empty(), Opt.of_nullable(None)]).flatten_opt().to_list(), []
+        )
+        self.assertEqual(Stream([]).flatten_opt().to_list(), [])
+        # Test with stream of non-Opt (should ideally not happen with type hints, but good to check)
+        # This will likely cause an AttributeError if not handled, or a type error.
+        # The current implementation maps to get_actual, then filters None.
+        # If an element is not an Opt, opt.get_actual() will fail.
+        # For this test, we assume the input stream correctly contains Opt[L] instances.
+        s_typed: Stream[Opt[int]] = Stream.of_items(Opt.of(10), Opt.empty(), Opt.of(20))
+        self.assertEqual(s_typed.flatten_opt().to_list(), [10, 20])
+
+    def test_deep_copy(self) -> None:
+        original_stream = Stream([1, 2, 3, 4, 5])
+        clone = original_stream.clone()
+        self.assertEqual(original_stream.to_list(), clone.to_list())
+        self.assertNotEqual(original_stream, clone)
+        original_stream._Stream__arg = [1, 2]
+        self.assertNotEqual(original_stream.to_list(), clone.to_list())

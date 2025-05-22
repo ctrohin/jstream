@@ -1,4 +1,5 @@
 from collections import deque
+from copy import deepcopy
 from typing import (
     Callable,
     Iterable,
@@ -33,6 +34,7 @@ T = TypeVar("T")
 V = TypeVar("V")
 K = TypeVar("K")
 C = TypeVar("C")
+L = TypeVar("L")
 S = TypeVar("S")
 U = TypeVar("U")
 
@@ -801,6 +803,127 @@ class _FilterIterable(_GenericIterable[T]):
                 return next_obj
 
 
+class _MapIndexedIterable(Generic[T, V], Iterator[V], Iterable[V]):
+    __slots__ = ("_iterable", "_iterator", "__mapper", "__index")
+
+    def __init__(self, it: Iterable[T], mapper: Callable[[int, T], V]) -> None:
+        self._iterable = it
+        self._iterator = self._iterable.__iter__()
+        self.__mapper = mapper
+        self.__index = 0
+
+    def _prepare(self) -> None:
+        self.__index = 0
+
+    def __iter__(self) -> Iterator[V]:
+        self._iterator = self._iterable.__iter__()
+        self._prepare()
+        return self
+
+    def __next__(self) -> V:
+        # Get the next element, increment the index, and then apply the mapper.
+        # This ensures that the mapper function always receives the current
+        # (correctly incremented) index alongside the element.
+        obj = self._iterator.__next__()
+        current_index = self.__index
+        self.__index += 1
+        return self.__mapper(current_index, obj)
+
+
+class _GroupAdjacentIterable(Generic[T, K], Iterator[list[T]], Iterable[list[T]]):
+    __slots__ = (
+        "_iterable",
+        "_iterator",
+        "__key_func",
+        "_current_group",
+        "_current_key",
+    )
+
+    def __init__(self, it: Iterable[T], key_func: Callable[[T], K]) -> None:
+        self._iterable = it
+        self._iterator = iter(self._iterable)
+        self.__key_func = key_func
+        self._current_group: list[T] = []
+        self._current_key: Optional[K] = None
+
+    def __iter__(self) -> Iterator[list[T]]:
+        self._iterator = iter(self._iterable)
+        self._current_group = []
+        self._current_key = None
+        return self
+
+    def __next__(self) -> list[T]:
+        try:
+            if not self._current_group:
+                # Start a new group: get the first element, initialize group and key
+                first_element = next(self._iterator)
+                self._current_key = self.__key_func(first_element)
+                self._current_group.append(first_element)
+
+            while True:  # Keep trying to extend the current group
+                next_element = next(self._iterator)
+                next_key = self.__key_func(next_element)
+
+                if next_key == self._current_key:
+                    # Same key: add to group and continue
+                    self._current_group.append(next_element)
+                else:
+                    # Different key: yield current group, start a new group, and stop iteration for now
+                    group_to_yield = self._current_group
+                    self._current_key = next_key
+                    self._current_group = [next_element]
+                    return group_to_yield
+
+        except StopIteration as exc:
+            if self._current_group:
+                # Yield any remaining group at the end
+                group_to_yield = self._current_group
+                self._current_group = []  # Clear it after yielding
+                return group_to_yield
+            # No current group (probably empty iterator to start)
+            raise StopIteration from exc
+
+
+class _WindowedIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
+    __slots__ = ("_iterable", "_iterator", "_size", "_step", "_partial")
+
+    def __init__(
+        self, it: Iterable[T], size: int, step: int = 1, partial: bool = False
+    ) -> None:
+        if size <= 0 or step <= 0:
+            raise ValueError("Size and step must be positive")
+        self._iterable = it
+        self._iterator = iter(self._iterable)
+        self._size = size
+        self._step = step
+        self._partial = partial
+
+    def __iter__(self) -> Iterator[list[T]]:
+        self._iterator = iter(self._iterable)  # Reset iterator
+        return self
+
+    def __next__(self) -> list[T]:
+        window: list[T] = []
+        try:
+            # Try to populate a new window by skipping elements first if step > 1
+            if len(window) == 0:
+                for _ in range(
+                    self._step - 1
+                ):  # Consume and discard elements (if step > 1)
+                    next(
+                        self._iterator
+                    )  # Will raise StopIteration if not enough elements
+            # Fill as much of window as possible until end of data or window size
+            for _ in range(self._size):
+                window.append(next(self._iterator))
+        except StopIteration as exc:
+            # Check whether to yield a partial window if allowed or stop iteration
+            if not window or (not self._partial and len(window) < self._size):
+                raise StopIteration from exc
+        # If full or partial (if allowed), return the window
+        return window
+
+
 class _CastIterable(Generic[T, V], Iterator[T], Iterable[T]):
     __slots__ = ("__iterable", "__iterator")
 
@@ -1491,6 +1614,21 @@ class Stream(Generic[T]):
         return Stream(arg)
 
     @staticmethod
+    def just(value: T) -> "Stream[T]":
+        """
+        Creates a stream from a single value. This is a convenience method
+        for creating a stream with a single element.
+
+        Args:
+            value (T): The single value to include in the stream.
+
+        Returns:
+            Stream[T]: A stream containing only the provided value.
+        """
+        # Internally, it creates a list with a single element.
+        return Stream([value])
+
+    @staticmethod
     def of_nullable(arg: Iterable[Optional[T]]) -> "Stream[T]":
         """
         Creates a stream from an iterable of optional values, filtering out None values.
@@ -2167,6 +2305,118 @@ class Stream(Generic[T]):
             if pred.apply(element):
                 last_match = element
         return Opt(last_match)
+
+    def map_indexed(self, mapper: Callable[[int, T], V]) -> "Stream[V]":
+        """
+        Applies a mapping function to each element of the stream, along with its index.
+
+        Args:
+            mapper: A function that takes the index and the element, and returns a transformed value.
+
+        Returns:
+            Stream[V]: A stream of transformed values.
+        """
+        return Stream(_MapIndexedIterable(self.__arg, mapper))
+
+    def filter_indexed(self, predicate: Callable[[int, T], bool]) -> "Stream[T]":
+        """
+        Filters the elements of the stream based on a predicate that takes both the index and the element.
+
+        Args:
+            predicate: A function that takes the index and the element, and returns True if the element should be included in the result, False otherwise.
+
+        Returns:
+            Stream[T]: A stream of filtered elements.
+        """
+
+        def indexed_predicate(element: Pair[int, T]) -> bool:
+            return predicate(element.left(), element.right())
+
+        return self.indexed().filter(indexed_predicate).map(lambda p: p.right())
+
+    def group_adjacent(self, key_func: Callable[[T], K]) -> "Stream[list[T]]":
+        """
+        Groups consecutive elements of the stream that have the same key. The order is preserved.
+
+        Args:
+            key_func: A function that extracts a key from each element. Consecutive elements with the same key will be grouped together.
+
+        Returns:
+            Stream[list[T]]: A stream of lists, where each list is a group of adjacent elements with the same key.
+        """
+        return Stream(_GroupAdjacentIterable(self.__arg, key_func))
+
+    def windowed(
+        self, size: int, step: int = 1, partial: bool = False
+    ) -> "Stream[list[T]]":
+        """
+        Creates a stream of windows (sublists) from the elements of this stream,
+        where each window has a specified size and consecutive windows are
+        separated by a specified step.
+
+        Args:
+            size (int): The size of each window. Must be positive.
+            step (int): The number of elements to move forward for the start of
+                       the next window. Defaults to 1 (consecutive windows). Must be positive.
+            partial (bool): If True, allows windows that are smaller than 'size'
+                           at the end of the stream. If False (default), only windows
+                           of exactly 'size' are returned, and any remaining elements
+                           that cannot form a full window are discarded.
+
+        Returns:
+            Stream[list[T]]: A stream of windows (lists of elements).
+        Raises:
+            ValueError: If size or step is not positive.
+        """
+        return Stream(_WindowedIterable(self.__arg, size, step, partial))
+
+    def pad(self, size: int, value: T) -> "Stream[T]":
+        """
+        Pads the stream with a specified value until it reaches a desired size.
+        If the stream already has the target size or is larger, it's returned unmodified.
+
+        CAUTION: This operation buffers the entire stream up to the padding point,
+                 so may consume memory.
+
+        Args:
+            size (int): The desired final size of the stream after padding.
+                       Must be non-negative.
+            value (T): The value to use for padding.
+
+        Returns:
+            Stream[T]: The padded stream.
+
+        Raises:
+            ValueError: If size is negative.
+        """
+        if size < 0:
+            raise ValueError("Padding size must be non-negative.")
+
+        current_elements = list(self.__arg)  # Force evaluation of the iterable
+        if len(current_elements) >= size:  # No padding needed
+            return Stream(current_elements)
+        return Stream(current_elements + [value] * (size - len(current_elements)))
+
+    def flatten_opt(self: "Stream[Opt[L]]") -> "Stream[L]":
+        """
+        Flattens a stream of Opts into a stream of their contained values, discarding empty Opts.
+
+        This requires the stream to be of type Stream[Opt[L]], but type hinting can't
+        fully enforce this at runtime, so incorrect usage may result in errors.
+
+        Returns:
+            Stream[L]: A stream of values contained in the non-empty Opts.
+        """
+        # The type hint self: "Stream[Opt[L]]" constrains what streams this can be called on.
+        # We map to extract values from Opts, and filter to remove Nones.
+        return (
+            self.map(lambda opt: opt.get_actual())
+            .filter(is_not_none)
+            .map(lambda x: require_non_null(x))
+        )
+
+    def clone(self) -> "Stream[T]":
+        return deepcopy(self)
 
     @staticmethod
     def range(start: int, stop: Optional[int] = None, step: int = 1) -> "Stream[int]":

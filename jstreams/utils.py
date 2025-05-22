@@ -522,3 +522,14 @@ def initial(data: Sequence[T]) -> list[T]:
                  Returns an empty list if data has 0 or 1 element.
     """
     return list(data[:-1]) if len(data) > 1 else []
+
+
+def repeat_value(value: T, n: int) -> Iterable[T]:
+    """
+    Creates an iterable that repeats a given value n times.
+    """
+    if n < 0:
+        raise ValueError("Number of repetitions 'n' must be non-negative.")
+    if n == 0:
+        return []
+    return [value] * n
