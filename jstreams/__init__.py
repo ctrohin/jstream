@@ -176,6 +176,7 @@ from jstreams.utils import (
     tail,
     last,
     to_nullable,
+    repeat_value,
 )
 
 from jstreams.predicate import (
@@ -595,4 +596,5 @@ __all__ = [
     "last",
     "extract_list_strict",
     "extract_non_null_list_strict",
+    "repeat_value",
 ]
