@@ -7,9 +7,14 @@ from jstreams import (
     ReplaySubject,
     Single,
     RX,
+    Timestamped,
 )
 from jstreams.eventing import event, events, managed_events, on_event
 from jstreams.utils import Value
+
+
+class TestException(Exception):
+    pass
 
 
 class TestRx(BaseTestCase):
@@ -403,3 +408,191 @@ class TestRx(BaseTestCase):
         event(str, "2").publish("best")
         sleep(1)
         self.assertListEqual(elements, ["best"])
+
+    def test_rx_empty(self) -> None:
+        on_next_called = Value(False)
+        on_completed_called = Value(False)
+        on_error_called = Value(False)
+
+        RX.empty().subscribe(
+            lambda _: on_next_called.set(True),
+            lambda _: on_error_called.set(True),
+            lambda _: on_completed_called.set(True),
+        )
+        self.assertFalse(on_next_called.get())
+        self.assertTrue(on_completed_called.get())
+        self.assertFalse(on_error_called.get())
+
+    def test_rx_never(self) -> None:
+        on_next_called = Value(False)
+        on_completed_called = Value(False)
+        on_error_called = Value(False)
+
+        RX.never().subscribe(
+            lambda _: on_next_called.set(True),
+            lambda _: on_error_called.set(True),
+            lambda _: on_completed_called.set(True),
+        )
+        sleep(0.01)  # Give a small time for any potential async emission
+        self.assertFalse(on_next_called.get())
+        self.assertFalse(on_completed_called.get())
+        self.assertFalse(on_error_called.get())
+
+    def test_rx_throw(self) -> None:
+        on_next_called = Value(False)
+        on_completed_called = Value(False)
+        error_val = Value(None)
+
+        class TestException(Exception):
+            pass
+
+        test_exception = TestException("test error")
+
+        RX.throw(test_exception).subscribe(
+            lambda _: on_next_called.set(True),
+            error_val.set,
+            lambda _: on_completed_called.set(True),
+        )
+        self.assertFalse(on_next_called.get())
+        self.assertFalse(on_completed_called.get())
+        self.assertIsInstance(error_val.get(), TestException)
+        self.assertEqual(str(error_val.get()), "test error")
+
+        # Test with factory
+        on_next_called.set(False)
+        on_completed_called.set(False)
+        error_val.set(None)
+        RX.throw(lambda: TestException("factory error")).subscribe(
+            lambda _: on_next_called.set(True),
+            error_val.set,
+            lambda _: on_completed_called.set(True),
+        )
+        self.assertFalse(on_next_called.get())
+        self.assertFalse(on_completed_called.get())
+        self.assertIsInstance(error_val.get(), TestException)
+        self.assertEqual(str(error_val.get()), "factory error")
+
+    def test_rx_range(self) -> None:
+        results = []
+        RX.range(1, 5).subscribe(results.append)
+        self.assertListEqual(results, [1, 2, 3, 4, 5])
+
+        results = []
+        RX.range(0, 0).subscribe(results.append)  # Should behave like empty
+        self.assertListEqual(results, [])
+
+        with self.assertRaises(ValueError):
+            RX.range(1, -1)
+
+    def test_rx_defer(self) -> None:
+        factory_called_count = Value(0)
+
+        def observable_factory():
+            factory_called_count.set(factory_called_count.get() + 1)
+            return Flowable([1, 2])
+
+        deferred_obs = RX.defer(observable_factory)
+
+        results1 = []
+        deferred_obs.subscribe(results1.append)
+        self.assertEqual(factory_called_count.get(), 1)
+        self.assertListEqual(results1, [1, 2])
+
+        results2 = []
+        deferred_obs.subscribe(results2.append)
+        self.assertEqual(factory_called_count.get(), 2)
+        self.assertListEqual(results2, [1, 2])
+
+        # Test defer with factory error
+        error_val = Value(None)
+
+        def error_factory():
+            raise TestException("factory failed")
+
+        RX.defer(error_factory).subscribe(lambda _: None, error_val.set)
+        self.assertIsInstance(error_val.get(), TestException)
+        self.assertEqual(str(error_val.get()), "factory failed")
+
+    def test_rx_map_to(self) -> None:
+        results = []
+        Flowable([1, 2, 3]).pipe(RX.map_to("A")).subscribe(results.append)
+        self.assertListEqual(results, ["A", "A", "A"])
+
+    def test_rx_scan(self) -> None:
+        results = []
+        Flowable([1, 2, 3, 4]).pipe(RX.scan(lambda acc, val: acc + val, 0)).subscribe(
+            results.append
+        )
+        self.assertListEqual(results, [1, 3, 6, 10])
+
+        results = []
+        Flowable([1, 2, 3]).pipe(RX.scan(lambda acc, val: acc + [val], [])).subscribe(
+            results.append
+        )
+        self.assertListEqual(results, [[1], [1, 2], [1, 2, 3]])
+
+    def test_rx_distinct(self) -> None:
+        results = []
+        Flowable([1, 2, 2, 3, 1, 4, 4]).pipe(RX.distinct()).subscribe(results.append)
+        self.assertListEqual(results, [1, 2, 3, 4])
+
+        results = []
+        data = [{"id": 1, "val": "a"}, {"id": 2, "val": "b"}, {"id": 1, "val": "c"}]
+        Flowable(data).pipe(RX.distinct(key_selector=lambda x: x["id"])).subscribe(
+            results.append
+        )
+        self.assertListEqual(results, [{"id": 1, "val": "a"}, {"id": 2, "val": "b"}])
+
+    def test_rx_timestamp(self) -> None:
+        results = []
+        start_time = Value(None)
+        Flowable(["a", "b"]).pipe(RX.timestamp()).subscribe(
+            lambda ts_val: (
+                start_time.set(ts_val.timestamp) if start_time.get() is None else None,
+                results.append(ts_val),
+            )
+        )
+        self.assertEqual(len(results), 2)
+        self.assertIsInstance(results[0], Timestamped)
+        self.assertEqual(results[0].value, "a")
+        self.assertGreaterEqual(results[0].timestamp, start_time.get())
+        self.assertIsInstance(results[1], Timestamped)
+        self.assertEqual(results[1].value, "b")
+        self.assertGreaterEqual(results[1].timestamp, results[0].timestamp)
+
+    def test_rx_element_at(self) -> None:
+        results = []
+        Flowable(["a", "b", "c"]).pipe(RX.element_at(1)).subscribe(results.append)
+        self.assertListEqual(results, ["b"])
+
+        results = []
+        Flowable(["a", "b", "c"]).pipe(RX.element_at(0)).subscribe(results.append)
+        self.assertListEqual(results, ["a"])
+
+        results = []
+        Flowable(["a", "b", "c"]).pipe(RX.element_at(2)).subscribe(results.append)
+        self.assertListEqual(results, ["c"])
+
+        results = []  # out of bounds
+        Flowable(["a", "b", "c"]).pipe(RX.element_at(3)).subscribe(results.append)
+        self.assertListEqual(results, [])
+
+        with self.assertRaises(ValueError):
+            RX.element_at(-1)
+
+    def test_buffer_emits_none_then_list(self) -> None:
+        pipe = RX.buffer(0.02)
+        pipe.init()  # Important for stateful operators like buffer
+        self.assertIsNone(pipe.transform(1))  # type: ignore
+        self.assertIsNone(pipe.transform(2))  # type: ignore
+        sleep(0.03)
+        self.assertListEqual(pipe.transform(3), [1, 2, 3])  # type: ignore
+        self.assertIsNone(pipe.transform(4))  # type: ignore
+
+    def test_buffer_count_emits_none_then_list(self) -> None:
+        pipe = RX.buffer_count(3)
+        pipe.init()
+        self.assertIsNone(pipe.transform(1))  # type: ignore
+        self.assertIsNone(pipe.transform(2))  # type: ignore
+        self.assertListEqual(pipe.transform(3), [1, 2, 3])  # type: ignore
+        self.assertIsNone(pipe.transform(4))  # type: ignore

@@ -1,5 +1,6 @@
 import logging
 from threading import Lock, Thread
+import time
 from typing import (
     Callable,
     Generic,
@@ -8,10 +9,12 @@ from typing import (
     TypeVar,
     Any,
     cast,
+    Union,
     overload,
 )
 import uuid
 from copy import deepcopy
+from dataclasses import dataclass
 
 from jstreams.predicate import not_strict
 from jstreams.stream import Stream
@@ -66,11 +69,11 @@ class Pipe(Generic[T, V]):
         v: Any = val
         for op in self.__operators:
             if isinstance(op, BaseFilteringOperator):
-                if not op.matches(val):
+                if not op.matches(v):  # Pass current transformed value 'v'
                     return None
-            if isinstance(op, BaseMappingOperator):
+            elif isinstance(op, BaseMappingOperator):
                 v = op.transform(v)
-        return cast(V, v)
+        return cast(V, v)  # Return the finally transformed value
 
     def clone(self) -> "Pipe[T, V]":
         return Pipe(T, V, deepcopy(self.__operators))  # type: ignore[misc]
@@ -176,6 +179,7 @@ class Subscribable(abc.ABC, Generic[T]):
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
+        asynchronous: bool = False,  # Added for consistency with Observable.subscribe
     ) -> ObservableSubscription[Any]:
         pass
 
@@ -821,6 +825,126 @@ class Single(Flowable[T]):
         super().__init__([value] if value is not None else [])
 
 
+class _EmptyObservable(Subscribable[Any]):
+    _instance: Optional["_EmptyObservable"] = None
+
+    def __new__(cls) -> "_EmptyObservable":
+        if cls._instance is None:
+            cls._instance = super(_EmptyObservable, cls).__new__(cls)
+        return cls._instance
+
+    def subscribe(
+        self,
+        on_next: NextHandler[Any],
+        on_error: ErrorHandler = None,
+        on_completed: CompletedHandler[Any] = None,
+        on_dispose: DisposeHandler = None,
+        asynchronous: bool = False,
+    ) -> ObservableSubscription[Any]:
+        def _complete_action() -> None:
+            if on_completed:
+                on_completed(None)
+            if on_dispose:
+                on_dispose()
+
+        if asynchronous:
+            Thread(target=_complete_action).start()
+        else:
+            _complete_action()
+        # Return a subscription that is effectively already disposed
+        return ObservableSubscription(
+            self, lambda _: None, None, None, None, asynchronous
+        )
+
+
+class _NeverObservable(Subscribable[Any]):
+    _instance: Optional["_NeverObservable"] = None
+
+    def __new__(cls) -> "_NeverObservable":
+        if cls._instance is None:
+            cls._instance = super(_NeverObservable, cls).__new__(cls)
+        return cls._instance
+
+    def subscribe(
+        self,
+        on_next: NextHandler[Any],
+        on_error: ErrorHandler = None,
+        on_completed: CompletedHandler[Any] = None,
+        on_dispose: DisposeHandler = None,
+        asynchronous: bool = False,
+    ) -> ObservableSubscription[Any]:
+        # Returns a subscription that does nothing and can be disposed.
+        return ObservableSubscription(
+            self, on_next, on_error, on_completed, on_dispose, asynchronous
+        )
+
+
+class _ThrowErrorObservable(Subscribable[T]):
+    def __init__(self, error_or_factory: Union[Exception, Callable[[], Exception]]):
+        self._error_or_factory = error_or_factory
+
+    def subscribe(
+        self,
+        on_next: NextHandler[T],
+        on_error: ErrorHandler = None,
+        on_completed: CompletedHandler[T] = None,
+        on_dispose: DisposeHandler = None,
+        asynchronous: bool = False,
+    ) -> ObservableSubscription[T]:
+        try:
+            error_to_throw = (
+                self._error_or_factory()
+                if callable(self._error_or_factory)
+                else self._error_or_factory
+            )
+        except Exception as e:  # pylint: disable=broad-except
+            error_to_throw = e
+
+        def _error_action() -> None:
+            if on_error:
+                on_error(error_to_throw)  # type: ignore
+            if on_dispose:
+                on_dispose()
+
+        if asynchronous:
+            Thread(target=_error_action).start()
+        else:
+            _error_action()
+        return ObservableSubscription(
+            self, on_next, on_error, on_completed, on_dispose, asynchronous
+        )
+
+
+class _DeferObservable(
+    Observable[T]
+):  # Inherits Observable to use its subscription management
+    def __init__(self, factory: Callable[[], Subscribable[T]]):
+        super().__init__()
+        self._factory = factory
+
+    def subscribe(
+        self,
+        on_next: NextHandler[T],
+        on_error: ErrorHandler = None,
+        on_completed: CompletedHandler[T] = None,
+        on_dispose: DisposeHandler = None,
+        asynchronous: bool = False,
+    ) -> ObservableSubscription[T]:
+        try:
+            deferred_observable = self._factory()
+        except Exception as e:  # pylint: disable=broad-except
+            # If factory fails, error the subscription immediately.
+            _ThrowErrorObservable(e).subscribe(
+                on_next, on_error, on_completed, on_dispose, asynchronous
+            )
+            return ObservableSubscription(
+                self, on_next, on_error, on_completed, on_dispose, asynchronous
+            )  # Return a new sub
+        return deferred_observable.subscribe(
+            on_next, on_error, on_completed, on_dispose, asynchronous=asynchronous
+        )  # type: ignore
+
+
 class SingleValueSubject(Single[T], _OnNext[T]):
     def __init__(self, value: Optional[T]) -> None:  # pylint: disable=useless-parent-delegation
         super().__init__(value)
@@ -1100,6 +1224,79 @@ class DropUntil(BaseFilteringOperator[T]):
         return False
 
 
+class MapTo(BaseMappingOperator[Any, V]):
+    __slots__ = ("__value",)
+
+    def __init__(self, value: V) -> None:
+        """
+        Emits the given constant value whenever the source Observable emits a value.
+        Args:
+            value (V): The constant value to emit.
+        """
+        super().__init__(lambda _: value)
+        self.__value = value  # Store for potential deepcopy or inspection
+
+    # transform is inherited
+
+
+class Scan(BaseMappingOperator[T, A]):
+    __slots__ = ("__accumulator_fn", "__seed", "__current_value", "_has_emitted_seed")
+
+    def __init__(self, accumulator_fn: Callable[[A, T], A], seed: A):
+        """
+        Applies an accumulator function to the source Observable, and returns each
+        intermediate result. The seed value is used for the initial accumulation.
+
+        Args:
+            accumulator_fn (Callable[[A, T], A]): An accumulator function to be
+                                                  invoked on each item emitted by the source Observable,
+                                                  whose result will be sent to the observer.
+            seed (A): The initial accumulator value.
+        """
+        super().__init__(self._accumulate)
+        self.__accumulator_fn = accumulator_fn
+        self.__seed = seed
+        self.__current_value: A = seed
+        self._has_emitted_seed = False  # To emit seed first if no items arrive
+
+    def init(self) -> None:
+        self.__current_value = self.__seed
+        self._has_emitted_seed = False
+
+    def _accumulate(self, val: T) -> A:
+        if not self._has_emitted_seed:  # First actual value from source
+            # If seed itself should be emitted before first accumulation with a source item,
+            # this logic would need adjustment or Scan would need to emit seed upon subscription.
+            # Standard Rx scan usually emits `accumulator(seed, first_item)`.
+            # If source is empty, some RxScans emit seed, some don't.
+            # This one will emit seed if it's the first call to transform and then accumulate.
+            # Let's assume seed is the initial state, and first emission is accumulator(seed, first_value)
+            self._has_emitted_seed = (
+                True  # Mark that we are past the initial seed state for accumulation
+            )
+        self.__current_value = self.__accumulator_fn(self.__current_value, val)
+        return self.__current_value
+
+
+class Distinct(BaseFilteringOperator[T]):
+    __slots__ = ("__key_selector", "__seen_keys")
+
+    def __init__(self, key_selector: Optional[Callable[[T], K]] = None) -> None:
+        super().__init__(self._is_new)
+        self.__key_selector = key_selector
+        self.__seen_keys: set[K] = set()
+
+    def init(self) -> None:
+        self.__seen_keys.clear()
+
+    def _is_new(self, val: T) -> bool:
+        current_key = self.__key_selector(val) if self.__key_selector else val
+        if current_key not in self.__seen_keys:
+            self.__seen_keys.add(cast(K, current_key))
+            return True
+        return False
+
+
 _SENTINEL = object()
 
 
@@ -1247,7 +1444,7 @@ class Buffer(BaseMappingOperator[T, list[T]]):
         self.__buffer = []
         self.__last_checked = None
 
-    def __emit_buffer(self, val: T) -> list[T]:
+    def __emit_buffer(self, val: T) -> Optional[list[T]]:
         import time
 
         current_time = time.time()
@@ -1261,7 +1458,7 @@ class Buffer(BaseMappingOperator[T, list[T]]):
             emitted_buffer = self.__buffer
             self.__buffer = []
             return emitted_buffer
-        return []  # Return an empty list if the buffer should not emit yet
+        return None
 
 
 class BufferCount(BaseMappingOperator[T, list[T]]):
@@ -1281,13 +1478,52 @@ class BufferCount(BaseMappingOperator[T, list[T]]):
     def init(self) -> None:
         self.__buffer = []
 
-    def __emit_buffer(self, val: T) -> list[T]:
+    def __emit_buffer(self, val: T) -> Optional[list[T]]:
         self.__buffer.append(val)
         if len(self.__buffer) >= self.__count:
             emitted_buffer = self.__buffer
             self.__buffer = []
             return emitted_buffer
-        return []  # Return an empty list if the buffer is not full yet
+        return None
+
+
+@dataclass
+class Timestamped(Generic[T]):
+    value: T
+    timestamp: float  # Unix timestamp
+
+
+class TimestampOperator(BaseMappingOperator[T, Timestamped[T]]):
+    def __init__(self) -> None:
+        super().__init__(self._add_timestamp)
+
+    def _add_timestamp(self, val: T) -> Timestamped[T]:
+        return Timestamped(value=val, timestamp=time.time())
+
+
+class ElementAt(BaseFilteringOperator[T]):  # Also implicitly maps T to T
+    __slots__ = ("__index", "__current_index", "__found")
+
+    def __init__(self, index: int) -> None:
+        if index < 0:
+            raise ValueError("Index must be a non-negative integer.")
+        self.__index = index
+        self.__current_index = -1
+        self.__found = False
+        super().__init__(self._match_index)
+
+    def init(self) -> None:
+        self.__current_index = -1
+        self.__found = False
+
+    def _match_index(self, _: T) -> bool:
+        if self.__found:  # Already emitted, ignore subsequent items
+            return False
+        self.__current_index += 1
+        if self.__current_index == self.__index:
+            self.__found = True
+            return True
+        return False
 
 
 class RX:
@@ -1506,6 +1742,91 @@ class RX:
         """
         return BufferCount(count)
 
+    @staticmethod
+    def empty() -> Subscribable[Any]:
+        """
+        Creates an Observable that emits no items and completes immediately.
+        """
+        return _EmptyObservable()
+
+    @staticmethod
+    def never() -> Subscribable[Any]:
+        """
+        Creates an Observable that emits no items and never completes.
+        """
+        return _NeverObservable()
+
+    @staticmethod
+    def throw(
+        error_or_factory: Union[Exception, Callable[[], Exception]],
+    ) -> Subscribable[T]:
+        """
+        Creates an Observable that emits no items and terminates with an error.
+        Args:
+            error_or_factory: The error instance or a factory function that produces an error.
+        """
+        return _ThrowErrorObservable(error_or_factory)
+
+    @staticmethod
+    def range(start: int, count: int) -> Flowable[int]:
+        """
+        Creates an Observable that emits a sequence of sequential integers within a specified range.
+        Args:
+            start: The first integer in the sequence.
+            count: The number of sequential integers to generate.
+        """
+        if count < 0:
+            raise ValueError("Count must be non-negative.")
+        if count == 0:
+            return cast(Flowable[int], RX.empty())
+        return Flowable(list(range(start, start + count)))
+
+    @staticmethod
+    def defer(factory: Callable[[], Subscribable[T]]) -> Subscribable[T]:
+        """
+        Creates an Observable that, for each subscriber, calls an Observable factory to make an Observable.
+        Args:
+            factory: The Observable factory function to call for each subscriber.
+        """
+        return _DeferObservable(factory)
+
+    @staticmethod
+    def map_to(value: V) -> RxOperator[Any, V]:
+        """
+        Emits the given constant value whenever the source Observable emits a value.
+        """
+        return MapTo(value)
+
+    @staticmethod
+    def scan(accumulator_fn: Callable[[A, T], A], seed: A) -> RxOperator[T, A]:
+        """
+        Applies an accumulator function over the source Observable, and returns each intermediate result.
+        """
+        return Scan(accumulator_fn, seed)
+
+    @staticmethod
+    def distinct(key_selector: Optional[Callable[[T], K]] = None) -> RxOperator[T, T]:
+        """
+        Returns an Observable that emits all items emitted by the source Observable that are distinct.
+        """
+        return Distinct(key_selector)
+
+    @staticmethod
+    def timestamp() -> RxOperator[T, Timestamped[T]]:
+        """
+        Attaches a timestamp to each item emitted by the source Observable.
+        """
+        return TimestampOperator()
+
+    @staticmethod
+    def element_at(index: int) -> RxOperator[T, T]:
+        """
+        Emits only the item emitted by the source Observable at the specified index.
+        Errors if the source completes before emitting the item at that index,
+        unless a default value is provided (not supported in this simplified version).
+        """
+        return ElementAt(index)
+
 
 def rx_reduce(reducer: Callable[[T, T], T]) -> RxOperator[T, T]:
     """
@@ -1713,3 +2034,75 @@ def rx_buffer_count(count: int) -> RxOperator[T, list[T]]:
         count (int): The number of values to buffer before emitting.
     """
     return RX.buffer_count(count)
+
+
+def rx_empty() -> Subscribable[Any]:
+    """
+    Creates an Observable that emits no items and completes immediately.
+    """
+    return RX.empty()
+
+
+def rx_never() -> Subscribable[Any]:
+    """
+    Creates an Observable that emits no items and never completes.
+    """
+    return RX.never()
+
+
+def rx_throw(
+    error_or_factory: Union[Exception, Callable[[], Exception]],
+) -> Subscribable[T]:
+    """
+    Creates an Observable that emits no items and terminates with an error.
+    """
+    return RX.throw(error_or_factory)
+
+
+def rx_range(start: int, count: int) -> Flowable[int]:
+    """
+    Creates an Observable that emits a sequence of sequential integers within a specified range.
+    """
+    return RX.range(start, count)
+
+
+def rx_defer(factory: Callable[[], Subscribable[T]]) -> Subscribable[T]:
+    """
+    Creates an Observable that, for each subscriber, calls an Observable factory to make an Observable.
+    """
+    return RX.defer(factory)
+
+
+def rx_map_to(value: V) -> RxOperator[Any, V]:
+    """
+    Emits the given constant value whenever the source Observable emits a value.
+    """
+    return RX.map_to(value)
+
+
+def rx_scan(accumulator_fn: Callable[[A, T], A], seed: A) -> RxOperator[T, A]:
+    """
+    Applies an accumulator function over the source Observable, and returns each intermediate result.
+    """
+    return RX.scan(accumulator_fn, seed)
+
+
+def rx_distinct(key_selector: Optional[Callable[[T], K]] = None) -> RxOperator[T, T]:
+    """
+    Returns an Observable that emits all items emitted by the source Observable that are distinct.
+    """
+    return RX.distinct(key_selector)
+
+
+def rx_timestamp() -> RxOperator[T, Timestamped[T]]:
+    """
+    Attaches a timestamp to each item emitted by the source Observable.
+    """
+    return RX.timestamp()
+
+
+def rx_element_at(index: int) -> RxOperator[T, T]:
+    """
+    Emits only the item emitted by the source Observable at the specified index.
+    """
+    return RX.element_at(index)
