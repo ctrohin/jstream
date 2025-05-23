@@ -10,6 +10,7 @@ from jstreams import (
     injector,
     provide_variable,
     component,
+    provide,
 )
 
 import abc
@@ -44,6 +45,13 @@ class MaxLengthValidator(ValidationInterface):
         return obj is not None and len(obj) < self.max_len
 
 
+# We can also define a non decorated class, that we can provide to the
+# injection mechanism using the configuration class below
+class NoSpaceValidator(ValidationInterface):
+    def is_valid(self, obj: Optional[str]) -> bool:
+        return obj is not None and " " not in obj
+
+
 # Then we can provide a set of dependencies using a configuration class
 @configuration()
 class InjectorConfig:
@@ -51,6 +59,10 @@ class InjectorConfig:
     @provide_variable(int, "max_len")
     def get_max_len(self) -> int:
         return 10
+
+    @provide(ValidationInterface, "no_space_validator")
+    def get_no_space_validator(self) -> ValidationInterface:
+        return NoSpaceValidator()
 
 
 # In this validation method, we retrieve all classes that implement our `ValidationInterface` in order
@@ -73,7 +85,12 @@ is_valid = validate("Test")
 print("Matches", is_valid)
 assert not is_valid
 
+# This string will not match the no space validator
+is_valid = validate("t est")
+print("Matches", is_valid)
+assert not is_valid
+
 # This string will not match the length validator
-is_valid = validate("test a string that is way too long")
+is_valid = validate("test_a_string_that_is_way_too_long")
 print("Matches", is_valid)
 assert not is_valid
