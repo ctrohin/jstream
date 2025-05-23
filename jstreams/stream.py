@@ -1597,108 +1597,6 @@ class Stream(Generic[T]):
     def __init__(self, arg: Iterable[T]) -> None:
         self.__arg = require_non_null(arg)
 
-    @staticmethod
-    def of(arg: Iterable[T]) -> "Stream[T]":
-        """
-        Creates a stream from an iterable. Much in the same way as when calling the Stream constructor, the
-        type of the stream is inferred from the type of the iterable.
-        This method is useful when you want to create a stream from an iterable without explicitly specifying
-        the type of the stream. It allows for more concise code and can be used in situations where the type
-        of the iterable is known but the type of the stream is not.
-
-        Args:
-            arg (Iterable[T]): The iterable to create the stream from
-        Returns:
-            Stream[T]: The stream
-        """
-        return Stream(arg)
-
-    @staticmethod
-    def just(value: T) -> "Stream[T]":
-        """
-        Creates a stream from a single value. This is a convenience method
-        for creating a stream with a single element.
-
-        Args:
-            value (T): The single value to include in the stream.
-
-        Returns:
-            Stream[T]: A stream containing only the provided value.
-        """
-        # Internally, it creates a list with a single element.
-        return Stream([value])
-
-    @staticmethod
-    def of_nullable(arg: Iterable[Optional[T]]) -> "Stream[T]":
-        """
-        Creates a stream from an iterable of optional values, filtering out None values.
-        This method is useful when you want to create a stream from an iterable that may contain None values,
-        and you want to filter them out. It allows for more concise code and can be used in situations where
-        the type of the iterable is known to be optional, but the resulting stream needs to be of non-null elements.
-
-        Args:
-            arg (Iterable[Optional[T]]): The iterable of optional values
-        Returns:
-            Stream[T]: The stream of non-null values
-        """
-        return Stream(arg).filter(is_not_none).map(lambda el: require_non_null(el))
-
-    @staticmethod
-    def cycle(iterable: Iterable[T], n: Optional[int] = None) -> "Stream[T]":
-        """
-        Creates a stream that cycles over the elements of an iterable.
-
-        The elements of the input iterable are buffered. The stream will then
-        repeat these buffered elements.
-
-        Args:
-            iterable (Iterable[T]): The iterable whose elements are to be cycled.
-            n (Optional[int]): The number of times to cycle through the iterable.
-                If None (default), cycles indefinitely.
-                If 0, results in an empty stream.
-                If the input iterable is empty and n > 0, an empty stream is also produced.
-
-        Returns:
-            Stream[T]: A stream that cycles through the elements of the iterable.
-
-        Raises:
-            ValueError: If n is specified and is negative.
-        """
-        if n is not None and n < 0:
-            raise ValueError("Number of repetitions 'n' must be non-negative.")
-        if n == 0:
-            return Stream.empty()
-        return Stream(_CycleIterable(iterable, n))
-
-    @staticmethod
-    def of_dict_keys(dictionary: dict[K, Any]) -> "Stream[K]":
-        """
-        Creates a stream from the keys of the given dictionary.
-        """
-        return Stream(dictionary.keys())
-
-    @staticmethod
-    def of_dict_values(dictionary: dict[Any, V]) -> "Stream[V]":
-        """
-        Creates a stream from the values of the given dictionary.
-        """
-        return Stream(dictionary.values())
-
-    @staticmethod
-    def of_dict_items(dictionary: dict[K, V]) -> "Stream[Pair[K, V]]":
-        """
-        Creates a stream of Pair(key, value) from the items of the given dictionary.
-        """
-        return Stream(dictionary.items()).map(pair_of)
-
-    @staticmethod
-    def defer(supplier: Callable[[], Iterable[T]]) -> "Stream[T]":
-        """
-        Creates a stream whose underlying iterable is obtained by calling the
-        supplier function only when the stream is iterated.
-        """
-        return Stream(_DeferIterable(supplier))
-
     def map(self, mapper: Union[Mapper[T, V], Callable[[T], V]]) -> "Stream[V]":
         """
         Produces a new stream by mapping the stream elements using the given mapper function.
@@ -2418,6 +2316,258 @@ class Stream(Generic[T]):
     def clone(self) -> "Stream[T]":
         return deepcopy(self)
 
+    def pairwise(self) -> "Stream[Pair[T, T]]":
+        """
+        Returns a stream of pairs consisting of adjacent elements from this stream.
+        If the stream has N elements, the resulting stream will have N-1 elements.
+        Returns an empty stream if the original stream has 0 or 1 element.
+
+        Example:
+            Stream([1, 2, 3, 4]).pairwise().to_list()
+            # Output: [Pair(1, 2), Pair(2, 3), Pair(3, 4)]
+
+        Returns:
+            Stream[Pair[T, T]]: A stream of adjacent pairs.
+        """
+        return Stream(_PairwiseIterable(self.__arg))
+
+    def sliding_window(self, size: int, step: int = 1) -> "Stream[list[T]]":
+        """
+        Returns a stream of lists, where each list is a sliding window of
+        elements from the original stream.
+
+        Example:
+            Stream([1, 2, 3, 4, 5]).sliding_window(3, 1).to_list()
+            # Output: [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
+
+            Stream([1, 2, 3, 4, 5]).sliding_window(2, 2).to_list()
+            # Output: [[1, 2], [3, 4]] (depends on exact end behavior)
+
+
+        Args:
+            size (int): The size of each window. Must be positive.
+            step (int, optional): The number of elements to slide forward for
+                                the next window. Defaults to 1. Must be positive.
+
+        Returns:
+            Stream[list[T]]: A stream of lists representing the sliding windows.
+
+        Raises:
+            ValueError: If size or step are not positive.
+        """
+        # NOTE: The _SlidingWindowIterable implementation above is complex and might need refinement
+        # for full correctness and laziness, especially around edge cases and step > size.
+        # Consider starting with a simpler implementation if needed.
+        return Stream(_SlidingWindowIterable(self.__arg, size, step))
+
+    def any_none(self) -> bool:
+        """
+        Checks if any element in this stream is None.
+        This is a terminal operation and may short-circuit.
+
+        Returns:
+            bool: True if at least one element is None, False otherwise.
+        """
+        return self.any_match(is_none)
+
+    def none_none(self) -> bool:
+        """
+        Checks if no element in this stream is None.
+        Equivalent to `all_not_none()`.
+        This is a terminal operation and may short-circuit.
+
+        Returns:
+            bool: True if no elements are None, False otherwise.
+        """
+        return self.none_match(is_none)
+
+    def repeat(self, n: Optional[int] = None) -> "Stream[T]":
+        """
+        Returns a stream that repeats the elements of this stream n times,
+        or indefinitely if n is None.
+
+        CAUTION: This operation needs to buffer the original stream elements
+                to allow repetition, which might consume significant memory
+                for large streams. It should not be used on infinite streams
+                unless n is specified and finite.
+
+        Args:
+            n (Optional[int]): The number of times to repeat the stream.
+                            If None, repeats indefinitely. Defaults to None.
+
+        Returns:
+            Stream[T]: A stream consisting of the repeated elements.
+
+        Raises:
+            ValueError: If n is specified and is not positive.
+        """
+        if n is not None and n <= 0:
+            raise ValueError("Number of repetitions 'n' must be positive if specified.")
+        # The _RepeatIterable buffers the original self.__arg
+        return Stream(_RepeatIterable(self.__arg, n))
+
+    def intersperse(self, separator: T) -> "Stream[T]":
+        """
+        Returns a stream with the separator element inserted between each
+        element of this stream.
+
+        Example:
+            Stream([1, 2, 3]).intersperse(0).to_list()
+            # Output: [1, 0, 2, 0, 3, 0]
+
+            Stream(["a", "b"]).intersperse("-").to_list()
+            # Output: ["a", "-", "b", "-"]
+
+            Stream([]).intersperse(0).to_list()
+            # Output: []
+
+            Stream([1]).intersperse(0).to_list()
+            # Output: [1, 0]
+
+        Args:
+            separator (T): The element to insert between original elements.
+
+        Returns:
+            Stream[T]: The resulting stream with separators.
+        """
+        return Stream(_IntersperseIterable(self.__arg, separator))
+
+    # ==========================================
+    #          FACTORY METHODS
+    # ==========================================
+    @staticmethod
+    def of(arg: Iterable[T]) -> "Stream[T]":
+        """
+        Creates a stream from an iterable. Much in the same way as when calling the Stream constructor, the
+        type of the stream is inferred from the type of the iterable.
+        This method is useful when you want to create a stream from an iterable without explicitly specifying
+        the type of the stream. It allows for more concise code and can be used in situations where the type
+        of the iterable is known but the type of the stream is not.
+
+        Args:
+            arg (Iterable[T]): The iterable to create the stream from
+        Returns:
+            Stream[T]: The stream
+        """
+        return Stream(arg)
+
+    @staticmethod
+    def of_items(*items: T) -> "Stream[T]":
+        """
+        Creates a stream from the provided items.
+
+        Example:
+            Stream.of_items(1, 2, 3).map(lambda x: x * 2).to_list()
+            # Output: [2, 4, 6]
+
+        Args:
+            *items: The items to include in the stream.
+
+        Returns:
+            Stream[T]: A stream containing the provided items.
+        """
+        return Stream(items)  # Pass the tuple of items directly
+
+    @staticmethod
+    def just(value: T) -> "Stream[T]":
+        """
+        Creates a stream from a single value. This is a convenience method
+        for creating a stream with a single element.
+
+        Args:
+            value (T): The single value to include in the stream.
+
+        Returns:
+            Stream[T]: A stream containing only the provided value.
+        """
+        # Internally, it creates a list with a single element.
+        return Stream([value])
+
+    @staticmethod
+    def just_nullable(value: Optional[T]) -> "Stream[T]":
+        """
+        Creates a stream from a single optional value. This is a convenience method
+        for creating a stream with a single element.
+
+        Args:
+            value (Optional[T]): The single optional value to include in the stream.
+
+        Returns:
+            Stream[T]: A stream containing only the provided value.
+        """
+        return Stream.of_nullable([value])
+
+    @staticmethod
+    def of_nullable(arg: Iterable[Optional[T]]) -> "Stream[T]":
+        """
+        Creates a stream from an iterable of optional values, filtering out None values.
+        This method is useful when you want to create a stream from an iterable that may contain None values,
+        and you want to filter them out. It allows for more concise code and can be used in situations where
+        the type of the iterable is known to be optional, but the resulting stream needs to be of non-null elements.
+
+        Args:
+            arg (Iterable[Optional[T]]): The iterable of optional values
+        Returns:
+            Stream[T]: The stream of non-null values
+        """
+        return Stream(arg).filter(is_not_none).map(lambda el: require_non_null(el))
+
+    @staticmethod
+    def cycle(iterable: Iterable[T], n: Optional[int] = None) -> "Stream[T]":
+        """
+        Creates a stream that cycles over the elements of an iterable.
+
+        The elements of the input iterable are buffered. The stream will then
+        repeat these buffered elements.
+
+        Args:
+            iterable (Iterable[T]): The iterable whose elements are to be cycled.
+            n (Optional[int]): The number of times to cycle through the iterable.
+                If None (default), cycles indefinitely.
+                If 0, results in an empty stream.
+                If the input iterable is empty and n > 0, an empty stream is also produced.
+
+        Returns:
+            Stream[T]: A stream that cycles through the elements of the iterable.
+
+        Raises:
+            ValueError: If n is specified and is negative.
+        """
+        if n is not None and n < 0:
+            raise ValueError("Number of repetitions 'n' must be non-negative.")
+        if n == 0:
+            return Stream.empty()
+        return Stream(_CycleIterable(iterable, n))
+
+    @staticmethod
+    def of_dict_keys(dictionary: dict[K, Any]) -> "Stream[K]":
+        """
+        Creates a stream from the keys of the given dictionary.
+        """
+        return Stream(dictionary.keys())
+
+    @staticmethod
+    def of_dict_values(dictionary: dict[Any, V]) -> "Stream[V]":
+        """
+        Creates a stream from the values of the given dictionary.
+        """
+        return Stream(dictionary.values())
+
+    @staticmethod
+    def of_dict_items(dictionary: dict[K, V]) -> "Stream[Pair[K, V]]":
+        """
+        Creates a stream of Pair(key, value) from the items of the given dictionary.
+        """
+        return Stream(dictionary.items()).map(pair_of)
+
+    @staticmethod
+    def defer(supplier: Callable[[], Iterable[T]]) -> "Stream[T]":
+        """
+        Creates a stream whose underlying iterable is obtained by calling the
+        supplier function only when the stream is iterated.
+        """
+        return Stream(_DeferIterable(supplier))
+
     @staticmethod
     def range(start: int, stop: Optional[int] = None, step: int = 1) -> "Stream[int]":
         """
@@ -2506,139 +2656,6 @@ class Stream(Generic[T]):
         if len(iterables) == 1:
             return Stream(iterables[0])
         return Stream(_MultiConcatIterable(iterables))
-
-    def pairwise(self) -> "Stream[Pair[T, T]]":
-        """
-        Returns a stream of pairs consisting of adjacent elements from this stream.
-        If the stream has N elements, the resulting stream will have N-1 elements.
-        Returns an empty stream if the original stream has 0 or 1 element.
-
-        Example:
-            Stream([1, 2, 3, 4]).pairwise().to_list()
-            # Output: [Pair(1, 2), Pair(2, 3), Pair(3, 4)]
-
-        Returns:
-            Stream[Pair[T, T]]: A stream of adjacent pairs.
-        """
-        return Stream(_PairwiseIterable(self.__arg))
-
-    def sliding_window(self, size: int, step: int = 1) -> "Stream[list[T]]":
-        """
-        Returns a stream of lists, where each list is a sliding window of
-        elements from the original stream.
-
-        Example:
-            Stream([1, 2, 3, 4, 5]).sliding_window(3, 1).to_list()
-            # Output: [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
-
-            Stream([1, 2, 3, 4, 5]).sliding_window(2, 2).to_list()
-            # Output: [[1, 2], [3, 4]] (depends on exact end behavior)
-
-
-        Args:
-            size (int): The size of each window. Must be positive.
-            step (int, optional): The number of elements to slide forward for
-                                the next window. Defaults to 1. Must be positive.
-
-        Returns:
-            Stream[list[T]]: A stream of lists representing the sliding windows.
-
-        Raises:
-            ValueError: If size or step are not positive.
-        """
-        # NOTE: The _SlidingWindowIterable implementation above is complex and might need refinement
-        # for full correctness and laziness, especially around edge cases and step > size.
-        # Consider starting with a simpler implementation if needed.
-        return Stream(_SlidingWindowIterable(self.__arg, size, step))
-
-    def any_none(self) -> bool:
-        """
-        Checks if any element in this stream is None.
-        This is a terminal operation and may short-circuit.
-
-        Returns:
-            bool: True if at least one element is None, False otherwise.
-        """
-        return self.any_match(is_none)
-
-    def none_none(self) -> bool:
-        """
-        Checks if no element in this stream is None.
-        Equivalent to `all_not_none()`.
-        This is a terminal operation and may short-circuit.
-
-        Returns:
-            bool: True if no elements are None, False otherwise.
-        """
-        return self.none_match(is_none)
-
-    @staticmethod
-    def of_items(*items: T) -> "Stream[T]":
-        """
-        Creates a stream from the provided items.
-
-        Example:
-            Stream.of_items(1, 2, 3).map(lambda x: x * 2).to_list()
-            # Output: [2, 4, 6]
-
-        Args:
-            *items: The items to include in the stream.
-
-        Returns:
-            Stream[T]: A stream containing the provided items.
-        """
-        return Stream(items)  # Pass the tuple of items directly
-
-    def repeat(self, n: Optional[int] = None) -> "Stream[T]":
-        """
-        Returns a stream that repeats the elements of this stream n times,
-        or indefinitely if n is None.
-
-        CAUTION: This operation needs to buffer the original stream elements
-                to allow repetition, which might consume significant memory
-                for large streams. It should not be used on infinite streams
-                unless n is specified and finite.
-
-        Args:
-            n (Optional[int]): The number of times to repeat the stream.
-                            If None, repeats indefinitely. Defaults to None.
-
-        Returns:
-            Stream[T]: A stream consisting of the repeated elements.
-
-        Raises:
-            ValueError: If n is specified and is not positive.
-        """
-        if n is not None and n <= 0:
-            raise ValueError("Number of repetitions 'n' must be positive if specified.")
-        # The _RepeatIterable buffers the original self.__arg
-        return Stream(_RepeatIterable(self.__arg, n))
-
-    def intersperse(self, separator: T) -> "Stream[T]":
-        """
-        Returns a stream with the separator element inserted between each
-        element of this stream.
-
-        Example:
-            Stream([1, 2, 3]).intersperse(0).to_list()
-            # Output: [1, 0, 2, 0, 3, 0]
-
-            Stream(["a", "b"]).intersperse("-").to_list()
-            # Output: ["a", "-", "b", "-"]
-
-            Stream([]).intersperse(0).to_list()
-            # Output: []
-
-            Stream([1]).intersperse(0).to_list()
-            # Output: [1, 0]
-
-        Args:
-            separator (T): The element to insert between original elements.
-
-        Returns:
-            Stream[T]: The resulting stream with separators.
-        """
-        return Stream(_IntersperseIterable(self.__arg, separator))
 
     @staticmethod
     def unfold(seed: S, generator: Callable[[S], Optional[Pair[T, S]]]) -> "Stream[T]":

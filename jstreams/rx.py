@@ -902,7 +902,7 @@ class _ThrowErrorObservable(Subscribable[T]):
 
         def _error_action() -> None:
             if on_error:
-                on_error(error_to_throw)  # type: ignore
+                on_error(error_to_throw)
             if on_dispose:
                 on_dispose()
 
@@ -942,7 +942,7 @@ class _DeferObservable(
             )  # Return a new sub
         return deferred_observable.subscribe(
             on_next, on_error, on_completed, on_dispose, asynchronous=asynchronous
-        )  # type: ignore
+        )
 
 
 class SingleValueSubject(Single[T], _OnNext[T]):
@@ -1225,8 +1225,6 @@ class DropUntil(BaseFilteringOperator[T]):
 
 
 class MapTo(BaseMappingOperator[Any, V]):
-    __slots__ = ("__value",)
-
     def __init__(self, value: V) -> None:
         """
         Emits the given constant value whenever the source Observable emits a value.
@@ -1234,9 +1232,6 @@ class MapTo(BaseMappingOperator[Any, V]):
             value (V): The constant value to emit.
         """
         super().__init__(lambda _: value)
-        self.__value = value  # Store for potential deepcopy or inspection
-
-    # transform is inherited
 
 
 class Scan(BaseMappingOperator[T, A]):
@@ -1278,7 +1273,7 @@ class Scan(BaseMappingOperator[T, A]):
         return self.__current_value
 
 
-class Distinct(BaseFilteringOperator[T]):
+class Distinct(Generic[T, K], BaseFilteringOperator[T]):
     __slots__ = ("__key_selector", "__seen_keys")
 
     def __init__(self, key_selector: Optional[Callable[[T], K]] = None) -> None:
@@ -1385,8 +1380,6 @@ class Debounce(BaseFilteringOperator[T]):
         self.__last_emitted = None
 
     def __debounce(self, _: T) -> bool:
-        import time
-
         current_time = time.time()
         if self.__last_emitted is None or (
             current_time - self.__last_emitted >= self.__timespan
@@ -1414,8 +1407,6 @@ class Throttle(BaseFilteringOperator[T]):
         self.__last_emitted = None
 
     def __throttle(self, _: T) -> bool:
-        import time
-
         current_time = time.time()
         if self.__last_emitted is None or (
             current_time - self.__last_emitted >= self.__timespan
@@ -1438,15 +1429,18 @@ class Buffer(BaseMappingOperator[T, list[T]]):
         self.__timespan = timespan
         self.__buffer: list[T] = []
         self.__last_checked: Optional[float] = None
-        super().__init__(self.__emit_buffer)
+        # This type ignore is a bit of a hack. We don't want all buffer handlers
+        # to receive optionals, but we do want the method to return None, in case the buffer
+        # capacity is not reached.
+        # Using Optional[list[T]] will involve all downstream ops to handle optional values,
+        # while we absolutely know that such value will never reach downstream
+        super().__init__(self.__emit_buffer)  # type: ignore[arg-type]
 
     def init(self) -> None:
         self.__buffer = []
         self.__last_checked = None
 
     def __emit_buffer(self, val: T) -> Optional[list[T]]:
-        import time
-
         current_time = time.time()
         if self.__last_checked is None:
             self.__last_checked = current_time
@@ -1473,7 +1467,12 @@ class BufferCount(BaseMappingOperator[T, list[T]]):
         """
         self.__count = count
         self.__buffer: list[T] = []
-        super().__init__(self.__emit_buffer)
+        # This type ignore is a bit of a hack. We don't want all buffer handlers
+        # to receive optionals, but we do want the method to return None, in case the buffer
+        # capacity is not reached.
+        # Using Optional[list[T]] will involve all downstream ops to handle optional values,
+        # while we absolutely know that such value will never reach downstream
+        super().__init__(self.__emit_buffer)  # type: ignore[arg-type]
 
     def init(self) -> None:
         self.__buffer = []
