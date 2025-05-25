@@ -1807,6 +1807,10 @@ class RX:
     def distinct(key_selector: Optional[Callable[[T], K]] = None) -> RxOperator[T, T]:
         """
         Returns an Observable that emits all items emitted by the source Observable that are distinct.
+
+        CAUTION: The returned observable will store ALL unique keys generated for each items that passes
+        through. If `key_selector` is not passed, it will store ALL objects. This can cause out of memory errors
+        if used for long lived observables. USE WITH CARE!
         """
         return Distinct(key_selector)
 
@@ -2089,6 +2093,10 @@ def rx_scan(accumulator_fn: Callable[[A, T], A], seed: A) -> RxOperator[T, A]:
 def rx_distinct(key_selector: Optional[Callable[[T], K]] = None) -> RxOperator[T, T]:
     """
     Returns an Observable that emits all items emitted by the source Observable that are distinct.
+
+        CAUTION: The returned observable will store ALL unique keys generated for each items that passes
+    through. If `key_selector` is not passed, it will store ALL objects. This can cause out of memory errors
+    if used for long lived observables. USE WITH CARE!
     """
     return RX.distinct(key_selector)
 
