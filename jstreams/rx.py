@@ -124,11 +124,26 @@ class ObservableSubscription(Generic[T]):
         return self.__subscription_id
 
     def on_next(self, obj: T) -> None:
-        self.__on_next(obj)
+        if self.__paused:
+            return
+        if self.__asynchronous:
+            Thread(target=lambda: self.__push(obj)).start()
+        else:
+            self.__push(obj)
+
+    def __push(self, obj: T) -> None:
+        try:
+            self.__on_next(obj)
+        except Exception as e:
+            self.on_error(e)
 
     def on_error(self, ex: Exception) -> None:
-        if self.__on_error:
-            self.__on_error(ex)
+        if self.__on_error is not None:
+            try:
+                self.__on_error(ex)
+            except Exception as exc:
+                # Log uncaught exceptions in the error handler
+                logging.getLogger("observable").error(exc)
 
     def on_completed(self, obj: Optional[T]) -> None:
         if self.__on_completed:
@@ -376,35 +391,9 @@ class _ObservableBase(Subscribable[T]):
         if self.__subscriptions is not None:
             # Notify async subscriptions first, so they can be executed in parallel
             sub_stream = Stream(self.__subscriptions)
-            (
-                sub_stream.filter(lambda s: not s.is_paused())
-                .filter(lambda s: s.is_async())
-                .each(lambda s: self._push_to_subscription(s, val))
-            )
+            sub_stream.filter(lambda s: s.is_async()).each(lambda s: s.on_next(val))
             # Notify sync subscriptions after async ones
-            (
-                sub_stream.filter(lambda s: not s.is_paused())
-                .filter(lambda s: not s.is_async())
-                .each(lambda s: self._push_to_subscription(s, val))
-            )
-
-    def __push_value(self, sub: ObservableSubscription[Any], val: T) -> None:
-        try:
-            sub.on_next(val)
-        except Exception as e:
-            if sub.on_error is not None:
-                try:
-                    sub.on_error(e)
-                except Exception as exc:
-                    # Log uncaught exceptions in the error handler
-                    logging.getLogger("observable").error(exc)
-
-    def _push_to_subscription(self, sub: ObservableSubscription[Any], val: T) -> None:
-        if not sub.is_paused():
-            if sub.is_async():
-                Thread(target=lambda: self.__push_value(sub, val)).start()
-            else:
-                self.__push_value(sub, val)
+            sub_stream.filter(lambda s: not s.is_async()).each(lambda s: s.on_next(val))
 
     def subscribe(
         self,
@@ -445,8 +434,8 @@ class _ObservableBase(Subscribable[T]):
     def cancel(self, sub: ObservableSubscription[Any]) -> None:
         (
             Stream(self.__subscriptions)
-            .filter(lambda e: e.get_subscription_id() == sub.get_subscription_id())
-            .each(self.__subscriptions.remove)
+            .find_first(lambda e: e.get_subscription_id() == sub.get_subscription_id())
+            .if_present(self.__subscriptions.remove)
         )
 
     def dispose(self) -> None:
@@ -456,15 +445,15 @@ class _ObservableBase(Subscribable[T]):
     def pause(self, sub: ObservableSubscription[Any]) -> None:
         (
             Stream(self.__subscriptions)
-            .filter(lambda e: e.get_subscription_id() == sub.get_subscription_id())
-            .each(lambda s: s.pause())
+            .find_first(lambda e: e.get_subscription_id() == sub.get_subscription_id())
+            .if_present(lambda s: s.pause())
         )
 
     def resume(self, sub: ObservableSubscription[Any]) -> None:
         (
             Stream(self.__subscriptions)
-            .filter(lambda e: e.get_subscription_id() == sub.get_subscription_id())
-            .each(lambda s: s.resume())
+            .find_first(lambda e: e.get_subscription_id() == sub.get_subscription_id())
+            .if_present(lambda s: s.resume())
         )
 
     def pause_all(self) -> None:
@@ -811,7 +800,7 @@ class Flowable(Observable[T]):
 
     def _push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
         for v in self._values:
-            self._push_to_subscription(sub, v)
+            sub.on_next(v)
 
     def first(self) -> Observable[T]:
         return Single(Stream(self._values).first().get_actual())
@@ -999,9 +988,9 @@ class ReplaySubject(Flowable[T], _OnNext[T]):
 
     def _push_to_sub_on_subscribe(self, sub: ObservableSubscription[T]) -> None:
         for v in self._values:
-            self._push_to_subscription(sub, v)
+            sub.on_next(v)
         for v in self.__value_list:
-            self._push_to_subscription(sub, v)
+            sub.on_next(v)
 
 
 class BaseFilteringOperator(RxOperator[T, T]):
