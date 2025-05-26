@@ -1,6 +1,5 @@
 from time import sleep
 
-from colorama import Back
 from baseTest import BaseTestCase
 from jstreams import (
     BehaviorSubject,
