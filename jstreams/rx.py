@@ -167,7 +167,7 @@ class ObservableSubscription(Generic[T]):
         else:
             self.__push(obj)
 
-    def __should_push_backpressure(self) -> None:
+    def __should_push_backpressure(self) -> bool:
         if self.__backpressure == BackpressureStrategy.DROP:
             return False
         if self.__backpressure == BackpressureStrategy.ERROR:
@@ -240,6 +240,9 @@ class Subscribable(abc.ABC, Generic[T]):
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,  # Added for consistency with Observable.subscribe
+        backpressure: Optional[
+            BackpressureStrategy
+        ] = None,  # Added for consistency with Observable.subscribe
     ) -> ObservableSubscription[Any]:
         pass
 
@@ -547,6 +550,7 @@ class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
         on_completed: CompletedHandler[V] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
+        backpressure: Optional[BackpressureStrategy] = None,
     ) -> ObservableSubscription[V]:
         """
         Subscribe to this pipe in either synchronous(default) or asynchronous mode.
@@ -569,7 +573,12 @@ class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
         """
         wrapped_on_next, wrapped_on_completed = self.__wrap(on_next, on_completed)
         return self.__parent.subscribe(
-            wrapped_on_next, on_error, wrapped_on_completed, on_dispose, asynchronous
+            wrapped_on_next,
+            on_error,
+            wrapped_on_completed,
+            on_dispose,
+            asynchronous,
+            backpressure,
         )
 
     def __wrap(
@@ -881,6 +890,7 @@ class _EmptyObservable(Subscribable[Any]):
         on_completed: CompletedHandler[Any] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
+        backpressure: Optional[BackpressureStrategy] = None,
     ) -> ObservableSubscription[Any]:
         def _complete_action() -> None:
             if on_completed:
@@ -894,7 +904,7 @@ class _EmptyObservable(Subscribable[Any]):
             _complete_action()
         # Return a subscription that is effectively already disposed
         return ObservableSubscription(
-            self, lambda _: None, None, None, None, asynchronous
+            self, lambda _: None, None, None, None, asynchronous, backpressure
         )
 
 
@@ -913,10 +923,17 @@ class _NeverObservable(Subscribable[Any]):
         on_completed: CompletedHandler[Any] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
+        backpressure: Optional[BackpressureStrategy] = None,
     ) -> ObservableSubscription[Any]:
         # Returns a subscription that does nothing and can be disposed.
         return ObservableSubscription(
-            self, on_next, on_error, on_completed, on_dispose, asynchronous
+            self,
+            on_next,
+            on_error,
+            on_completed,
+            on_dispose,
+            asynchronous,
+            backpressure,
         )
 
 
@@ -931,6 +948,7 @@ class _ThrowErrorObservable(Subscribable[T]):
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
+        backpressure: Optional[BackpressureStrategy] = None,
     ) -> ObservableSubscription[T]:
         try:
             error_to_throw = (
@@ -952,7 +970,13 @@ class _ThrowErrorObservable(Subscribable[T]):
         else:
             _error_action()
         return ObservableSubscription(
-            self, on_next, on_error, on_completed, on_dispose, asynchronous
+            self,
+            on_next,
+            on_error,
+            on_completed,
+            on_dispose,
+            asynchronous,
+            backpressure,
         )
 
 
@@ -970,19 +994,31 @@ class _DeferObservable(
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
+        backpressure: Optional[BackpressureStrategy] = None,
     ) -> ObservableSubscription[T]:
         try:
             deferred_observable = self._factory()
         except Exception as e:  # pylint: disable=broad-except
             # If factory fails, error the subscription immediately.
             _ThrowErrorObservable(e).subscribe(
-                on_next, on_error, on_completed, on_dispose, asynchronous
+                on_next, on_error, on_completed, on_dispose, asynchronous, backpressure
             )
             return ObservableSubscription(
-                self, on_next, on_error, on_completed, on_dispose, asynchronous
+                self,
+                on_next,
+                on_error,
+                on_completed,
+                on_dispose,
+                asynchronous,
+                backpressure,
             )  # Return a new sub
         return deferred_observable.subscribe(
-            on_next, on_error, on_completed, on_dispose, asynchronous=asynchronous
+            on_next,
+            on_error,
+            on_completed,
+            on_dispose,
+            asynchronous=asynchronous,
+            backpressure=backpressure,
         )
 
 
