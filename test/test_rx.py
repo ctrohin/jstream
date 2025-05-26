@@ -1,4 +1,6 @@
 from time import sleep
+
+from colorama import Back
 from baseTest import BaseTestCase
 from jstreams import (
     BehaviorSubject,
@@ -10,6 +12,12 @@ from jstreams import (
     Timestamped,
 )
 from jstreams.eventing import event, events, managed_events, on_event
+from jstreams.rx import (
+    BackpressureException,
+    BackpressureMismatchException,
+    BackpressureStrategy,
+    SingleValueSubject,
+)
 from jstreams.utils import Value
 
 
@@ -596,3 +604,70 @@ class TestRx(BaseTestCase):
         self.assertIsNone(pipe.transform(2))  # type: ignore
         self.assertListEqual(pipe.transform(3), [1, 2, 3])  # type: ignore
         self.assertIsNone(pipe.transform(4))  # type: ignore
+
+    def test_backpressure_drop(self) -> None:
+        subject = SingleValueSubject("test")
+        values = []
+        errors = []
+
+        def handler(val: str) -> None:
+            values.append(val)
+            sleep(1)
+
+        def error(val: Exception) -> None:
+            errors.append(val)
+
+        subject.subscribe(
+            handler,
+            on_error=error,
+            backpressure=BackpressureStrategy.DROP,
+            asynchronous=True,
+        )
+        subject.on_next("test1")
+        subject.on_next("test2")
+        sleep(1.5)
+
+        self.assertEquals(values, ["test"])
+        self.assertEquals(errors, [])
+
+    def test_backpressure_error(self) -> None:
+        subject = SingleValueSubject("test")
+        values = []
+        errors = []
+
+        def handler(val: str) -> None:
+            values.append(val)
+            sleep(1)
+
+        def error(val: Exception) -> None:
+            errors.append(val)
+
+        subject.subscribe(
+            handler,
+            on_error=error,
+            backpressure=BackpressureStrategy.ERROR,
+            asynchronous=True,
+        )
+        subject.on_next("test1")
+        subject.on_next("test2")
+        sleep(1.5)
+
+        self.assertEquals(values, ["test"])
+        self.assertEquals(
+            errors,
+            [
+                BackpressureException("Missed value"),
+                BackpressureException("Missed value"),
+            ],
+        )
+
+    def test_invalid_backpressure(self) -> None:
+        subject = SingleValueSubject("test")
+        self.assertRaises(
+            BackpressureMismatchException,
+            lambda: subject.subscribe(
+                lambda _: None,
+                asynchronous=False,
+                backpressure=BackpressureStrategy.DROP,
+            ),
+        )

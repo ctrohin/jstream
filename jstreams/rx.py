@@ -1,3 +1,4 @@
+from enum import Enum
 import logging
 from threading import Lock, Thread
 import time
@@ -20,7 +21,7 @@ from jstreams.predicate import not_strict
 from jstreams.stream import Stream
 import abc
 
-from jstreams.utils import is_empty_or_none
+from jstreams.utils import Value, is_empty_or_none
 
 T = TypeVar("T")
 A = TypeVar("A")
@@ -43,6 +44,28 @@ ErrorHandler = Optional[Callable[[Exception], Any]]
 CompletedHandler = Optional[Callable[[Optional[T]], Any]]
 NextHandler = Callable[[T], Any]
 DisposeHandler = Optional[Callable[[], Any]]
+
+
+class BackpressureException(Exception):
+    __slots__ = ("message",)
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
+
+    def __eq__(self, value: Any) -> bool:
+        return (
+            isinstance(value, BackpressureException) and self.message == value.message
+        )
+
+
+class BackpressureMismatchException(Exception):
+    pass
+
+
+class BackpressureStrategy(Enum):
+    DROP = 0
+    ERROR = 1
 
 
 class RxOperator(Generic[T, V], abc.ABC):
@@ -97,6 +120,8 @@ class ObservableSubscription(Generic[T]):
         "__subscription_id",
         "__paused",
         "__asynchronous",
+        "__backpressure",
+        "__pushing",
     )
 
     def __init__(
@@ -107,7 +132,13 @@ class ObservableSubscription(Generic[T]):
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
+        backpressure: Optional[BackpressureStrategy] = None,
     ) -> None:
+        if not asynchronous and backpressure is not None:
+            raise BackpressureMismatchException(
+                "Cannot use backpressure strategy with synchronous subscription"
+            )
+
         self.__parent = parent
         self.__on_next = on_next
         self.__on_error = on_error
@@ -116,6 +147,8 @@ class ObservableSubscription(Generic[T]):
         self.__subscription_id = str(uuid.uuid4())
         self.__paused = False
         self.__asynchronous = asynchronous
+        self.__backpressure = backpressure
+        self.__pushing = Value(False)
 
     def is_async(self) -> bool:
         return self.__asynchronous
@@ -127,15 +160,27 @@ class ObservableSubscription(Generic[T]):
         if self.__paused:
             return
         if self.__asynchronous:
+            if self.__pushing.get() and not self.__should_push_backpressure():
+                return
+            self.__pushing.set(True)
             Thread(target=lambda: self.__push(obj)).start()
         else:
             self.__push(obj)
+
+    def __should_push_backpressure(self) -> None:
+        if self.__backpressure == BackpressureStrategy.DROP:
+            return False
+        if self.__backpressure == BackpressureStrategy.ERROR:
+            self.on_error(BackpressureException("Missed value"))
+            return False
+        return True
 
     def __push(self, obj: T) -> None:
         try:
             self.__on_next(obj)
         except Exception as e:
             self.on_error(e)
+        self.__pushing.set(False)
 
     def on_error(self, ex: Exception) -> None:
         if self.__on_error is not None:
@@ -402,6 +447,7 @@ class _ObservableBase(Subscribable[T]):
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
+        backpressure: Optional[BackpressureStrategy] = None,
     ) -> ObservableSubscription[Any]:
         """
         Subscribe to this pipe in either synchronous(default) or asynchronous mode.
@@ -424,7 +470,13 @@ class _ObservableBase(Subscribable[T]):
         """
 
         sub = ObservableSubscription(
-            self, on_next, on_error, on_completed, on_dispose, asynchronous
+            self,
+            on_next,
+            on_error,
+            on_completed,
+            on_dispose,
+            asynchronous,
+            backpressure=backpressure,
         )
         self.__subscriptions.append(sub)
         if self._parent is not None:
