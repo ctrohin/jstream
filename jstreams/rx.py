@@ -2094,7 +2094,7 @@ def rx_distinct(key_selector: Optional[Callable[[T], K]] = None) -> RxOperator[T
     """
     Returns an Observable that emits all items emitted by the source Observable that are distinct.
 
-        CAUTION: The returned observable will store ALL unique keys generated for each items that passes
+    CAUTION: The returned observable will store ALL unique keys generated for each items that passes
     through. If `key_selector` is not passed, it will store ALL objects. This can cause out of memory errors
     if used for long lived observables. USE WITH CARE!
     """
