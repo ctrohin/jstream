@@ -604,6 +604,19 @@ class TestRx(BaseTestCase):
         self.assertListEqual(pipe.transform(3), [1, 2, 3])  # type: ignore
         self.assertIsNone(pipe.transform(4))  # type: ignore
 
+    def test_buffer_count_emits_none_then_list_subject(self) -> None:
+        subject = SingleValueSubject(1)
+        value_list = Value([])
+        subject.pipe(RX.buffer_count(3)).subscribe(value_list.set)
+        subject.on_next(2)
+        subject.on_next(3)
+        subject.on_next(4)
+        subject.on_next(5)
+        self.assertListEqual(value_list.get(), [1, 2, 3])
+        subject.on_next(6)
+        self.assertListEqual(value_list.get(), [4, 5, 6])
+        subject.dispose()
+
     def test_backpressure_drop(self) -> None:
         subject = SingleValueSubject("test")
         values = []

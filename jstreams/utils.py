@@ -310,6 +310,11 @@ class Value(Generic[T]):
     def get(self) -> Optional[T]:
         return self.__value
 
+    def __call__(self, value: Optional[T] = None) -> Optional[T]:
+        if value is not None:
+            self.__value = value
+        return self.__value
+
 
 @locked()
 class SynchronizedValue(Value[T]):

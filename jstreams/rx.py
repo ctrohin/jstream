@@ -1439,33 +1439,6 @@ class Ignore(BaseFilteringOperator[T]):
         pass  # No specific state to reset
 
 
-class Debounce(BaseFilteringOperator[T]):
-    __slots__ = ("__timespan", "__last_emitted")
-
-    def __init__(self, timespan: float) -> None:
-        """
-        Emits a value from the source Observable only after a particular timespan has passed without another source emission.
-
-        Args:
-            timespan (float): The timespan in seconds to wait for inactivity before emitting.
-        """
-        self.__timespan = timespan
-        self.__last_emitted: Optional[float] = None
-        super().__init__(self.__debounce)
-
-    def init(self) -> None:
-        self.__last_emitted = None
-
-    def __debounce(self, _: T) -> bool:
-        current_time = time.time()
-        if self.__last_emitted is None or (
-            current_time - self.__last_emitted >= self.__timespan
-        ):
-            self.__last_emitted = current_time
-            return True
-        return False
-
-
 class Throttle(BaseFilteringOperator[T]):
     __slots__ = ("__timespan", "__last_emitted")
 
@@ -1779,16 +1752,6 @@ class RX:
         return Ignore(predicate)
 
     @staticmethod
-    def debounce(timespan: float) -> RxOperator[T, T]:
-        """
-        Emits a value from the source Observable only after a particular timespan has passed without another source emission.
-
-        Args:
-            timespan (float): The timespan in seconds to wait for inactivity before emitting.
-        """
-        return Debounce(timespan)
-
-    @staticmethod
     def throttle(timespan: float) -> RxOperator[T, T]:
         """
         Emits a value from the source Observable, then ignores subsequent source emissions for a particular timespan.
@@ -2074,16 +2037,6 @@ def rx_ignore_all() -> RxOperator[T, T]:
         RxOperator[T, T]: An IgnoreElements operator.
     """
     return RX.ignore_all()
-
-
-def rx_debounce(timespan: float) -> RxOperator[T, T]:
-    """
-    Emits a value from the source Observable only after a particular timespan has passed without another source emission.
-
-    Args:
-        timespan (float): The timespan in seconds to wait for inactivity before emitting.
-    """
-    return RX.debounce(timespan)
 
 
 def rx_throttle(timespan: float) -> RxOperator[T, T]:
