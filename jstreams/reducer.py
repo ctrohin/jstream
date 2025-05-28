@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Generic, TypeVar, Union
+from typing import Callable, Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -22,7 +22,7 @@ class Reducer(ABC, Generic[T]):
         return self.reduce(a, b)
 
     @staticmethod
-    def of(reducer: "Union[Reducer[T], Callable[[T, T], T]]") -> "Reducer[T]":
+    def of(reducer: Callable[[T, T], T]) -> "Reducer[T]":
         if isinstance(reducer, Reducer):
             return reducer
         return _WrapReducer(reducer)
@@ -38,5 +38,5 @@ class _WrapReducer(Reducer[T]):
         return self.__reducer(a, b)
 
 
-def reducer_of(reducer: Union[Reducer[T], Callable[[T, T], T]]) -> Reducer[T]:
+def reducer_of(reducer: Callable[[T, T], T]) -> Reducer[T]:
     return Reducer.of(reducer)

@@ -30,10 +30,10 @@ class Predicate(ABC, Generic[T]):
             bool: True if the value matches, False otherwise
         """
 
-    def or_(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
+    def or_(self, other: Callable[[T], bool]) -> "Predicate[T]":
         return Predicate.of(lambda v: self.apply(v) or predicate_of(other).apply(v))
 
-    def and_(self, other: Union[Callable[[T], bool], "Predicate[T]"]) -> "Predicate[T]":
+    def and_(self, other: Callable[[T], bool]) -> "Predicate[T]":
         return Predicate.of(lambda v: self.apply(v) and predicate_of(other).apply(v))
 
     def __call__(self, value: T) -> bool:
@@ -41,14 +41,14 @@ class Predicate(ABC, Generic[T]):
 
     @staticmethod
     def of(
-        predicate: "Union[Predicate[T], Callable[[T], bool]]",
+        predicate: Callable[[T], bool],
     ) -> "Predicate[T]":
         """
         If the value passed is a predicate, it is returned without any changes.
         If a function is passed, it will be wrapped into a Predicate object.
 
         Args:
-            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             Predicate[T]: The produced predicate
@@ -83,14 +83,14 @@ class PredicateWith(ABC, Generic[T, K]):
 
     @staticmethod
     def of(
-        predicate: "Union[PredicateWith[T, K], Callable[[T, K], bool]]",
+        predicate: Callable[[T, K], bool],
     ) -> "PredicateWith[T, K]":
         """
         If the value passed is a predicate, it is returned without any changes.
         If a function is passed, it will be wrapped into a Predicate object.
 
         Args:
-            predicate (Union[PredicateWith[T, K], Callable[[T, K], bool]]): The predicate
+            predicate (Callable[[T, K], bool]): The predicate
 
         Returns:
             PredicateWith[T, K]: The produced predicate
@@ -120,13 +120,13 @@ class _WrapPredicateWith(PredicateWith[T, K]):
         return self.__predicate_fn(value, with_value)
 
 
-def predicate_of(predicate: Union[Predicate[T], Callable[[T], bool]]) -> Predicate[T]:
+def predicate_of(predicate: Callable[[T], bool]) -> Predicate[T]:
     """
     If the value passed is a predicate, it is returned without any changes.
     If a function is passed, it will be wrapped into a Predicate object.
 
     Args:
-        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+        predicate (Callable[[T], bool]): The predicate
 
     Returns:
         Predicate[T]: The produced predicate
@@ -135,14 +135,14 @@ def predicate_of(predicate: Union[Predicate[T], Callable[[T], bool]]) -> Predica
 
 
 def predicate_with_of(
-    predicate: Union[PredicateWith[T, K], Callable[[T, K], bool]],
+    predicate: Callable[[T, K], bool],
 ) -> PredicateWith[T, K]:
     """
     If the value passed is a predicate, it is returned without any changes.
     If a function is passed, it will be wrapped into a Predicate object.
 
     Args:
-        predicate (Union[PredicateWith[T, K], Callable[[T, K], bool]]): The predicate
+        predicate (Callable[[T, K], bool]): The predicate
 
     Returns:
         PredicateWith[T, K]: The produced predicate
@@ -745,7 +745,7 @@ def not_(
 
 
 def not_strict(
-    predicate: Union[Predicate[T], Callable[[T], bool]],
+    predicate: Callable[[T], bool],
 ) -> Predicate[T]:
     """
     Negates the result of the given predicate. Requires non-Optional input.

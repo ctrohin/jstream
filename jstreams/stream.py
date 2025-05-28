@@ -9,19 +9,14 @@ from typing import (
     TypeVar,
     Generic,
     cast,
-    Union,
 )
 from abc import ABC
 
 from jstreams.class_operations import ClassOps
 from jstreams.iterable_operations import find_first, find_last, reduce
-from jstreams.mapper import Mapper, MapperWith, flat_map, mapper_of
-from jstreams.reducer import Reducer
+from jstreams.mapper import flat_map
 from jstreams.predicate import (
-    Predicate,
-    PredicateWith,
     is_none,
-    predicate_of,
 )
 from jstreams.tuples import Pair, pair_of
 from jstreams.utils import is_not_none, require_non_null, each, is_empty_or_none, sort
@@ -248,12 +243,12 @@ class Opt(Generic[T]):
             empty_action(with_val)
         return self
 
-    def filter(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> "Opt[T]":
+    def filter(self, predicate: Callable[[T], bool]) -> "Opt[T]":
         """
         Returns the filtered value of the Opt if it matches the given predicate
 
         Args:
-            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             Opt[T]: The resulting Opt
@@ -264,16 +259,14 @@ class Opt(Generic[T]):
             return self
         return self.__get_none()
 
-    def filter_with(
-        self, with_val: K, predicate: Union[PredicateWith[T, K], Callable[[T, K], bool]]
-    ) -> "Opt[T]":
+    def filter_with(self, with_val: K, predicate: Callable[[T, K], bool]) -> "Opt[T]":
         """
         Returns the filtered value of the Opt if it matches the given predicate, by
         providing the predicat with an additional value
 
         Args:
             with_val (K): the additional value
-            predicate (Union[PredicateWith[T, K], Callable[[T, K], bool]]): The predicate
+            predicate (Callable[[T, K], bool]): The predicate
 
         Returns:
             Opt[T]: The resulting Opt
@@ -284,7 +277,7 @@ class Opt(Generic[T]):
             return self
         return self.__get_none()
 
-    def map(self, mapper: Union[Mapper[T, V], Callable[[T], V]]) -> "Opt[V]":
+    def map(self, mapper: Callable[[T], V]) -> "Opt[V]":
         """
         Maps the Opt value into another Opt by applying the mapper function
 
@@ -298,9 +291,7 @@ class Opt(Generic[T]):
             return cast(Opt[V], self.__get_none())
         return Opt(mapper(self.__val))
 
-    def map_with(
-        self, with_val: K, mapper: Union[MapperWith[T, K, V], Callable[[T, K], V]]
-    ) -> "Opt[V]":
+    def map_with(self, with_val: K, mapper: Callable[[T, K], V]) -> "Opt[V]":
         """
         Maps the Opt value into another Opt by applying the mapper function with an additional parameter
 
@@ -349,7 +340,7 @@ class Opt(Generic[T]):
 
     def if_matches(
         self,
-        predicate: Union[Predicate[T], Callable[[T], bool]],
+        predicate: Callable[[T], bool],
         action: Callable[[T], Any],
     ) -> "Opt[T]":
         """
@@ -357,7 +348,7 @@ class Opt(Generic[T]):
         matches the given predicate. Returns the same Opt
 
         Args:
-            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+            predicate (Callable[[T], bool]): The predicate
             action (Callable[[T], Any]): The action to be executed
 
         Returns:
@@ -369,7 +360,7 @@ class Opt(Generic[T]):
 
     def if_matches_opt(
         self,
-        predicate: Union[Predicate[Optional[T]], Callable[[Optional[T]], bool]],
+        predicate: Callable[[Optional[T]], bool],
         action: Callable[[Optional[T]], Any],
     ) -> "Opt[T]":
         """
@@ -377,7 +368,7 @@ class Opt(Generic[T]):
         is present, if the value matches the given predicate. Returns the same Opt
 
         Args:
-            predicate (Union[Predicate[Optional[T]], Callable[[Optional[T]], bool]]): The predicate
+            predicate (Callable[[Optional[T]], bool]): The predicate
             action (Callable[[Optional[T]], Any]): The action to be executed
 
         Returns:
@@ -446,7 +437,7 @@ class Opt(Generic[T]):
 
     def if_present_map(
         self,
-        is_present_mapper: Union[Mapper[T, V], Callable[[T], V]],
+        is_present_mapper: Callable[[T], V],
         or_else_supplier: Callable[[], Optional[V]],
     ) -> "Opt[V]":
         """
@@ -454,7 +445,7 @@ class Opt(Generic[T]):
         If the optional value is not present, returns the value produced by or_else_supplier
 
         Args:
-            is_present_mapper (Union[Mapper[T, V], Callable[[T], V]]): The presence mapper
+            is_present_mapper (Callable[[T], V]): The presence mapper
             or_else_supplier (Callable[[], Optional[V]]): The missing value producer
 
         Returns:
@@ -467,7 +458,7 @@ class Opt(Generic[T]):
     def if_present_map_with(
         self,
         with_val: K,
-        is_present_mapper: Union[MapperWith[T, K, V], Callable[[T, K], V]],
+        is_present_mapper: Callable[[T, K], V],
         or_else_supplier: Callable[[K], Optional[V]],
     ) -> "Opt[V]":
         """
@@ -477,7 +468,7 @@ class Opt(Generic[T]):
 
         Args:
             with_val (K): The additional mapper value
-            is_present_mapper (Union[MapperWith[T, K, V],  Callable[[T, K], V]]): The presence mapper
+            is_present_mapper (Callable[[T, K], V]): The presence mapper
             or_else_supplier (Callable[[K], V]): The missing value producer
 
         Returns:
@@ -515,8 +506,8 @@ class Opt(Generic[T]):
 
     def if_matches_map(
         self,
-        predicate: Union[Predicate[T], Callable[[T], bool]],
-        mapper: Union[Mapper[T, Optional[V]], Callable[[T], Optional[V]]],
+        predicate: Callable[[T], bool],
+        mapper: Callable[[T], Optional[V]],
     ) -> "Opt[V]":
         """
         If the optional value is present and matches the given predicate, returns the value mapped
@@ -524,8 +515,8 @@ class Opt(Generic[T]):
         If the optional value is not present, returns an empty Opt.
 
         Args:
-            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
-            mapper (Union[Mapper[T, V], Callable[[T], Optional[V]]]): The the mapper
+            predicate (Callable[[T], bool]): The predicate
+            mapper (Callable[[T], Optional[V]]): The the mapper
 
         Returns:
             Opt[V]: An optional
@@ -537,8 +528,8 @@ class Opt(Generic[T]):
     def if_matches_map_with(
         self,
         with_val: K,
-        predicate: Union[PredicateWith[T, K], Callable[[T, K], bool]],
-        mapper: Union[MapperWith[T, K, Optional[V]], Callable[[T, K], Optional[V]]],
+        predicate: Callable[[T, K], bool],
+        mapper: Callable[[T, K], Optional[V]],
     ) -> "Opt[V]":
         """
         If the optional value is present and matches the given predicate, returns the value mapped by mapper wrapped in an Opt.
@@ -547,8 +538,8 @@ class Opt(Generic[T]):
 
         Args:
             with_val (K): The additional mapper value
-            predicate (Union[PredicateWith[T, K], Callable[[T, K], bool]]): The predicate
-            mapper (Union[MapperWith[T, K, Optional[V]], Callable[[T, K], Optional[V]]]): The mapper
+            predicate (Callable[[T, K], bool]): The predicate
+            mapper (Callable[[T, K], Optional[V]]): The mapper
 
         Returns:
             Opt[V]: An optional
@@ -789,14 +780,14 @@ class _GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
 class _FilterIterable(_GenericIterable[T]):
     __slots__ = ("__predicate",)
 
-    def __init__(self, it: Iterable[T], predicate: Predicate[T]) -> None:
+    def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
         super().__init__(it)
         self.__predicate = predicate
 
     def __next__(self) -> T:
         while True:
             next_obj = self._iterator.__next__()
-            if self.__predicate.apply(next_obj):
+            if self.__predicate(next_obj):
                 return next_obj
 
 
@@ -981,7 +972,7 @@ class _TakeWhileIterable(_GenericIterable[T]):
     __slots__ = ("__predicate", "__done", "__include_stop_value")
 
     def __init__(
-        self, it: Iterable[T], predicate: Predicate[T], include_stop_value: bool
+        self, it: Iterable[T], predicate: Callable[[T], bool], include_stop_value: bool
     ) -> None:
         super().__init__(it)
         self.__done = False
@@ -996,7 +987,7 @@ class _TakeWhileIterable(_GenericIterable[T]):
             raise StopIteration()
 
         obj = self._iterator.__next__()
-        if not self.__predicate.apply(obj):
+        if not self.__predicate(obj):
             self.__done = True
             if not self.__include_stop_value:
                 raise StopIteration()
@@ -1007,7 +998,7 @@ class _TakeWhileIterable(_GenericIterable[T]):
 class _DropWhileIterable(_GenericIterable[T]):
     __slots__ = ("__predicate", "__done")
 
-    def __init__(self, it: Iterable[T], predicate: Predicate[T]) -> None:
+    def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
         super().__init__(it)
         self.__done = False
         self.__predicate = predicate
@@ -1020,7 +1011,7 @@ class _DropWhileIterable(_GenericIterable[T]):
             return self._iterator.__next__()
         while not self.__done:
             obj = self._iterator.__next__()
-            if not self.__predicate.apply(obj):
+            if not self.__predicate(obj):
                 self.__done = True
                 return obj
         raise StopIteration()
@@ -1077,7 +1068,7 @@ class _DistinctIterable(_GenericIterable[T]):
 class _MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
     __slots__ = ("_iterable", "_iterator", "__mapper")
 
-    def __init__(self, it: Iterable[T], mapper: Mapper[T, V]) -> None:
+    def __init__(self, it: Iterable[T], mapper: Callable[[T], V]) -> None:
         self._iterable = it
         self._iterator = self._iterable.__iter__()
         self.__mapper = mapper
@@ -1091,7 +1082,7 @@ class _MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
         return self
 
     def __next__(self) -> V:
-        return self.__mapper.map(self._iterator.__next__())
+        return self.__mapper(self._iterator.__next__())
 
 
 class _PeekIterable(_GenericIterable[T]):
@@ -1178,7 +1169,7 @@ class _TakeUntilIterable(_GenericIterable[T]):
     __slots__ = ("__predicate", "__done", "__include_stop_value")
 
     def __init__(
-        self, it: Iterable[T], predicate: Predicate[T], include_stop_value: bool
+        self, it: Iterable[T], predicate: Callable[[T], bool], include_stop_value: bool
     ) -> None:
         super().__init__(it)
         self.__predicate = predicate
@@ -1193,7 +1184,7 @@ class _TakeUntilIterable(_GenericIterable[T]):
             raise StopIteration()
 
         obj = self._iterator.__next__()
-        if self.__predicate.apply(obj):
+        if self.__predicate(obj):
             self.__done = True  # Stop after yielding this one
             if not self.__include_stop_value:
                 raise StopIteration()
@@ -1204,7 +1195,7 @@ class _TakeUntilIterable(_GenericIterable[T]):
 class _DropUntilIterable(_GenericIterable[T]):
     __slots__ = ("__predicate", "__dropping")
 
-    def __init__(self, it: Iterable[T], predicate: Predicate[T]) -> None:
+    def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
         super().__init__(it)
         self.__predicate = predicate
         self.__dropping = True  # Start in dropping mode
@@ -1215,7 +1206,7 @@ class _DropUntilIterable(_GenericIterable[T]):
     def __next__(self) -> T:
         while self.__dropping:
             obj = self._iterator.__next__()  # Consume elements
-            if self.__predicate.apply(obj):
+            if self.__predicate(obj):
                 self.__dropping = False  # Stop dropping
                 return obj  # Return the first matching element
         # Once dropping stops, just yield remaining elements
@@ -1594,16 +1585,16 @@ class Stream(Generic[T]):
     def __init__(self, arg: Iterable[T]) -> None:
         self.__arg = require_non_null(arg)
 
-    def map(self, mapper: Union[Mapper[T, V], Callable[[T], V]]) -> "Stream[V]":
+    def map(self, mapper: Callable[[T], V]) -> "Stream[V]":
         """
         Produces a new stream by mapping the stream elements using the given mapper function.
         Args:
-            mapper (Union[Mapper[T, V], Callable[[T], V]]): The mapper
+            mapper (Callable[[T], V]): The mapper
 
         Returns:
             Stream[V]: The result stream
         """
-        return Stream(_MapIterable(self.__arg, mapper_of(mapper)))
+        return Stream(_MapIterable(self.__arg, mapper))
 
     def zip_longest(
         self, other: Iterable[V], fillvalue: Any = None
@@ -1626,19 +1617,17 @@ class Stream(Generic[T]):
         # Pair[Optional[T], Optional[V]] is correct.
         return Stream(_ZipLongestIterable(self.__arg, other, fillvalue))
 
-    def flat_map(
-        self, mapper: Union[Mapper[T, Iterable[V]], Callable[[T], Iterable[V]]]
-    ) -> "Stream[V]":
+    def flat_map(self, mapper: Callable[[T], Iterable[V]]) -> "Stream[V]":
         """
         Produces a flat stream by mapping an element of this stream to an iterable, then concatenates
         the iterables into a single stream.
         Args:
-            mapper (Union[Mapper[T, Iterable[V]], Callable[[T], Iterable[V]]]): The mapper
+            mapper (Callable[[T], Iterable[V]]): The mapper
 
         Returns:
             Stream[V]: the result stream
         """
-        return Stream(flat_map(self.__arg, mapper_of(mapper)))
+        return Stream(flat_map(self.__arg, mapper))
 
     def flatten(self, typ: type[V]) -> "Stream[V]":  # pylint: disable=unused-argument
         """
@@ -1661,32 +1650,30 @@ class Stream(Generic[T]):
         """
         return self.find_first(lambda e: True)
 
-    def find_first(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> Opt[T]:
+    def find_first(self, predicate: Callable[[T], bool]) -> Opt[T]:
         """
         Finds and returns the first element matching the predicate
 
         Args:
-            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             Opt[T]: The firs element found
         """
         return Opt(find_first(self.__arg, predicate))
 
-    def filter(
-        self, predicate: Union[Predicate[T], Callable[[T], bool]]
-    ) -> "Stream[T]":
+    def filter(self, predicate: Callable[[T], bool]) -> "Stream[T]":
         """
         Returns a stream of objects that match the given predicate
 
         Args:
-            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             Stream[T]: The stream of filtered objects
         """
 
-        return Stream(_FilterIterable(self.__arg, predicate_of(predicate)))
+        return Stream(_FilterIterable(self.__arg, predicate))
 
     def cast(self, cast_to: type[V]) -> "Stream[V]":
         """
@@ -1701,12 +1688,12 @@ class Stream(Generic[T]):
         """
         return Stream(_CastIterable(self.__arg, cast_to))
 
-    def any_match(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> bool:
+    def any_match(self, predicate: Callable[[T], bool]) -> bool:
         """
         Checks if any stream object matches the given predicate
 
         Args:
-            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             bool: True if any object matches, False otherwise
@@ -1718,12 +1705,12 @@ class Stream(Generic[T]):
                 return True
         return False
 
-    def none_match(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> bool:
+    def none_match(self, predicate: Callable[[T], bool]) -> bool:
         """
         Checks if none of the stream objects matches the given predicate. This is the inverse of 'any_match`
 
         Args:
-            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             bool: True if no object matches, False otherwise
@@ -1733,12 +1720,12 @@ class Stream(Generic[T]):
 
         return not self.any_match(predicate)
 
-    def all_match(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> bool:
+    def all_match(self, predicate: Callable[[T], bool]) -> bool:
         """
         Checks if all of the stream objects matche the given predicate.
 
         Args:
-            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             bool: True if all objects matche, False otherwise
@@ -1851,8 +1838,8 @@ class Stream(Generic[T]):
 
     def to_dict(
         self,
-        key_mapper: Union[Mapper[T, V], Callable[[T], V]],
-        value_mapper: Union[Mapper[T, K], Callable[[T], K]],
+        key_mapper: Callable[[T], V],
+        value_mapper: Callable[[T], K],
     ) -> dict[V, K]:
         """
         Creates a dictionary with the contents of the stream creating keys using
@@ -1861,17 +1848,15 @@ class Stream(Generic[T]):
         infinite generators, calling this method will block the execution of the program.
 
         Args:
-            key_mapper (Union[Mapper[T, V], Callable[[T], V]]): The key mapper
-            value_mapper (Union[Mapper[T, K], Callable[[T], K]]): The value mapper
+            key_mapper (Callable[[T], V]): The key mapper
+            value_mapper (Callable[[T], K]): The value mapper
 
         Returns:
             dict[V, K]: The resulting dictionary
         """
         return {key_mapper(v): value_mapper(v) for v in self.__arg}
 
-    def to_dict_as_values(
-        self, key_mapper: Union[Mapper[T, V], Callable[[T], V]]
-    ) -> dict[V, T]:
+    def to_dict_as_values(self, key_mapper: Callable[[T], V]) -> dict[V, T]:
         """
         Creates a dictionary with the contents of the stream creating keys using
         the given key mapper
@@ -1879,16 +1864,14 @@ class Stream(Generic[T]):
         infinite generators, calling this method will block the execution of the program.
 
         Args:
-            key_mapper (Union[Mapper[T, V], Callable[[T], V]]): The key mapper
+            key_mapper (Callable[[T], V]): The key mapper
 
         Returns:
             dict[V, T]: The resulting dictionary
         """
         return {key_mapper(v): v for v in self.__arg}
 
-    def to_dict_as_keys(
-        self, value_mapper: Union[Mapper[T, V], Callable[[T], V]]
-    ) -> dict[T, V]:
+    def to_dict_as_keys(self, value_mapper: Callable[[T], V]) -> dict[T, V]:
         """
         Creates a dictionary using the contents of the stream as keys and mapping
         the dictionary values using the given value mapper
@@ -1896,7 +1879,7 @@ class Stream(Generic[T]):
         infinite generators, calling this method will block the execution of the program.
 
         Args:
-            value_mapper (Union[Mapper[T, V], Callable[[T], V]]): The value mapper
+            value_mapper (Callable[[T], V]): The value mapper
 
         Returns:
             dict[V, T]: The resulting dictionary
@@ -1976,39 +1959,35 @@ class Stream(Generic[T]):
 
     def take_while(
         self,
-        predicate: Union[Predicate[T], Callable[[T], bool]],
+        predicate: Callable[[T], bool],
         include_stop_value: bool = False,
     ) -> "Stream[T]":
         """
         Returns a stream of elements until the first element that DOES NOT match the given predicate
 
         Args:
-            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             Stream[T]: The result stream
         """
-        return Stream(
-            _TakeWhileIterable(self.__arg, predicate_of(predicate), include_stop_value)
-        )
+        return Stream(_TakeWhileIterable(self.__arg, predicate, include_stop_value))
 
-    def drop_while(
-        self, predicate: Union[Predicate[T], Callable[[T], bool]]
-    ) -> "Stream[T]":
+    def drop_while(self, predicate: Callable[[T], bool]) -> "Stream[T]":
         """
         Returns a stream of elements by dropping the first elements that match the given predicate
 
         Args:
-            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             Stream[T]: The result stream
         """
-        return Stream(_DropWhileIterable(self.__arg, predicate_of(predicate)))
+        return Stream(_DropWhileIterable(self.__arg, predicate))
 
     def take_until(
         self,
-        predicate: Union[Predicate[T], Callable[[T], bool]],
+        predicate: Callable[[T], bool],
         include_stop_value: bool = False,
     ) -> "Stream[T]":
         """
@@ -2022,13 +2001,9 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The resulting stream.
         """
-        return Stream(
-            _TakeUntilIterable(self.__arg, predicate_of(predicate), include_stop_value)
-        )
+        return Stream(_TakeUntilIterable(self.__arg, predicate, include_stop_value))
 
-    def drop_until(
-        self, predicate: Union[Predicate[T], Callable[[T], bool]]
-    ) -> "Stream[T]":
+    def drop_until(self, predicate: Callable[[T], bool]) -> "Stream[T]":
         """
         Returns a stream consisting of the remaining elements after dropping
         elements until the predicate returns True for the first time. The element
@@ -2040,9 +2015,9 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The resulting stream.
         """
-        return Stream(_DropUntilIterable(self.__arg, predicate_of(predicate)))
+        return Stream(_DropUntilIterable(self.__arg, predicate))
 
-    def reduce(self, reducer: Union[Reducer[T], Callable[[T, T], T]]) -> Opt[T]:
+    def reduce(self, reducer: Callable[[T, T], T]) -> Opt[T]:
         """
         Reduces a stream to a single value. The reducer takes two values and
         returns only one. This function can be used to find min or max from a stream of ints.
@@ -2050,7 +2025,7 @@ class Stream(Generic[T]):
         infinite generators, calling this method will block the execution of the program.
 
         Args:
-            reducer (Union[Reducer[T], Callable[[T, T], T]]): The reducer
+            reducer (Callable[[T, T], T]): The reducer
 
         Returns:
             Opt[T]: The resulting optional
@@ -2183,13 +2158,13 @@ class Stream(Generic[T]):
         """
         return Stream(_ChunkedIterable(self.__arg, size))
 
-    def find_last(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> Opt[T]:
+    def find_last(self, predicate: Callable[[T], bool]) -> Opt[T]:
         """
         Finds the last element in the stream that matches the given predicate.
         This is a terminal operation and consumes the stream.
 
         Args:
-            predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate to match.
+            predicate (Callable[[T], bool]): The predicate to match.
 
         Returns:
             Opt[T]: An Opt containing the last matching element, or empty if none match or the stream is empty.

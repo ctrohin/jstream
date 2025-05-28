@@ -1,21 +1,17 @@
-from typing import Callable, Iterable, Optional, TypeVar, Union
-
-from jstreams.predicate import Predicate
-from jstreams.reducer import Reducer
-
+from typing import Callable, Iterable, Optional, TypeVar
 
 T = TypeVar("T")
 
 
 def find_first(
-    target: Optional[Iterable[T]], predicate: Union[Predicate[T], Callable[[T], bool]]
+    target: Optional[Iterable[T]], predicate: Callable[[T], bool]
 ) -> Optional[T]:
     """
     Retrieves the first element of the given iterable that matches the given predicate
 
     Args:
         target (Optional[Iterable[T]]): The target iterable
-        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+        predicate (Callable[[T], bool]): The predicate
 
     Returns:
         Optional[T]: The first matching element, or None if no element matches the predicate
@@ -30,7 +26,7 @@ def find_first(
 
 
 def find_last(
-    target: Optional[Iterable[T]], predicate: Union[Predicate[T], Callable[[T], bool]]
+    target: Optional[Iterable[T]], predicate: Callable[[T], bool]
 ) -> Optional[T]:
     """
     Retrieves the last element of the given iterable that matches the given predicate.
@@ -38,7 +34,7 @@ def find_last(
 
     Args:
         target (Optional[Iterable[T]]): The target iterable.
-        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate.
+        predicate (Callable[[T], bool]): The predicate.
 
     Returns:
         Optional[T]: The last matching element, or None if no element matches the predicate.
@@ -53,15 +49,13 @@ def find_last(
     return last_match
 
 
-def matching(
-    target: Iterable[T], predicate: Union[Predicate[T], Callable[[T], bool]]
-) -> list[T]:
+def matching(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
     """
     Returns all elements of the target iterable that match the given predicate
 
     Args:
         target (Iterable[T]): The target iterable
-        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+        predicate (Callable[[T], bool]): The predicate
 
     Returns:
         list[T]: The matching elements
@@ -72,16 +66,14 @@ def matching(
     return [el for el in target if predicate(el)]
 
 
-def take_while(
-    target: Iterable[T], predicate: Union[Predicate[T], Callable[[T], bool]]
-) -> list[T]:
+def take_while(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
     """
     Returns the first batch of elements matching the predicate. Once an element
     that does not match the predicate is found, the function will return
 
     Args:
         target (Iterable[T]): The target iterable
-        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+        predicate (Callable[[T], bool]): The predicate
 
     Returns:
         list[T]: The result list
@@ -98,9 +90,7 @@ def take_while(
     return ret
 
 
-def drop_while(
-    target: Iterable[T], predicate: Union[Predicate[T], Callable[[T], bool]]
-) -> list[T]:
+def drop_while(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
     """
     Returns the target iterable elements without the first elements that match the
     predicate. Once an element that does not match the predicate is found,
@@ -108,7 +98,7 @@ def drop_while(
 
     Args:
         target (Iterable[T]): The target iterable
-        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
+        predicate (Callable[[T], bool]): The predicate
 
     Returns:
         list[T]: The result list
@@ -134,7 +124,7 @@ def drop_while(
 
 def take_until(
     target: Iterable[T],
-    predicate: Union[Predicate[T], Callable[[T], bool]],
+    predicate: Callable[[T], bool],
     include_stop_value: bool = False,
 ) -> list[T]:
     """
@@ -143,7 +133,7 @@ def take_until(
 
     Args:
         target (Iterable[T]): The target iterable.
-        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate.
+        predicate (Callable[[T], bool]): The predicate.
 
     Returns:
         list[T]: The result list including the element that matched the predicate.
@@ -161,16 +151,14 @@ def take_until(
     return ret
 
 
-def drop_until(
-    target: Iterable[T], predicate: Union[Predicate[T], Callable[[T], bool]]
-) -> list[T]:
+def drop_until(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
     """
     Returns the target iterable elements starting from the first element that
     matches the predicate (inclusive). Elements before the first match are dropped.
 
     Args:
         target (Iterable[T]): The target iterable.
-        predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate.
+        predicate (Callable[[T], bool]): The predicate.
 
     Returns:
         list[T]: The result list starting from the first matching element.
@@ -190,15 +178,13 @@ def drop_until(
     return target_list[index:]
 
 
-def reduce(
-    target: Iterable[T], reducer: Union[Reducer[T], Callable[[T, T], T]]
-) -> Optional[T]:
+def reduce(target: Iterable[T], reducer: Callable[[T, T], T]) -> Optional[T]:
     """
     Reduces an iterable to a single value. The reducer function takes two values and
     returns only one. This function can be used to find min or max from a stream of ints.
 
     Args:
-        reducer (Union[Reducer[T], Callable[[T, T], T]]): The reducer
+        reducer (Callable[[T, T], T]): The reducer
 
     Returns:
         Optional[T]: The resulting optional

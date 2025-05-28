@@ -1,4 +1,4 @@
-from typing import Any, Callable, Generic, TypeVar, Union
+from typing import Any, Callable, Generic, TypeVar
 
 from jstreams.predicate import Predicate, predicate_of
 
@@ -126,13 +126,13 @@ def triplet_of(values: tuple[T, V, K]) -> Triplet[T, V, K]:
 
 
 def left_matches(
-    predicate_arg: Union[Predicate[T], Callable[[T], bool]],
+    predicate_arg: Callable[[T], bool],
 ) -> Predicate[Pair[Any, Any]]:
     """
     Produces a predicate that checks if the left value of a Pair/Triplet matches the given predicate
 
     Args:
-        predicate_arg (Union[Predicate[T], Callable[[T], bool]]): The left matching predicate
+        predicate_arg (Callable[[T], bool]): The left matching predicate
 
     Returns:
         Predicate[Pair[T, V]]: The produced predicate
@@ -145,38 +145,38 @@ def left_matches(
 
 
 def right_matches(
-    predicate_arg: Union[Predicate[V], Callable[[V], bool]],
+    predicate_arg: Callable[[V], bool],
 ) -> Predicate[Pair[Any, Any]]:
     """
     Produces a predicate that checks if the right value of a Pair/Triplet matches the given predicate
 
     Args:
-        predicate_arg (Union[Predicate[V], Callable[[V], bool]]): The right matching predicate
+        predicate_arg (Callable[[V], bool]): The right matching predicate
 
     Returns:
         Predicate[Pair[T, V]]: The produced predicate
     """
 
     def wrap(pair_arg: Pair[T, V]) -> bool:
-        return predicate_of(predicate_arg)(pair_arg.right())
+        return predicate_arg(pair_arg.right())
 
     return predicate_of(wrap)
 
 
 def middle_matches(
-    predicate_arg: Union[Predicate[V], Callable[[V], bool]],
+    predicate_arg: Callable[[V], bool],
 ) -> Predicate[Triplet[Any, Any, Any]]:
     """
     Produces a predicate that checks if the middle value of a Triplet matches the given predicate
 
     Args:
-        predicate_arg (Union[Predicate[V], Callable[[V], bool]]): The middle matching predicate
+        predicate_arg (Callable[[V], bool]): The middle matching predicate
 
     Returns:
         Predicate[Triplet[T, V, K]]: The produced predicate
     """
 
     def wrap(triplet_arg: Triplet[T, V, K]) -> bool:
-        return predicate_of(predicate_arg)(triplet_arg.middle())
+        return predicate_arg(triplet_arg.middle())
 
     return predicate_of(wrap)
