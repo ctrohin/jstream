@@ -55,7 +55,6 @@ class TestSerialize(BaseTestCase):
             b: Optional[str] = "test"
 
         value = SerializedClass()
-        print(value.a, value.b)
         serialized = json_serialize(value)
         self.assertEqual(serialized, {"a": 1, "b": "test"})
 

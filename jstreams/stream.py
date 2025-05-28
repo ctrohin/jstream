@@ -14,15 +14,14 @@ from typing import (
 from abc import ABC
 
 from jstreams.class_operations import ClassOps
-from jstreams.iterable_operations import find_first, reduce
-from jstreams.mapper import Mapper, MapperWith, flat_map, mapper_of, mapper_with_of
+from jstreams.iterable_operations import find_first, find_last, reduce
+from jstreams.mapper import Mapper, MapperWith, flat_map, mapper_of
 from jstreams.reducer import Reducer
 from jstreams.predicate import (
     Predicate,
     PredicateWith,
     is_none,
     predicate_of,
-    predicate_with_of,
 )
 from jstreams.tuples import Pair, pair_of
 from jstreams.utils import is_not_none, require_non_null, each, is_empty_or_none, sort
@@ -261,7 +260,7 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return self
-        if predicate_of(predicate).apply(self.__val):
+        if predicate(self.__val):
             return self
         return self.__get_none()
 
@@ -281,7 +280,7 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return self
-        if predicate_with_of(predicate).apply(self.__val, with_val):
+        if predicate(self.__val, with_val):
             return self
         return self.__get_none()
 
@@ -297,7 +296,7 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return cast(Opt[V], self.__get_none())
-        return Opt(mapper_of(mapper).map(self.__val))
+        return Opt(mapper(self.__val))
 
     def map_with(
         self, with_val: K, mapper: Union[MapperWith[T, K, V], Callable[[T, K], V]]
@@ -314,7 +313,7 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return cast(Opt[V], self.__get_none())
-        return Opt(mapper_with_of(mapper).map(self.__val, with_val))
+        return Opt(mapper(self.__val, with_val))
 
     def or_else_get_with(self, with_val: K, supplier: Callable[[K], T]) -> "Opt[T]":
         """
@@ -364,7 +363,7 @@ class Opt(Generic[T]):
         Returns:
             Opt[T]: The same Opt
         """
-        if self.__val is not None and predicate_of(predicate).apply(self.__val):
+        if self.__val is not None and predicate(self.__val):
             action(self.__val)
         return self
 
@@ -384,7 +383,7 @@ class Opt(Generic[T]):
         Returns:
             Opt[T]: The same Opt
         """
-        if predicate_of(predicate).apply(self.__val):
+        if predicate(self.__val):
             action(self.__val)
         return self
 
@@ -463,7 +462,7 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return Opt(or_else_supplier())
-        return Opt(mapper_of(is_present_mapper).map(self.__val))
+        return Opt(is_present_mapper(self.__val))
 
     def if_present_map_with(
         self,
@@ -486,7 +485,7 @@ class Opt(Generic[T]):
         """
         if self.__val is None:
             return Opt(or_else_supplier(with_val))
-        return Opt(mapper_with_of(is_present_mapper).map(self.__val, with_val))
+        return Opt(is_present_mapper(self.__val, with_val))
 
     def instance_of(self, class_type: type) -> "Opt[T]":
         """
@@ -531,8 +530,8 @@ class Opt(Generic[T]):
         Returns:
             Opt[V]: An optional
         """
-        if self.__val is not None and predicate_of(predicate).apply(self.__val):
-            return Opt(mapper_of(mapper).map(self.__val))
+        if self.__val is not None and predicate(self.__val):
+            return Opt(mapper(self.__val))
         return cast(Opt[V], self.__get_none())
 
     def if_matches_map_with(
@@ -554,10 +553,8 @@ class Opt(Generic[T]):
         Returns:
             Opt[V]: An optional
         """
-        if self.__val is not None and predicate_with_of(predicate).apply(
-            self.__val, with_val
-        ):
-            return Opt(mapper_with_of(mapper).map(self.__val, with_val))
+        if self.__val is not None and predicate(self.__val, with_val):
+            return Opt(mapper(self.__val, with_val))
         return cast(Opt[V], self.__get_none())
 
     def flatten(self: "Opt[Opt[U]]") -> "Opt[U]":
@@ -1674,7 +1671,7 @@ class Stream(Generic[T]):
         Returns:
             Opt[T]: The firs element found
         """
-        return Opt(find_first(self.__arg, predicate_of(predicate)))
+        return Opt(find_first(self.__arg, predicate))
 
     def filter(
         self, predicate: Union[Predicate[T], Callable[[T], bool]]
@@ -1714,13 +1711,16 @@ class Stream(Generic[T]):
         Returns:
             bool: True if any object matches, False otherwise
         """
-        return self.filter(predicate_of(predicate)).is_not_empty()
+        if self.__arg is None:
+            return False
+        for el in self.__arg:
+            if predicate(el):
+                return True
+        return False
 
     def none_match(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> bool:
         """
         Checks if none of the stream objects matches the given predicate. This is the inverse of 'any_match`
-        CAUTION: This method will actually iterate the entire stream, so if you're using
-        infinite generators, calling this method will block the execution of the program.
 
         Args:
             predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
@@ -1728,13 +1728,14 @@ class Stream(Generic[T]):
         Returns:
             bool: True if no object matches, False otherwise
         """
-        return self.filter(predicate_of(predicate)).is_empty()
+        if self.__arg is None:
+            return False
+
+        return not self.any_match(predicate)
 
     def all_match(self, predicate: Union[Predicate[T], Callable[[T], bool]]) -> bool:
         """
         Checks if all of the stream objects matche the given predicate.
-        CAUTION: This method will actually iterate the entire stream, so if you're using
-        infinite generators, calling this method will block the execution of the program.
 
         Args:
             predicate (Union[Predicate[T], Callable[[T], bool]]): The predicate
@@ -1742,15 +1743,17 @@ class Stream(Generic[T]):
         Returns:
             bool: True if all objects matche, False otherwise
         """
-        return len(self.filter(predicate_of(predicate)).to_list()) == len(
-            list(self.__arg)
-        )
+        if self.__arg is None:
+            return False
+
+        for el in self.__arg:
+            if not predicate(el):
+                return False
+        return True
 
     def is_empty(self) -> bool:
         """
         Checks if the stream is empty
-        CAUTION: This method will actually iterate the entire stream, so if you're using
-        infinite generators, calling this method will block the execution of the program.
 
         Returns:
             bool: True if the stream is empty, False otherwise
@@ -1760,8 +1763,6 @@ class Stream(Generic[T]):
     def is_not_empty(self) -> bool:
         """
         Checks if the stream is not empty
-        CAUTION: This method will actually iterate the entire stream, so if you're using
-        infinite generators, calling this method will block the execution of the program.
 
         Returns:
             bool: True if the stream is not empty, False otherwise
@@ -1866,9 +1867,7 @@ class Stream(Generic[T]):
         Returns:
             dict[V, K]: The resulting dictionary
         """
-        key_mapper_obj = mapper_of(key_mapper)
-        value_mapper_obj = mapper_of(value_mapper)
-        return {key_mapper_obj.map(v): value_mapper_obj.map(v) for v in self.__arg}
+        return {key_mapper(v): value_mapper(v) for v in self.__arg}
 
     def to_dict_as_values(
         self, key_mapper: Union[Mapper[T, V], Callable[[T], V]]
@@ -1885,8 +1884,7 @@ class Stream(Generic[T]):
         Returns:
             dict[V, T]: The resulting dictionary
         """
-        key_mapper_obj = mapper_of(key_mapper)
-        return {key_mapper_obj.map(v): v for v in self.__arg}
+        return {key_mapper(v): v for v in self.__arg}
 
     def to_dict_as_keys(
         self, value_mapper: Union[Mapper[T, V], Callable[[T], V]]
@@ -1903,8 +1901,7 @@ class Stream(Generic[T]):
         Returns:
             dict[V, T]: The resulting dictionary
         """
-        value_mapper_obj = mapper_of(value_mapper)
-        return {v: value_mapper_obj.map(v) for v in self.__arg}
+        return {v: value_mapper(v) for v in self.__arg}
 
     def to_tuple(self) -> tuple[T, ...]:
         """
@@ -2197,12 +2194,7 @@ class Stream(Generic[T]):
         Returns:
             Opt[T]: An Opt containing the last matching element, or empty if none match or the stream is empty.
         """
-        last_match: Optional[T] = None
-        pred = predicate_of(predicate)
-        for element in self.__arg:
-            if pred.apply(element):
-                last_match = element
-        return Opt(last_match)
+        return Opt(find_last(self.__arg, predicate))
 
     def map_indexed(self, mapper: Callable[[int, T], V]) -> "Stream[V]":
         """

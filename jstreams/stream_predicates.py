@@ -51,10 +51,9 @@ def all_of(
         Predicate[T]: The combined predicate.
     """
     # Convert to list to avoid consuming iterator multiple times if stream doesn't cache
-    predicate_list = [predicate_of(p) for p in predicates]
 
     def wrap(val: T) -> bool:
-        return Stream(predicate_list).all_match(lambda p: p.apply(val))
+        return Stream(predicates).all_match(lambda p: p(val))
 
     return predicate_of(wrap)
 
@@ -72,10 +71,9 @@ def any_of(
     Returns:
         Predicate[T]: The combined predicate.
     """
-    predicate_list = [predicate_of(p) for p in predicates]
 
     def wrap(val: T) -> bool:
-        return Stream(predicate_list).any_match(lambda p: p.apply(val))
+        return Stream(predicates).any_match(lambda p: p(val))
 
     return predicate_of(wrap)
 
@@ -92,9 +90,8 @@ def none_of(
     Returns:
         Predicate[T]: The combined predicate.
     """
-    predicate_list = [predicate_of(p) for p in predicates]
 
     def wrap(val: T) -> bool:
-        return Stream(predicate_list).none_match(lambda p: p.apply(val))
+        return Stream(predicates).none_match(lambda p: p(val))
 
     return predicate_of(wrap)

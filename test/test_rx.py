@@ -639,8 +639,8 @@ class TestRx(BaseTestCase):
         subject.on_next("test2")
         sleep(1.5)
 
-        self.assertEquals(values, ["test"])
-        self.assertEquals(errors, [])
+        self.assertEqual(values, ["test"])
+        self.assertEqual(errors, [])
 
     def test_backpressure_error(self) -> None:
         subject = SingleValueSubject("test")
@@ -664,8 +664,8 @@ class TestRx(BaseTestCase):
         subject.on_next("test2")
         sleep(1.5)
 
-        self.assertEquals(values, ["test"])
-        self.assertEquals(
+        self.assertEqual(values, ["test"])
+        self.assertEqual(
             errors,
             [
                 BackpressureException("Missed value"),

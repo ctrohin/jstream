@@ -1,7 +1,7 @@
 from typing import Callable, Iterable, Optional, TypeVar, Union
 
-from jstreams.predicate import Predicate, predicate_of
-from jstreams.reducer import Reducer, reducer_of
+from jstreams.predicate import Predicate
+from jstreams.reducer import Reducer
 
 
 T = TypeVar("T")
@@ -24,7 +24,7 @@ def find_first(
         return None
 
     for el in target:
-        if predicate_of(predicate).apply(el):
+        if predicate(el):
             return el
     return None
 
@@ -47,9 +47,8 @@ def find_last(
         return None
 
     last_match: Optional[T] = None
-    pred = predicate_of(predicate)
     for el in target:
-        if pred.apply(el):
+        if predicate(el):
             last_match = el
     return last_match
 
@@ -67,15 +66,10 @@ def matching(
     Returns:
         list[T]: The matching elements
     """
-    ret: list[T] = []
     if target is None:
-        return ret
+        return []
 
-    pred = predicate_of(predicate)
-    for el in target:
-        if pred.apply(el):
-            ret.append(el)
-    return ret
+    return [el for el in target if predicate(el)]
 
 
 def take_while(
@@ -96,9 +90,8 @@ def take_while(
     if target is None:
         return ret
 
-    pred = predicate_of(predicate)
     for el in target:
-        if pred.apply(el):
+        if predicate(el):
             ret.append(el)
         else:
             break
@@ -126,12 +119,11 @@ def drop_while(
 
     index = 0
     start_adding = False
-    pred = predicate_of(predicate)
     for el in target:
         if start_adding:
             ret.append(el)
             continue
-        if pred.apply(el):
+        if predicate(el):
             index += 1
         else:
             start_adding = True
@@ -160,9 +152,8 @@ def take_until(
     if target is None:
         return ret
 
-    pred = predicate_of(predicate)
     for el in target:
-        if pred.apply(el):  # Then check if the condition is met
+        if predicate(el):  # Then check if the condition is met
             if include_stop_value:
                 ret.append(el)  # Append the if it needs to be included
             break  # Stop after including the element
@@ -189,17 +180,14 @@ def drop_until(
         return []
 
     index = 0
-    found_match = False
     target_list = list(target)  # Convert once for slicing and indexing
 
-    pred = predicate_of(predicate)
-    for i, el in enumerate(target_list):
-        if pred.apply(el):
-            index = i  # Index of the first element matching the predicate
-            found_match = True
+    for el in target_list:
+        if predicate(el):
             break  # Stop searching
+        index += 1
 
-    return target_list[index:] if found_match else []
+    return target_list[index:]
 
 
 def reduce(
@@ -224,11 +212,6 @@ def reduce(
         return None
 
     result: T = elem_list[0]
-    reducer_obj = reducer_of(reducer)
-    first = True
-    for el in elem_list:
-        if first:
-            first = False
-            continue
-        result = reducer_obj.reduce(result, el)
+    for el in elem_list[1:]:
+        result = reducer(result, el)
     return result
