@@ -1,4 +1,5 @@
 from typing import Callable, Iterable, Optional, TypeVar
+import functools
 
 T = TypeVar("T")
 
@@ -189,15 +190,16 @@ def reduce(target: Iterable[T], reducer: Callable[[T, T], T]) -> Optional[T]:
     Returns:
         Optional[T]: The resulting optional
     """
-
     if target is None:
         return None
 
-    elem_list = list(target)
-    if len(elem_list) == 0:
+    iterator = iter(target)
+    try:
+        initial_value = next(iterator)
+    except StopIteration:
+        # Iterable is empty
         return None
 
-    result: T = elem_list[0]
-    for el in elem_list[1:]:
-        result = reducer(result, el)
-    return result
+    # functools.reduce will apply the reducer to the rest of the iterator
+    # starting with the initial_value.
+    return functools.reduce(reducer, iterator, initial_value)
