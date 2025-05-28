@@ -1,5 +1,4 @@
 from collections import deque
-from copy import deepcopy
 from typing import (
     Callable,
     Iterable,
@@ -13,17 +12,14 @@ from typing import (
 from abc import ABC
 
 from jstreams.class_operations import ClassOps
+import itertools  # Added import
+from jstreams.iterable_operations import find_first, find_last, reduce
+from jstreams.mapper import flat_map
 from jstreams.predicate import (
     is_none,
 )
 from jstreams.tuples import Pair, pair_of
 from jstreams.utils import is_not_none, require_non_null, each, is_empty_or_none, sort
-
-from jstreams.iterable_operations import (
-    find_first as j_find_first,
-    find_last as j_find_last,
-    reduce as j_reduce,
-)
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -1583,45 +1579,6 @@ class _DeferIterable(Generic[T], Iterator[T], Iterable[T]):
         return next(self._current_iterator)
 
 
-class _LazyFlatMapIterable(Generic[T, V], Iterator[V], Iterable[V]):
-    __slots__ = (
-        "_source_iterable",
-        "_mapper",
-        "_current_outer_iterator",
-        "_current_inner_iterator",
-    )
-
-    def __init__(self, it: Iterable[T], mapper: Callable[[T], Iterable[V]]) -> None:
-        self._source_iterable = it  # Store original iterable for potential re-iteration
-        self._mapper = mapper
-        self._current_outer_iterator: Optional[Iterator[T]] = None
-        self._current_inner_iterator: Optional[Iterator[V]] = None
-
-    def __iter__(self) -> Iterator[V]:
-        self._current_outer_iterator = iter(self._source_iterable)
-        self._current_inner_iterator = None
-        return self
-
-    def __next__(self) -> V:
-        if self._current_outer_iterator is None:
-            # Ensure __iter__ has been called
-            raise RuntimeError(
-                "Stream has not been initialized for iteration. Call iter() first."
-            )
-
-        while True:
-            if self._current_inner_iterator is not None:
-                try:
-                    return next(self._current_inner_iterator)
-                except StopIteration:
-                    self._current_inner_iterator = None
-            # No active inner_iterator or it's exhausted
-            # This will raise StopIteration when the outer iterator is exhausted,
-            # which is the correct behavior to signal the end of the flat_map operation.
-            outer_element = next(self._current_outer_iterator)
-            self._current_inner_iterator = iter(self._mapper(outer_element))
-
-
 class Stream(Generic[T]):
     __slots__ = ("__arg",)
 
@@ -1670,7 +1627,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: the result stream
         """
-        return Stream(_LazyFlatMapIterable(self.__arg, mapper))
+        return Stream(flat_map(self.__arg, mapper))
 
     def flatten(self, typ: type[V]) -> "Stream[V]":  # pylint: disable=unused-argument
         """
@@ -1680,18 +1637,9 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: A flattened stream
         """
-
-        # Define a mapper that handles elements which might be iterable or single items
-        def _flatten_mapper(item: Any) -> Iterable[V]:
-            # isinstance check for str, bytes, bytearray to avoid flattening them
-            if isinstance(item, Iterable) and not isinstance(
-                item, (str, bytes, bytearray)
-            ):
-                yield from cast(Iterable[V], item)
-            else:
-                yield cast(V, item)
-
-        return Stream(_LazyFlatMapIterable(self.__arg, _flatten_mapper))
+        return self.flat_map(
+            lambda v: cast(Iterable[V], v) if isinstance(v, Iterable) else [cast(V, v)]
+        )
 
     def first(self) -> Opt[T]:
         """
@@ -1700,7 +1648,7 @@ class Stream(Generic[T]):
         Returns:
             Opt[T]: First element
         """
-        return self.find_first(lambda _: True)
+        return self.find_first(lambda e: True)
 
     def find_first(self, predicate: Callable[[T], bool]) -> Opt[T]:
         """
@@ -1712,7 +1660,7 @@ class Stream(Generic[T]):
         Returns:
             Opt[T]: The firs element found
         """
-        return Opt(j_find_first(self.__arg, predicate))
+        return Opt(find_first(self.__arg, predicate))
 
     def filter(self, predicate: Callable[[T], bool]) -> "Stream[T]":
         """
@@ -2082,7 +2030,7 @@ class Stream(Generic[T]):
         Returns:
             Opt[T]: The resulting optional
         """
-        return Opt(j_reduce(self.__arg, reducer))
+        return Opt(reduce(self.__arg, reducer))
 
     def non_null(self) -> "Stream[T]":
         """
@@ -2221,7 +2169,7 @@ class Stream(Generic[T]):
         Returns:
             Opt[T]: An Opt containing the last matching element, or empty if none match or the stream is empty.
         """
-        return Opt(j_find_last(self.__arg, predicate))
+        return Opt(find_last(self.__arg, predicate))
 
     def map_indexed(self, mapper: Callable[[int, T], V]) -> "Stream[V]":
         """
@@ -2333,7 +2281,15 @@ class Stream(Generic[T]):
         )
 
     def clone(self) -> "Stream[T]":
-        return deepcopy(self)
+        # If self.__arg is a list, tuple, or set, a shallow copy is often enough
+        # to allow independent iteration if the elements themselves are not modified.
+        if isinstance(self.__arg, (list, tuple, set)):
+            return Stream(list(self.__arg))  # Create a new list from it
+
+        # For generic iterables/iterators, use tee to allow multiple "independent" iterations.
+        it1, it2 = itertools.tee(self.__arg)
+        self.__arg = it1  # Current stream continues with one tee'd iterator
+        return Stream(it2)  # New stream gets the other tee'd iterator
 
     def pairwise(self) -> "Stream[Pair[T, T]]":
         """
