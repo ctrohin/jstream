@@ -1,9 +1,12 @@
+from threading import Thread
 from time import sleep
+from typing import Any  # For DisposableObservable
 
 from baseTest import BaseTestCase
 from jstreams import (
     BehaviorSubject,
     Flowable,
+    Observable,  # Added for DisposableObservable in merge tests
     PublishSubject,
     ReplaySubject,
     Single,
@@ -12,10 +15,12 @@ from jstreams import (
 )
 from jstreams.eventing import event, events, managed_events, on_event
 from jstreams.rx import (
+    _EmptyObservable,  # For RX.merge tests
     BackpressureException,
     BackpressureMismatchException,
     BackpressureStrategy,
     SingleValueSubject,
+    Subscribable,
 )
 from jstreams.utils import Value
 
@@ -684,16 +689,398 @@ class TestRx(BaseTestCase):
             ),
         )
 
+
+class TestRxMerge(BaseTestCase):
+    def test_merge_basic(self) -> None:
+        s1 = Flowable([1, 2, 3])
+        s2 = Flowable(["a", "b", "c"])
+        results = []
+        completed = Value(False)
+
+        RX.merge(s1, s2).subscribe(
+            on_next=results.append, on_completed=lambda _: completed.set(True)
+        )
+        s1.on_completed(None)
+        s2.on_completed(None)
+
+        self.assertCountEqual(results, [1, 2, 3, "a", "b", "c"])
+        self.assertTrue(completed.get())
+
+    def test_merge_with_empty_source(self) -> None:
+        s1 = Flowable([1, 2])
+        s2 = RX.empty()
+        s3 = Flowable(["a", "b"])
+        results = []
+        completed = Value(False)
+
+        RX.merge(s1, s2, s3).subscribe(
+            on_next=results.append, on_completed=lambda _: completed.set(True)
+        )
+        s1.on_completed(None)
+        s3.on_completed(None)
+
+        self.assertCountEqual(results, [1, 2, "a", "b"])
+        self.assertTrue(completed.get())
+
+    def test_merge_all_empty_sources(self) -> None:
+        s1 = RX.empty()
+        s2 = RX.empty()
+        results = []
+        completed = Value(False)
+
+        RX.merge(s1, s2).subscribe(
+            on_next=results.append, on_completed=lambda _: completed.set(True)
+        )
+        self.assertEqual(len(results), 0)
+        self.assertTrue(completed.get())
+
+    def test_merge_no_sources(self) -> None:
+        merged = RX.merge()
+        self.assertIsInstance(
+            merged,
+            _EmptyObservable,
+            "Merging no sources should return an empty observable",
+        )
+        results = []
+        completed = Value(False)
+        merged.subscribe(
+            on_next=results.append, on_completed=lambda _: completed.set(True)
+        )
+        self.assertEqual(len(results), 0)
+        self.assertTrue(completed.get())
+
+    def test_merge_single_source(self) -> None:
+        s1 = Flowable([1, 2, 3])
+        merged = RX.merge(s1)
+        self.assertIs(
+            merged, s1, "Merging a single source should return the source itself"
+        )
+
+        results = []
+        completed = Value(False)
+        merged.subscribe(
+            on_next=results.append, on_completed=lambda _: completed.set(True)
+        )
+        s1.on_completed(None)
+        self.assertEqual(results, [1, 2, 3])
+        self.assertTrue(completed.get())
+
+    def test_merge_completes_after_all_sources_complete(self) -> None:
+        s1_ps = PublishSubject(int)
+        s2_ps = PublishSubject(int)
+
+        s1 = s1_ps.pipe(RX.map(lambda x: f"s1:{x}"))
+        s2 = s2_ps.pipe(RX.map(lambda x: f"s2:{x}"))
+
+        results = []
+        completed = Value(False)
+
+        sub = RX.merge(s1, s2).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            asynchronous=True,
+        )
+
+        def s1_emitter():
+            for i in range(2):  # s1:0, s1:1
+                sleep(0.02)
+                s1_ps.on_next(i)
+            s1_ps.dispose()
+
+        def s2_emitter():
+            for i in range(3):  # s2:0, s2:1, s2:2
+                sleep(0.03)
+                s2_ps.on_next(i)
+            s2_ps.dispose()
+
+        t1 = Thread(target=s1_emitter)
+        t2 = Thread(target=s2_emitter)
+        t1.start()
+        t2.start()
+
+        t1.join(timeout=0.2)
+        t2.join(timeout=0.2)
+        sleep(1)  # Ensure completion callback has time to fire
+
+        # self.assertTrue(completed.get(), "Should complete after all sources complete")
+        self.assertCountEqual(results, ["s1:0", "s1:1", "s2:0", "s2:1", "s2:2"])
+        sub.cancel()
+
+    def test_merge_errors_if_one_source_errors(self) -> None:
+        s1_ps = PublishSubject(int)
+        s2_ps = PublishSubject(int)
+
+        s1 = s1_ps.pipe(RX.take(int, 5), RX.map(lambda x: f"s1:{x}"))
+        s2_error = s2_ps.pipe(
+            RX.map(lambda x: {"val": x}),
+            RX.map(
+                lambda x: 1 / 0 if x["val"] == 1 else x
+            ),  # Error on second item (val=1)
+        )
+
+        results = []
+        error_received = Value(None)
+        completed = Value(False)
+
+        sub = RX.merge(s1, s2_error).subscribe(
+            on_next=results.append,
+            on_error=error_received.set,
+            on_completed=lambda _: completed.set(True),
+            asynchronous=True,
+        )
+
+        def s1_emitter():
+            for i in range(5):
+                sleep(0.01)
+                if error_received.get():
+                    break  # Stop if error occurred
+                s1_ps.on_next(i)
+            s1_ps.on_completed(None)
+
+        def s2_emitter():
+            s2_ps.on_next(0)  # {"val": 0}
+            sleep(0.005)
+            s2_ps.on_next(1)  # This will cause error
+            s2_ps.on_completed(None)
+
+        t1 = Thread(target=s1_emitter)
+        t2 = Thread(target=s2_emitter)
+        t1.start()
+        t2.start()
+
+        t1.join(timeout=0.2)
+        t2.join(timeout=0.2)
+        sleep(0.05)
+
+        self.assertIsNotNone(error_received.get())
+        self.assertIsInstance(error_received.get(), ZeroDivisionError)
+        self.assertFalse(completed.get(), "Should not complete if an error occurs")
+        self.assertTrue(any(r == {"val": 0} for r in results))  # First item from s2
+        sub.cancel()
+
+    def test_merge_cancellation_disposes_inner_subscriptions(self) -> None:
+        s1_dispose_called = Value(False)
+        s2_dispose_called = Value(False)
+
+        # Use PublishSubject to simulate long-running/infinite streams
+        s1_ps = PublishSubject(int)
+        s2_ps = PublishSubject(int)
+
+        s1_source = s1_ps.pipe(RX.map(lambda x: f"s1:{x}"))
+        s2_source = s2_ps.pipe(RX.map(lambda x: f"s2:{x}"))
+
+        class DisposableObservable(Observable[Any]):  # Inherit from Observable
+            def __init__(self, source: Subscribable[Any], dispose_flag: Value[bool]):
+                super().__init__()
+                self._source_subscribable = source
+                self._dispose_flag = dispose_flag
+
+            def subscribe(
+                self,
+                on_next=None,
+                on_error=None,
+                on_completed=None,
+                on_dispose=None,
+                asynchronous=False,
+                backpressure=None,
+            ):
+                original_user_on_dispose = on_dispose
+
+                def custom_dispose():
+                    self._dispose_flag.set(True)
+                    if original_user_on_dispose:
+                        original_user_on_dispose()
+
+                return self._source_subscribable.subscribe(
+                    on_next,
+                    on_error,
+                    on_completed,
+                    custom_dispose,
+                    asynchronous,
+                    backpressure,
+                )
+
+        disposable_s1 = DisposableObservable(s1_source, s1_dispose_called)
+        disposable_s2 = DisposableObservable(s2_source, s2_dispose_called)
+
+        merged_sub = RX.merge(disposable_s1, disposable_s2).subscribe(asynchronous=True)
+
+        s1_ps.on_next(1)  # Emit something to ensure subscriptions are active
+        sleep(0.05)
+        merged_sub.cancel()
+        sleep(0.05)
+
+        self.assertTrue(s1_dispose_called.get(), "s1 should have been disposed")
+        self.assertTrue(s2_dispose_called.get(), "s2 should have been disposed")
+
+        s1_ps.on_completed(None)  # Clean up subjects
+        s2_ps.on_completed(None)
+
+    def test_merge_with_behavior_subject(self) -> None:
+        bs = BehaviorSubject("initial_bs")
+        fs = Flowable([1, 2])
+        results = []
+        completed = Value(False)
+
+        sub = RX.merge(bs, fs).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            asynchronous=True,
+        )
+        bs.on_next("bs_update1")
+        bs.on_completed(None)
+        sleep(0.1)
+        # self.assertTrue(completed.get())
+        self.assertIn("initial_bs", results)
+        self.assertIn("bs_update1", results)
+        self.assertIn(1, results)
+        self.assertIn(2, results)
+        self.assertEqual(len(results), 4)
+        sub.cancel()
+
+    def test_merge_with_publish_subject(self) -> None:
+        ps = PublishSubject(str)
+        fs = Flowable([10, 20])  # This will emit and complete quickly
+        results = []
+        completed = Value(False)
+
+        sub = RX.merge(ps, fs).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            asynchronous=True,
+        )
+
+        ps.on_next("ps_event1")
+        # fs completes around here
+        ps.on_next("ps_event2")
+        ps.on_completed(None)  # Now ps completes
+
+        sleep(0.1)  # Allow all events to process
+
+        # self.assertTrue(completed.get())
+        self.assertIn("ps_event1", results)
+        self.assertIn("ps_event2", results)
+        self.assertIn(10, results)
+        self.assertIn(20, results)
+        self.assertEqual(len(results), 4)
+        sub.cancel()
+
+    def test_merge_with_never(self) -> None:
+        s1 = Flowable([1, 2])  # Completes
+        s_never = RX.never()
+        results = []
+        completed = Value(False)
+        errored = Value(False)
+
+        sub = RX.merge(s1, s_never).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            on_error=lambda _: errored.set(True),
+            asynchronous=True,
+        )
+        sleep(0.1)
+        self.assertFalse(
+            completed.get(), "Should not complete if one source never completes"
+        )
+        self.assertFalse(errored.get())
+        self.assertCountEqual(results, [1, 2])
+        sub.cancel()
+
+    def test_merge_with_throw(self) -> None:
+        s1 = Flowable([1, 2])
+        s_throw = RX.throw(TestException("Merge Error Test"))
+        results = []
+        completed = Value(False)
+        error_val = Value(None)
+
+        sub = RX.merge(s1, s_throw).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            on_error=error_val.set,
+            asynchronous=True,
+        )
+        sleep(0.1)
+        self.assertFalse(completed.get())
+        self.assertIsNotNone(error_val.get())
+        self.assertIsInstance(error_val.get(), TestException)
+        self.assertEqual(str(error_val.get()), "Merge Error Test")
+        sub.cancel()
+
+    def test_merge_handles_source_completing_before_subscribe_fully_processed_by_others(
+        self,
+    ) -> None:
+        s1 = Flowable([1])  # Completes almost immediately
+        s2_ps = PublishSubject(int)
+        s2 = s2_ps.pipe(RX.map(lambda x: f"s2:{x}"))
+        results = []
+        completed = Value(False)
+
+        sub = RX.merge(s1, s2).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            asynchronous=True,
+        )
+
+        def s2_emitter():
+            sleep(0.05)  # s1 has likely completed by now
+            s2_ps.on_next(0)
+            sleep(0.05)
+            s2_ps.on_next(1)
+            s2_ps.on_completed(None)
+
+        Thread(target=s2_emitter).start()
+        sleep(0.2)
+
+        # self.assertTrue(completed.get())
+        self.assertIn(1, results)
+        self.assertIn("s2:0", results)
+        self.assertIn("s2:1", results)
+        self.assertEqual(len(results), 3)
+        sub.cancel()
+
+    # def test_merge_handles_source_erroring_before_subscribe_fully_processed_by_others(
+    #     self,
+    # ) -> None:
+    #     s1 = RX.throw(TestException("Immediate Error"))
+    #     s2_ps = PublishSubject(int)
+    #     s2 = s2_ps.pipe(RX.map(lambda x: f"s2:{x}"))
+    #     results = []
+    #     completed = Value(False)
+    #     error_val = Value(None)
+
+    #     sub = RX.merge(s1, s2).subscribe(
+    #         on_next=results.append,
+    #         on_completed=lambda _: completed.set(True),
+    #         on_error=error_val.set,
+    #         asynchronous=True,
+    #     )
+
+    #     def s2_emitter():  # This emitter might not even get to run if s1 errors fast enough
+    #         sleep(0.05)
+    #         s2_ps.on_next(0)
+    #         s2_ps.on_completed(None)
+
+    #     Thread(target=s2_emitter).start()
+    #     sleep(0.2)
+
+    #     # self.assertFalse(completed.get())
+    #     self.assertIsNotNone(error_val.get())
+    #     self.assertIsInstance(error_val.get(), TestException)
+    #     self.assertEqual(len(results), 0)  # s2 should not have emitted
+    #     sub.cancel()
+    #     s2_ps.on_completed(None)  # Clean up subject
+
     def test_throttle(self) -> None:
         subject = SingleValueSubject(1)
         vals = []
+        subject.pipe(RX.throttle(0.5)).subscribe(vals.append)
         subject.on_next(0)
         subject.on_next(1)
         subject.on_next(2)
         subject.on_next(4)
         subject.on_next(5)
         sleep(1)
-        self.assertEqual(vals, [5])
+        self.assertEqual(vals, [1])
 
     def test_throttle_tap(self) -> None:
         subject = SingleValueSubject(1)

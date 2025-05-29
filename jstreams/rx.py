@@ -152,7 +152,7 @@ class ObservableSubscription(Generic[T]):
         "__on_next",
         "__on_error",
         "__on_completed",
-        "__on_dispose",
+        "on_dispose",
         "__subscription_id",
         "__paused",
         "__asynchronous",
@@ -179,7 +179,7 @@ class ObservableSubscription(Generic[T]):
         self.__on_next = on_next
         self.__on_error = on_error
         self.__on_completed = on_completed
-        self.__on_dispose = on_dispose
+        self.on_dispose = on_dispose
         self.__subscription_id = str(uuid.uuid4())
         self.__paused = False
         self.__asynchronous = asynchronous
@@ -240,12 +240,14 @@ class ObservableSubscription(Generic[T]):
         self.__paused = False
 
     def dispose(self) -> None:
-        if self.__on_dispose:
-            self.__on_dispose()
+        if self.on_dispose:
+            self.on_dispose()
 
     def cancel(self) -> None:
         if hasattr(self.__parent, "cancel"):
             self.__parent.cancel(self)
+        # Directly dispose the subscription, which will trigger its on_dispose handler
+        self.dispose()
 
 
 class _ObservableParent(Generic[T]):
@@ -688,6 +690,143 @@ class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
             .to_list()
         )
         return PipeObservable(self, Pipe(T, V, op_list))  # type: ignore
+
+
+class _MergeSubscriptionManager(Generic[T]):
+    __slots__ = (
+        "_sources",
+        "_merged_subscription",
+        "_inner_subscriptions",
+        "_completed_count",
+        "_errored",
+        "_lock",
+        "_asynchronous_sources",
+        "_backpressure_sources",
+    )
+
+    def __init__(
+        self,
+        sources: tuple[Subscribable[T], ...],
+        merged_subscription: ObservableSubscription[T],
+        asynchronous_sources: bool,
+        backpressure_sources: Optional[BackpressureStrategy],
+    ):
+        self._sources = sources
+        self._merged_subscription = merged_subscription
+        self._inner_subscriptions: list[ObservableSubscription[Any]] = []
+        self._completed_count = 0
+        self._errored = False
+        self._lock = Lock()
+        self._asynchronous_sources = asynchronous_sources
+        self._backpressure_sources = backpressure_sources
+
+    def _on_next_forward(self, value: T) -> None:
+        if not self._merged_subscription.is_paused():
+            self._merged_subscription.on_next(value)
+
+    def _on_error_forward(self, ex: Exception) -> None:
+        should_forward_error = False
+        with self._lock:
+            if not self._errored:
+                self._errored = True
+                should_forward_error = True
+
+        if should_forward_error:
+            self._merged_subscription.on_error(ex)
+            self.dispose_all_inner()  # Cancel all other sources
+
+    def _on_completed_forward(self, _: Optional[Any] = None) -> None:
+        should_complete_merged = False
+        with self._lock:
+            if self._errored:
+                return
+            self._completed_count += 1
+            if self._completed_count == len(self._sources):
+                should_complete_merged = True
+
+        if should_complete_merged:
+            self._merged_subscription.on_completed(None)
+            # All sources completed, manager can also consider its job done.
+            # self.dispose_all_inner() # Optionally cleanup immediately.
+            # Relying on merged_subscription's lifecycle for now.
+
+    def subscribe_to_sources(self) -> None:
+        if not self._sources:  # Should be guarded by MergeObservable's init
+            if not self._errored:
+                self._merged_subscription.on_completed(None)
+            return
+
+        # Optimization: if all sources are known to be empty, complete immediately.
+        # This check is a bit optimistic as it doesn't cover all empty-like observables.
+        if all(isinstance(s, _EmptyObservable) for s in self._sources):
+            if not self._errored:
+                self._merged_subscription.on_completed(None)
+            return
+
+        for source in self._sources:
+            inner_sub = source.subscribe(
+                on_next=self._on_next_forward,
+                on_error=self._on_error_forward,
+                on_completed=self._on_completed_forward,
+                asynchronous=self._asynchronous_sources,
+                backpressure=self._backpressure_sources,
+            )
+            self._inner_subscriptions.append(inner_sub)
+
+    def dispose_all_inner(self) -> None:
+        for sub in self._inner_subscriptions:
+            sub.cancel()  # This will call sub.dispose()
+        self._inner_subscriptions.clear()
+
+
+class MergeObservable(Subscribable[T]):
+    __slots__ = ("_sources",)
+
+    def __init__(self, *sources: Subscribable[T]):
+        if not sources:
+            # If no sources, it behaves like an empty observable
+            self._sources: tuple[Subscribable[T], ...] = (RX.empty(),)
+        else:
+            self._sources = sources
+
+    def subscribe(
+        self,
+        on_next: Optional[NextHandler[T]] = None,
+        on_error: ErrorHandler = None,
+        on_completed: CompletedHandler[T] = None,
+        on_dispose: DisposeHandler = None,
+        asynchronous: bool = False,
+        backpressure: Optional[BackpressureStrategy] = None,
+    ) -> ObservableSubscription[T]:
+        merged_subscription = ObservableSubscription(
+            self,  # Parent for potential cancellation, though direct dispose is preferred
+            on_next if on_next else _empty_sub,
+            on_error,
+            on_completed,
+            on_dispose,  # User's on_dispose for the merged stream
+            asynchronous,
+            backpressure,
+        )
+
+        manager = _MergeSubscriptionManager[T](
+            self._sources,
+            merged_subscription,
+            asynchronous,  # How sources push to the manager
+            backpressure,  # Backpressure from sources to manager
+        )
+
+        original_on_dispose_for_merged_sub = merged_subscription.on_dispose
+
+        def custom_dispose_logic() -> None:
+            manager.dispose_all_inner()
+            if original_on_dispose_for_merged_sub:
+                original_on_dispose_for_merged_sub()
+
+        merged_subscription.on_dispose = custom_dispose_logic
+
+        manager.subscribe_to_sources()
+
+        return merged_subscription
 
 
 class Observable(_Observable[T]):
@@ -1972,6 +2111,20 @@ class RX:
         """
         return ElementAt(index)
 
+    @staticmethod
+    def merge(*sources: Subscribable[T]) -> Subscribable[T]:
+        """
+        Merges multiple Observables into one Observable by emitting all items from all
+        of the source Observables.
+        The merged Observable completes only after all source Observables have completed.
+        If any of the source Observables errors, the merged Observable immediately errors.
+        """
+        if not sources:
+            return RX.empty()
+        if len(sources) == 1:
+            return sources[0]  # No need to wrap a single source
+        return MergeObservable(*sources)
+
 
 def rx_reduce(reducer: Callable[[T, T], T]) -> RxOperator[T, T]:
     """
@@ -2255,3 +2408,11 @@ def rx_debounce(timespan: float) -> RxOperator[T, T]:
         timespan (float): The timespan in seconds to wait before emitting the value.
     """
     return RX.debounce(timespan)
+
+
+def rx_merge(*sources: Subscribable[T]) -> Subscribable[T]:
+    """
+    Merges multiple Observables into one by emitting all items from all sources.
+    Completes when all sources complete; errors if any source errors.
+    """
+    return RX.merge(*sources)
