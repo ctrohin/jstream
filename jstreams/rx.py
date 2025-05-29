@@ -21,6 +21,7 @@ from jstreams.predicate import not_strict
 from jstreams.stream import Stream
 import abc
 
+from jstreams.timer import Timer
 from jstreams.utils import Value, is_empty_or_none
 
 T = TypeVar("T")
@@ -75,6 +76,37 @@ class RxOperator(Generic[T, V], abc.ABC):
     def init(self) -> None:
         pass
 
+    def emmits_none(self) -> bool:
+        return True
+
+
+class _WrapOperator:
+    def __init__(self, op: RxOperator[Any, Any]) -> None:
+        self.__op = op
+        self.__next: Optional[Union[_WrapOperator, Callable[[Any], Any]]] = None
+
+    def set_next(self, next_op: Union["_WrapOperator", Callable[[Any], Any]]) -> None:
+        self.__next = next_op
+
+    def process(self, v: Any) -> None:
+        if isinstance(self.__op, BaseFilteringOperator):
+            if not self.__op.matches(v):  # Pass current transformed value 'v'
+                return
+        elif isinstance(self.__op, DelayedBaseFilteringOperator):
+            if self.__next is None or not self.__op.matches(v, self.__next):
+                return
+        elif isinstance(self.__op, BaseMappingOperator):
+            v = self.__op.transform(v)
+
+        if not self.__op.emmits_none() and v is None:
+            return
+
+        if self.__next is not None:
+            self.__next(v)
+
+    def __call__(self, v: Any) -> None:
+        self.process(v)
+
 
 class Pipe(Generic[T, V]):
     __slots__ = ("__operators",)
@@ -88,15 +120,19 @@ class Pipe(Generic[T, V]):
         super().__init__()
         self.__operators: list[RxOperator[Any, Any]] = ops
 
-    def apply(self, val: T) -> Optional[V]:
-        v: Any = val
-        for op in self.__operators:
-            if isinstance(op, BaseFilteringOperator):
-                if not op.matches(v):  # Pass current transformed value 'v'
-                    return None
-            elif isinstance(op, BaseMappingOperator):
-                v = op.transform(v)
-        return cast(V, v)  # Return the finally transformed value
+    def __build_chain(self, callback: Callable[[Any], Any]) -> list[_WrapOperator]:
+        chain: list[_WrapOperator] = [_WrapOperator(op) for op in self.__operators]
+        prev = chain[0]
+        for wop in chain:
+            if wop != prev:
+                prev.set_next(wop)
+            prev = wop
+        prev.set_next(callback)
+        return chain
+
+    def apply(self, val: T, callback: Callable[[Any], Any]) -> None:
+        chain = self.__build_chain(callback)
+        chain[0].process(val)
 
     def clone(self) -> "Pipe[T, V]":
         return Pipe(T, V, deepcopy(self.__operators))  # type: ignore[misc]
@@ -587,16 +623,12 @@ class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
         clone_pipe = self.__pipe.clone()
 
         def on_next_wrapped(val: T) -> None:
-            result = clone_pipe.apply(val)
-            if result is not None:
-                on_next(result)
+            clone_pipe.apply(val, on_next)
 
         def on_completed_wrapped(val: Optional[T]) -> None:
             if val is None or on_completed is None:
                 return
-            result = clone_pipe.apply(val)
-            if result is not None:
-                on_completed(result)
+            clone_pipe.apply(val, on_completed)
 
         return (on_next_wrapped, on_completed_wrapped)
 
@@ -1091,6 +1123,16 @@ class BaseFilteringOperator(RxOperator[T, T]):
         return self.__fn(val)
 
 
+class DelayedBaseFilteringOperator(RxOperator[T, T]):
+    __slots__ = ("__fn",)
+
+    def __init__(self, predicate: Callable[[T, Callable[[Any], Any]], bool]) -> None:
+        self.__fn = predicate
+
+    def matches(self, val: T, callback: Callable[[Any], Any]) -> bool:
+        return self.__fn(val, callback)
+
+
 class BaseMappingOperator(RxOperator[T, V]):
     __slots__ = ("__fn",)
 
@@ -1466,6 +1508,40 @@ class Throttle(BaseFilteringOperator[T]):
         return False
 
 
+class Debounce(DelayedBaseFilteringOperator[T]):
+    __slots__ = ("__timespan", "__last_value", "__interval")
+
+    def __init__(self, timespan: float) -> None:
+        """
+        Emits a value from the source Observable, after a particular timespan passes without new emissions.
+
+        Args:
+            timespan (float): The timespan in seconds to wait before emitting the value.
+        """
+        self.__timespan = timespan
+        self.__interval: Optional[Timer] = None
+        self.__last_value: Optional[T] = None
+        super().__init__(self.__debounce)
+
+    def init(self) -> None:
+        self.__last_value = None
+
+    def __create_timer(self, callback: Callable[[Any], Any]) -> Timer:
+        def do() -> None:
+            print("Ran")
+            callback(self.__last_value)
+
+        return Timer(self.__timespan, 0.01, do)
+
+    def __debounce(self, val: T, callback: Callable[[Any], Any]) -> bool:
+        self.__last_value = val
+        if self.__interval is not None:
+            self.__interval.cancel()
+        self.__interval = self.__create_timer(callback)
+        self.__interval.start()
+        return False
+
+
 class Buffer(BaseMappingOperator[T, list[T]]):
     __slots__ = ("__timespan", "__buffer", "__last_checked")
 
@@ -1504,6 +1580,9 @@ class Buffer(BaseMappingOperator[T, list[T]]):
             return emitted_buffer
         return None
 
+    def emmits_none(self) -> bool:
+        return False
+
 
 class BufferCount(BaseMappingOperator[T, list[T]]):
     __slots__ = ("__count", "__buffer")
@@ -1534,6 +1613,9 @@ class BufferCount(BaseMappingOperator[T, list[T]]):
             self.__buffer = []
             return emitted_buffer
         return None
+
+    def emmits_none(self) -> bool:
+        return False
 
 
 @dataclass
@@ -1760,6 +1842,16 @@ class RX:
             timespan (float): The timespan in seconds to wait before allowing another emission.
         """
         return Throttle(timespan)
+
+    @staticmethod
+    def debounce(timespan: float) -> RxOperator[T, T]:
+        """
+        Emits a value from the source Observable, after a particular timespan passes without new emissions.
+
+        Args:
+            timespan (float): The timespan in seconds to wait before emitting the value.
+        """
+        return Debounce(timespan)
 
     @staticmethod
     def buffer(timespan: float) -> RxOperator[T, list[T]]:
@@ -2143,3 +2235,13 @@ def rx_element_at(index: int) -> RxOperator[T, T]:
     Emits only the item emitted by the source Observable at the specified index.
     """
     return RX.element_at(index)
+
+
+def rx_debounce(timespan: float) -> RxOperator[T, T]:
+    """
+    Emits a value from the source Observable, after a particular timespan passes without new emissions.
+
+    Args:
+        timespan (float): The timespan in seconds to wait before emitting the value.
+    """
+    return RX.debounce(timespan)

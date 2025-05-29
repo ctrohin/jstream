@@ -111,6 +111,8 @@ from jstreams.rx import (
     Tap,
     Ignore,
     TimestampOperator,
+    rx_debounce,
+    Debounce,
 )
 
 from jstreams.thread import (
@@ -637,4 +639,6 @@ __all__ = [
     "Tap",
     "Ignore",
     "TimestampOperator",
+    "rx_debounce",
+    "Debounce",
 ]
