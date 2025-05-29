@@ -271,7 +271,7 @@ class Subscribable(abc.ABC, Generic[T]):
     @abc.abstractmethod
     def subscribe(
         self,
-        on_next: NextHandler[T],
+        on_next: Optional[NextHandler[T]] = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
@@ -481,7 +481,7 @@ class _ObservableBase(Subscribable[T]):
 
     def subscribe(
         self,
-        on_next: NextHandler[T],
+        on_next: Optional[NextHandler[T]] = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
@@ -503,6 +503,8 @@ class _ObservableBase(Subscribable[T]):
             on_dispose (DisposeHandler, optional): Dispose handler. Defaults to None.
             asynchronous (boolean): Flags if the subscription should be asynchronous. Asynchronous subscriptions
                                     are executed in a thread pool. Defaults to False.
+            backpressure (Optional[BackpressureStrategy]) Specifies what backpressure strategy should be used by this
+                                                          subscription. Defaults to None.
 
         Returns:
             ObservableSubscription[V]: The subscription
@@ -510,7 +512,7 @@ class _ObservableBase(Subscribable[T]):
 
         sub = ObservableSubscription(
             self,
-            on_next,
+            on_next if on_next else _empty_sub,
             on_error,
             on_completed,
             on_dispose,
@@ -553,7 +555,7 @@ class _ObservableBase(Subscribable[T]):
     def resume_paused(self) -> None:
         (
             Stream(self.__subscriptions)
-            .filter(ObservableSubscription.is_paused)
+            .filter(lambda s: s.is_paused())
             .each(lambda s: s.resume())
         )
 
@@ -571,6 +573,10 @@ class _Observable(_ObservableBase[T], _ObservableParent[T]):
         super().__init__()
 
 
+def _empty_sub(_: Any) -> None:
+    pass
+
+
 class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
     __slots__ = ("__pipe", "__parent")
 
@@ -581,7 +587,7 @@ class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
 
     def subscribe(
         self,
-        on_next: NextHandler[V],
+        on_next: Optional[NextHandler[V]] = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[V] = None,
         on_dispose: DisposeHandler = None,
@@ -603,11 +609,15 @@ class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
             on_dispose (DisposeHandler, optional): Dispose handler. Defaults to None.
             asynchronous (boolean): Flags if the subscription should be asynchronous. Asynchronous subscriptions
                                     are executed in a thread pool. Defaults to False.
+            backpressure (Optional[BackpressureStrategy]) Specifies what backpressure strategy should be used by this
+                                                          subscription. Defaults to None.
 
         Returns:
             ObservableSubscription[V]: The subscription
         """
-        wrapped_on_next, wrapped_on_completed = self.__wrap(on_next, on_completed)
+        wrapped_on_next, wrapped_on_completed = self.__wrap(
+            on_next if on_next else _empty_sub, on_completed
+        )
         return self.__parent.subscribe(
             wrapped_on_next,
             on_error,
@@ -917,7 +927,7 @@ class _EmptyObservable(Subscribable[Any]):
 
     def subscribe(
         self,
-        on_next: NextHandler[Any],
+        on_next: Optional[NextHandler[Any]] = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[Any] = None,
         on_dispose: DisposeHandler = None,
@@ -950,7 +960,7 @@ class _NeverObservable(Subscribable[Any]):
 
     def subscribe(
         self,
-        on_next: NextHandler[Any],
+        on_next: Optional[NextHandler[Any]] = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[Any] = None,
         on_dispose: DisposeHandler = None,
@@ -960,7 +970,7 @@ class _NeverObservable(Subscribable[Any]):
         # Returns a subscription that does nothing and can be disposed.
         return ObservableSubscription(
             self,
-            on_next,
+            on_next if on_next else _empty_sub,
             on_error,
             on_completed,
             on_dispose,
@@ -975,7 +985,7 @@ class _ThrowErrorObservable(Subscribable[T]):
 
     def subscribe(
         self,
-        on_next: NextHandler[T],
+        on_next: Optional[NextHandler[T]] = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
@@ -1003,7 +1013,7 @@ class _ThrowErrorObservable(Subscribable[T]):
             _error_action()
         return ObservableSubscription(
             self,
-            on_next,
+            on_next if on_next else _empty_sub,
             on_error,
             on_completed,
             on_dispose,
@@ -1021,7 +1031,7 @@ class _DeferObservable(
 
     def subscribe(
         self,
-        on_next: NextHandler[T],
+        on_next: Optional[NextHandler[T]] = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
@@ -1037,7 +1047,7 @@ class _DeferObservable(
             )
             return ObservableSubscription(
                 self,
-                on_next,
+                on_next if on_next else _empty_sub,
                 on_error,
                 on_completed,
                 on_dispose,

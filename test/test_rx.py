@@ -687,7 +687,18 @@ class TestRx(BaseTestCase):
     def test_throttle(self) -> None:
         subject = SingleValueSubject(1)
         vals = []
-        subject.pipe(RX.debounce(0.5)).subscribe(vals.append)
+        subject.on_next(0)
+        subject.on_next(1)
+        subject.on_next(2)
+        subject.on_next(4)
+        subject.on_next(5)
+        sleep(1)
+        self.assertEqual(vals, [5])
+
+    def test_throttle_tap(self) -> None:
+        subject = SingleValueSubject(1)
+        vals = []
+        subject.pipe(RX.debounce(0.5), RX.tap(vals.append)).subscribe()
         subject.on_next(0)
         subject.on_next(1)
         subject.on_next(2)
