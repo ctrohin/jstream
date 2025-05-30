@@ -1,8 +1,8 @@
 from threading import Lock, Thread
 from time import sleep
+from typing import Any, Callable
 
 from jstreams.thread import LoopingThread, Cancellable
-from jstreams.types import TAction
 
 
 class Timer(Thread, Cancellable):
@@ -22,7 +22,7 @@ class Timer(Thread, Cancellable):
     )
 
     def __init__(
-        self, time: float, cancel_polling_time: float, callback: TAction
+        self, time: float, cancel_polling_time: float, callback: Callable[[], Any]
     ) -> None:
         """
         Constructor.
@@ -30,7 +30,7 @@ class Timer(Thread, Cancellable):
         Args:
             time (float): Number of seconds until execution
             cancelPollingTime (float): Number of seconds at which this timer will poll for cancel flag
-            callback (TAction): The callback to be executed
+            callback (Callable[[], Any]): The callback to be executed
         """
         if time <= 0 or cancel_polling_time <= 0:
             raise ValueError(
@@ -42,7 +42,7 @@ class Timer(Thread, Cancellable):
 
         self.__time = time
         self.__cancel_polling_time = cancel_polling_time
-        self.__callback: TAction = callback
+        self.__callback: Callable[[], Any] = callback
         self.__canceled: bool = False
         self.__lock = Lock()
         Thread.__init__(self)
@@ -76,13 +76,13 @@ class Interval(LoopingThread):
 
     __slots__ = ("__interval", "__callback")
 
-    def __init__(self, interval: float, callback: TAction) -> None:
+    def __init__(self, interval: float, callback: Callable[[], Any]) -> None:
         """
         The interval thread calls the given callback at intervals defined by the interval parameter (in seconds).
 
         Args:
             interval (float): The interval at which the callback will be called
-            callback (TAction): The callback
+            callback (Callable[[], Any]): The callback
 
         Raises:
             ValueError: _description_
@@ -107,7 +107,7 @@ class CountdownTimer(Thread):
 
     __slots__ = ("__timeout", "__callback")
 
-    def __init__(self, timeout: float, callback: TAction) -> None:
+    def __init__(self, timeout: float, callback: Callable[[], Any]) -> None:
         """
         Constructor. This object cannot be cancelled. Once started, the callback will be
         unconditionally executed after the given time has ellapsed. This implementation
@@ -116,7 +116,7 @@ class CountdownTimer(Thread):
 
         Args:
             timeout (float): The number of seconds that should pass until the execution of the callback
-            callback (TAction): The callback function
+            callback (Callable[[], Any]): The callback function
         """
         Thread.__init__(self)
         if timeout <= 0:
@@ -130,13 +130,13 @@ class CountdownTimer(Thread):
         self.__callback()
 
 
-def set_timer(timeout: float, callback: TAction) -> Cancellable:
+def set_timer(timeout: float, callback: Callable[[], Any]) -> Cancellable:
     timer = Timer(timeout, 1, callback)
     timer.start()
     return timer
 
 
-def set_interval(interval: float, callback: TAction) -> Cancellable:
+def set_interval(interval: float, callback: Callable[[], Any]) -> Cancellable:
     timer = Interval(interval, callback)
     timer.start()
     return timer

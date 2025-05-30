@@ -1,7 +1,6 @@
-from typing import Any, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
 from jstreams.predicate import Predicate, predicate_of
-from jstreams.types import TPredicate
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -126,7 +125,9 @@ def triplet_of(values: tuple[T, V, K]) -> Triplet[T, V, K]:
     return triplet(t_val, v_val, k_val)
 
 
-def left_matches(predicate_arg: TPredicate[T]) -> Predicate[Pair[Any, Any]]:
+def left_matches(
+    predicate_arg: Callable[[T], bool],
+) -> Predicate[Pair[Any, Any]]:
     """
     Produces a predicate that checks if the left value of a Pair/Triplet matches the given predicate
 
@@ -143,7 +144,9 @@ def left_matches(predicate_arg: TPredicate[T]) -> Predicate[Pair[Any, Any]]:
     return predicate_of(wrap)
 
 
-def right_matches(predicate_arg: TPredicate[V]) -> Predicate[Pair[Any, Any]]:
+def right_matches(
+    predicate_arg: Callable[[V], bool],
+) -> Predicate[Pair[Any, Any]]:
     """
     Produces a predicate that checks if the right value of a Pair/Triplet matches the given predicate
 
@@ -160,7 +163,9 @@ def right_matches(predicate_arg: TPredicate[V]) -> Predicate[Pair[Any, Any]]:
     return predicate_of(wrap)
 
 
-def middle_matches(predicate_arg: TPredicate[V]) -> Predicate[Triplet[Any, Any, Any]]:
+def middle_matches(
+    predicate_arg: Callable[[V], bool],
+) -> Predicate[Triplet[Any, Any, Any]]:
     """
     Produces a predicate that checks if the middle value of a Triplet matches the given predicate
 

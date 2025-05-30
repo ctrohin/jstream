@@ -3,6 +3,7 @@ import logging
 from threading import Lock, Thread
 import time
 from typing import (
+    Callable,
     Generic,
     Iterable,
     Optional,
@@ -21,21 +22,6 @@ from jstreams.stream import Stream
 import abc
 
 from jstreams.timer import Timer
-from jstreams.types import (
-    CompletedHandler,
-    DisposeHandler,
-    ErrorHandler,
-    NextHandler,
-    TAccumulator,
-    TErrorOrFactory,
-    TFactory,
-    TMapper,
-    TParamAction,
-    TParamPredicate,
-    TPredicate,
-    TReducer,
-    TAnyFunction,
-)
 from jstreams.utils import Value, is_empty_or_none
 
 T = TypeVar("T")
@@ -53,6 +39,12 @@ L = TypeVar("L")
 M = TypeVar("M")
 N = TypeVar("N")
 V = TypeVar("V")
+
+
+ErrorHandler = Optional[Callable[[Exception], Any]]
+CompletedHandler = Optional[Callable[[Optional[T]], Any]]
+NextHandler = Callable[[T], Any]
+DisposeHandler = Optional[Callable[[], Any]]
 
 
 class BackpressureException(Exception):
@@ -91,9 +83,9 @@ class RxOperator(Generic[T, V], abc.ABC):
 class _WrapOperator:
     def __init__(self, op: RxOperator[Any, Any]) -> None:
         self.__op = op
-        self.__next: Optional[Union[_WrapOperator, TAnyFunction]] = None
+        self.__next: Optional[Union[_WrapOperator, Callable[[Any], Any]]] = None
 
-    def set_next(self, next_op: Union["_WrapOperator", TAnyFunction]) -> None:
+    def set_next(self, next_op: Union["_WrapOperator", Callable[[Any], Any]]) -> None:
         self.__next = next_op
 
     def process(self, v: Any) -> None:
@@ -128,7 +120,7 @@ class Pipe(Generic[T, V]):
         super().__init__()
         self.__operators: list[RxOperator[Any, Any]] = ops
 
-    def __build_chain(self, callback: TParamAction[Any]) -> list[_WrapOperator]:
+    def __build_chain(self, callback: Callable[[Any], Any]) -> list[_WrapOperator]:
         chain: list[_WrapOperator] = [_WrapOperator(op) for op in self.__operators]
         prev = chain[0]
         for wop in chain:
@@ -138,7 +130,7 @@ class Pipe(Generic[T, V]):
         prev.set_next(callback)
         return chain
 
-    def apply(self, val: T, callback: TParamAction[Any]) -> None:
+    def apply(self, val: T, callback: Callable[[Any], Any]) -> None:
         chain = self.__build_chain(callback)
         chain[0].process(val)
 
@@ -638,8 +630,8 @@ class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
         )
 
     def __wrap(
-        self, on_next: TParamAction[V], on_completed: CompletedHandler[V]
-    ) -> tuple[TParamAction[T], CompletedHandler[T]]:
+        self, on_next: Callable[[V], Any], on_completed: CompletedHandler[V]
+    ) -> tuple[Callable[[T], Any], CompletedHandler[T]]:
         clone_pipe = self.__pipe.clone()
 
         def on_next_wrapped(val: T) -> None:
@@ -1127,7 +1119,7 @@ class _NeverObservable(Subscribable[Any]):
 
 
 class _ThrowErrorObservable(Subscribable[T]):
-    def __init__(self, error_or_factory: TErrorOrFactory):
+    def __init__(self, error_or_factory: Union[Exception, Callable[[], Exception]]):
         self._error_or_factory = error_or_factory
 
     def subscribe(
@@ -1172,7 +1164,7 @@ class _ThrowErrorObservable(Subscribable[T]):
 class _DeferObservable(
     Observable[T]
 ):  # Inherits Observable to use its subscription management
-    def __init__(self, factory: TFactory[Subscribable[T]]):
+    def __init__(self, factory: Callable[[], Subscribable[T]]):
         super().__init__()
         self._factory = factory
 
@@ -1273,7 +1265,7 @@ class ReplaySubject(Flowable[T], _OnNext[T]):
 class BaseFilteringOperator(RxOperator[T, T]):
     __slots__ = ("__fn",)
 
-    def __init__(self, predicate: TPredicate[T]) -> None:
+    def __init__(self, predicate: Callable[[T], bool]) -> None:
         self.__fn = predicate
 
     def matches(self, val: T) -> bool:
@@ -1283,17 +1275,17 @@ class BaseFilteringOperator(RxOperator[T, T]):
 class DelayedBaseFilteringOperator(RxOperator[T, T]):
     __slots__ = ("__fn",)
 
-    def __init__(self, predicate: TParamPredicate[T, TParamAction[Any]]) -> None:
+    def __init__(self, predicate: Callable[[T, Callable[[Any], Any]], bool]) -> None:
         self.__fn = predicate
 
-    def matches(self, val: T, callback: TParamAction[Any]) -> bool:
+    def matches(self, val: T, callback: Callable[[Any], Any]) -> bool:
         return self.__fn(val, callback)
 
 
 class BaseMappingOperator(RxOperator[T, V]):
     __slots__ = ("__fn",)
 
-    def __init__(self, mapper: TMapper[T, V]) -> None:
+    def __init__(self, mapper: Callable[[T], V]) -> None:
         self.__fn = mapper
 
     def transform(self, val: T) -> V:
@@ -1301,12 +1293,12 @@ class BaseMappingOperator(RxOperator[T, V]):
 
 
 class Reduce(BaseFilteringOperator[T]):
-    def __init__(self, reducer: TReducer[T]) -> None:
+    def __init__(self, reducer: Callable[[T, T], T]) -> None:
         """
         Reduces two consecutive values into one by applying the provided reducer function
 
         Args:
-            reducer (TReducer[T]): Reducer function
+            reducer (Callable[[T, T], T]): Reducer function
         """
         self.__reducer = reducer
         self.__prev_val: Optional[T] = None
@@ -1329,23 +1321,23 @@ class Reduce(BaseFilteringOperator[T]):
 
 
 class Filter(BaseFilteringOperator[T]):
-    def __init__(self, predicate: TPredicate[T]) -> None:  # pylint: disable=useless-parent-delegation
+    def __init__(self, predicate: Callable[[T], bool]) -> None:  # pylint: disable=useless-parent-delegation
         """
         Allows only values that match the given predicate to flow through
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
         """
         super().__init__(predicate)
 
 
 class Map(BaseMappingOperator[T, V]):
-    def __init__(self, mapper: TMapper[T, V]) -> None:  # pylint: disable=useless-parent-delegation
+    def __init__(self, mapper: Callable[[T], V]) -> None:  # pylint: disable=useless-parent-delegation
         """
         Maps a value to a differnt value/form using the mapper function
 
         Args:
-            mapper (TMapper[T, V]): The mapper function
+            mapper (Callable[[T], V]): The mapper function
         """
         super().__init__(mapper)
 
@@ -1374,12 +1366,14 @@ class Take(BaseFilteringOperator[T]):
 
 
 class TakeWhile(BaseFilteringOperator[T]):
-    def __init__(self, predicate: TPredicate[T], include_stop_value: bool) -> None:
+    def __init__(
+        self, predicate: Callable[[T], bool], include_stop_value: bool
+    ) -> None:
         """
         Allows values to pass through as long as they match the give predicate. After one value is found not matching, no other values will flow through
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
         """
         self.__fn = predicate
         self.__should_push = True
@@ -1399,12 +1393,14 @@ class TakeWhile(BaseFilteringOperator[T]):
 
 
 class TakeUntil(BaseFilteringOperator[T]):
-    def __init__(self, predicate: TPredicate[T], include_stop_value: bool) -> None:
+    def __init__(
+        self, predicate: Callable[[T], bool], include_stop_value: bool
+    ) -> None:
         """
         Allows values to pass through until the first value found to match the give predicate. After that, no other values will flow through
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
         """
         self.__fn = predicate
         self.__should_push = True
@@ -1447,12 +1443,12 @@ class Drop(BaseFilteringOperator[T]):
 
 
 class DropWhile(BaseFilteringOperator[T]):
-    def __init__(self, predicate: TPredicate[T]) -> None:
+    def __init__(self, predicate: Callable[[T], bool]) -> None:
         """
         Blocks values as long as they match the given predicate. Once a value is encountered that does not match the predicate, all remaining values will be allowed to pass through
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
         """
         self.__fn = predicate
         self.__should_push = False
@@ -1472,12 +1468,12 @@ class DropWhile(BaseFilteringOperator[T]):
 
 
 class DropUntil(BaseFilteringOperator[T]):
-    def __init__(self, predicate: TPredicate[T]) -> None:
+    def __init__(self, predicate: Callable[[T], bool]) -> None:
         """
         Blocks values until the first value found that matches the given predicate. All remaining values will be allowed to pass through
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
         """
         self.__fn = predicate
         self.__should_push = False
@@ -1509,13 +1505,13 @@ class MapTo(BaseMappingOperator[Any, V]):
 class Scan(BaseMappingOperator[T, A]):
     __slots__ = ("__accumulator_fn", "__seed", "__current_value", "_has_emitted_seed")
 
-    def __init__(self, accumulator_fn: TAccumulator[A, T], seed: A):
+    def __init__(self, accumulator_fn: Callable[[A, T], A], seed: A):
         """
         Applies an accumulator function to the source Observable, and returns each
         intermediate result. The seed value is used for the initial accumulation.
 
         Args:
-            accumulator_fn (TAccumulator[A, T]): An accumulator function to be
+            accumulator_fn (Callable[[A, T], A]): An accumulator function to be
                                                   invoked on each item emitted by the source Observable,
                                                   whose result will be sent to the observer.
             seed (A): The initial accumulator value.
@@ -1548,7 +1544,7 @@ class Scan(BaseMappingOperator[T, A]):
 class Distinct(Generic[T, K], BaseFilteringOperator[T]):
     __slots__ = ("__key_selector", "__seen_keys")
 
-    def __init__(self, key_selector: Optional[TMapper[T, K]] = None) -> None:
+    def __init__(self, key_selector: Optional[Callable[[T], K]] = None) -> None:
         super().__init__(self._is_new)
         self.__key_selector = key_selector
         self.__seen_keys: set[K] = set()
@@ -1570,7 +1566,7 @@ _SENTINEL = object()
 class DistinctUntilChanged(BaseFilteringOperator[T]):
     __slots__ = ("__key_selector", "__prev_key")
 
-    def __init__(self, key_selector: Optional[TMapper[T, K]] = None) -> None:
+    def __init__(self, key_selector: Optional[Callable[[T], K]] = None) -> None:
         self.__key_selector = key_selector
         self.__prev_key: Any = _SENTINEL  # Stores the key of the previous item
         super().__init__(self.__is_distinct)
@@ -1595,7 +1591,7 @@ class DistinctUntilChanged(BaseFilteringOperator[T]):
 class Tap(BaseMappingOperator[T, T]):
     __slots__ = ("__action",)
 
-    def __init__(self, action: TParamAction[T]) -> None:
+    def __init__(self, action: Callable[[T], None]) -> None:
         self.__action = action
         super().__init__(self.__perform_action_and_return)
 
@@ -1627,7 +1623,7 @@ class Ignore(BaseFilteringOperator[T]):
     while still allowing others to pass through. It functions as the inverse of the filter operator.
     """
 
-    def __init__(self, predicate: TPredicate[T]) -> None:
+    def __init__(self, predicate: Callable[[T], bool]) -> None:
         super().__init__(not_strict(predicate))
 
     def init(self) -> None:
@@ -1679,14 +1675,14 @@ class Debounce(DelayedBaseFilteringOperator[T]):
     def init(self) -> None:
         self.__last_value = None
 
-    def __create_timer(self, callback: TParamAction[Any]) -> Timer:
+    def __create_timer(self, callback: Callable[[Any], Any]) -> Timer:
         def do() -> None:
             print("Ran")
             callback(self.__last_value)
 
         return Timer(self.__timespan, 0.01, do)
 
-    def __debounce(self, val: T, callback: TParamAction[Any]) -> bool:
+    def __debounce(self, val: T, callback: Callable[[Any], Any]) -> bool:
         self.__last_value = val
         if self.__interval is not None:
             self.__interval.cancel()
@@ -1825,7 +1821,7 @@ class RX:
         return Filter(lambda v: isinstance(v, typ))
 
     @staticmethod
-    def tap(action: TParamAction[T]) -> RxOperator[T, T]:
+    def tap(action: Callable[[T], Any]) -> RxOperator[T, T]:
         """
         Performs a side-effect action for each item in the stream without
         modifying the item.
@@ -1835,7 +1831,7 @@ class RX:
 
     @staticmethod
     def distinct_until_changed(
-        key_selector: Optional[TMapper[T, Any]] = None,
+        key_selector: Optional[Callable[[T], Any]] = None,
     ) -> RxOperator[T, T]:
         """
         Emits only items from an Observable that are distinct from their immediate
@@ -1844,12 +1840,12 @@ class RX:
         return DistinctUntilChanged(key_selector)
 
     @staticmethod
-    def filter(predicate: TPredicate[T]) -> RxOperator[T, T]:
+    def filter(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
         """
         Allows only values that match the given predicate to flow through
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             RxOperator[T, T]: A Filter operator
@@ -1858,12 +1854,12 @@ class RX:
         return Filter(predicate)
 
     @staticmethod
-    def map(mapper: TMapper[T, V]) -> RxOperator[T, V]:
+    def map(mapper: Callable[[T], V]) -> RxOperator[T, V]:
         """
         Maps a value to a differnt value/form using the mapper function
 
         Args:
-            mapper (TMapper[T, V]): The mapper function
+            mapper (Callable[[T], V]): The mapper function
 
         Returns:
             RxOperator[T, V]: A Map operator
@@ -1871,12 +1867,12 @@ class RX:
         return Map(mapper)
 
     @staticmethod
-    def reduce(reducer: TReducer[T]) -> RxOperator[T, T]:
+    def reduce(reducer: Callable[[T, T], T]) -> RxOperator[T, T]:
         """
         Reduces two consecutive values into one by applying the provided reducer function
 
         Args:
-            reducer (TReducer[T]): The reducer function
+            reducer (Callable[[T, T], T]): The reducer function
 
         Returns:
             RxOperator[T, T]: A Reduce operator
@@ -1900,13 +1896,13 @@ class RX:
 
     @staticmethod
     def take_while(
-        predicate: TPredicate[T], include_stop_value: bool = False
+        predicate: Callable[[T], bool], include_stop_value: bool = False
     ) -> RxOperator[T, T]:
         """
         Allows values to pass through as long as they match the give predicate. After one value is found not matching, no other values will flow through
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
             include_stop_value (bool): Flag indicating that the stop value should be included
 
         Returns:
@@ -1916,13 +1912,13 @@ class RX:
 
     @staticmethod
     def take_until(
-        predicate: TPredicate[T], include_stop_value: bool = False
+        predicate: Callable[[T], bool], include_stop_value: bool = False
     ) -> RxOperator[T, T]:
         """
         Allows values to pass through until the first value found to match the give predicate. After that, no other values will flow through
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
             include_stop_value (bool): Flag indicating that the stop value should be included
 
         Returns:
@@ -1946,12 +1942,12 @@ class RX:
         return Drop(typ, count)
 
     @staticmethod
-    def drop_while(predicate: TPredicate[T]) -> RxOperator[T, T]:
+    def drop_while(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
         """
         Blocks values as long as they match the given predicate. Once a value is encountered that does not match the predicate, all remaining values will be allowed to pass through
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             RxOperator[T, T]: A DropWhile operator
@@ -1959,12 +1955,12 @@ class RX:
         return DropWhile(predicate)
 
     @staticmethod
-    def drop_until(predicate: TPredicate[T]) -> RxOperator[T, T]:
+    def drop_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
         """
         Blocks values until the first value found that matches the given predicate. All remaining values will be allowed to pass through
 
         Args:
-            predicate (TPredicate[T]): The given predicate
+            predicate (Callable[[T], bool]): The given predicate
 
         Returns:
             RxOperator[T, T]: A DropUntil operator
@@ -1980,7 +1976,7 @@ class RX:
         return IgnoreAll()
 
     @staticmethod
-    def ignore(predicate: TPredicate[T]) -> RxOperator[T, T]:
+    def ignore(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
         """
         Discards all items emitted by the source Observable that match the given predicate.
         """
@@ -2041,7 +2037,9 @@ class RX:
         return _NeverObservable()
 
     @staticmethod
-    def throw(error_or_factory: TErrorOrFactory) -> Subscribable[T]:
+    def throw(
+        error_or_factory: Union[Exception, Callable[[], Exception]],
+    ) -> Subscribable[T]:
         """
         Creates an Observable that emits no items and terminates with an error.
         Args:
@@ -2064,7 +2062,7 @@ class RX:
         return Flowable(list(range(start, start + count)))
 
     @staticmethod
-    def defer(factory: TFactory[Subscribable[T]]) -> Subscribable[T]:
+    def defer(factory: Callable[[], Subscribable[T]]) -> Subscribable[T]:
         """
         Creates an Observable that, for each subscriber, calls an Observable factory to make an Observable.
         Args:
@@ -2080,14 +2078,14 @@ class RX:
         return MapTo(value)
 
     @staticmethod
-    def scan(accumulator_fn: TAccumulator[A, T], seed: A) -> RxOperator[T, A]:
+    def scan(accumulator_fn: Callable[[A, T], A], seed: A) -> RxOperator[T, A]:
         """
         Applies an accumulator function over the source Observable, and returns each intermediate result.
         """
         return Scan(accumulator_fn, seed)
 
     @staticmethod
-    def distinct(key_selector: Optional[TMapper[T, K]] = None) -> RxOperator[T, T]:
+    def distinct(key_selector: Optional[Callable[[T], K]] = None) -> RxOperator[T, T]:
         """
         Returns an Observable that emits all items emitted by the source Observable that are distinct.
 
@@ -2128,12 +2126,12 @@ class RX:
         return MergeObservable(*sources)
 
 
-def rx_reduce(reducer: TReducer[T]) -> RxOperator[T, T]:
+def rx_reduce(reducer: Callable[[T, T], T]) -> RxOperator[T, T]:
     """
     Reduces two consecutive values into one by applying the provided reducer function
 
     Args:
-        reducer (TReducer[T]): The reducer function
+        reducer (Callable[[T, T], T]): The reducer function
 
     Returns:
         RxOperator[T, T]: A Reduce operator
@@ -2141,12 +2139,12 @@ def rx_reduce(reducer: TReducer[T]) -> RxOperator[T, T]:
     return RX.reduce(reducer)
 
 
-def rx_filter(predicate: TPredicate[T]) -> RxOperator[T, T]:
+def rx_filter(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
     """
     Allows only values that match the given predicate to flow through
 
     Args:
-        predicate (TPredicate[T]): The predicate
+        predicate (Callable[[T], bool]): The predicate
 
     Returns:
         RxOperator[T, T]: A Filter operator
@@ -2154,12 +2152,12 @@ def rx_filter(predicate: TPredicate[T]) -> RxOperator[T, T]:
     return RX.filter(predicate)
 
 
-def rx_map(mapper: TMapper[T, V]) -> RxOperator[T, V]:
+def rx_map(mapper: Callable[[T], V]) -> RxOperator[T, V]:
     """
     Maps a value to a differnt value/form using the mapper function
 
     Args:
-        mapper (TMapper[T, V]): The mapper function
+        mapper (Callable[[T], V]): The mapper function
 
     Returns:
         RxOperator[T, V]: A Map operator
@@ -2182,13 +2180,13 @@ def rx_take(typ: type[T], count: int) -> RxOperator[T, T]:
 
 
 def rx_take_while(
-    predicate: TPredicate[T], include_stop_value: bool = False
+    predicate: Callable[[T], bool], include_stop_value: bool = False
 ) -> RxOperator[T, T]:
     """
     Allows values to pass through as long as they match the give predicate. After one value is found not matching, no other values will flow through
 
     Args:
-        predicate (TPredicate[T]): The predicate
+        predicate (Callable[[T], bool]): The predicate
         include_stop_value (bool): Flag indicating that the stop value should be included
 
     Returns:
@@ -2198,13 +2196,13 @@ def rx_take_while(
 
 
 def rx_take_until(
-    predicate: TPredicate[T], include_stop_value: bool = False
+    predicate: Callable[[T], bool], include_stop_value: bool = False
 ) -> RxOperator[T, T]:
     """
     Allows values to pass through until the first value found to match the give predicate. After that, no other values will flow through
 
     Args:
-        predicate (TPredicate[T]): The predicate
+        predicate (Callable[[T], bool]): The predicate
         include_stop_value (bool): Flag indicating that the stop value should be included
 
     Returns:
@@ -2227,12 +2225,12 @@ def rx_drop(typ: type[T], count: int) -> RxOperator[T, T]:
     return RX.drop(typ, count)
 
 
-def rx_drop_while(predicate: TPredicate[T]) -> RxOperator[T, T]:
+def rx_drop_while(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
     """
     Blocks values as long as they match the given predicate. Once a value is encountered that does not match the predicate, all remaining values will be allowed to pass through
 
     Args:
-        predicate (TPredicate[T]): The predicate
+        predicate (Callable[[T], bool]): The predicate
 
     Returns:
         RxOperator[T, T]: A DropWhile operator
@@ -2240,12 +2238,12 @@ def rx_drop_while(predicate: TPredicate[T]) -> RxOperator[T, T]:
     return RX.drop_while(predicate)
 
 
-def rx_drop_until(predicate: TPredicate[T]) -> RxOperator[T, T]:
+def rx_drop_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
     """
     Blocks values until the first value found that matches the given predicate. All remaining values will be allowed to pass through
 
     Args:
-        predicate (TPredicate[T]): The given predicate
+        predicate (Callable[[T], bool]): The given predicate
 
     Returns:
         RxOperator[T, T]: A DropUntil operator
@@ -2254,7 +2252,7 @@ def rx_drop_until(predicate: TPredicate[T]) -> RxOperator[T, T]:
 
 
 def rx_distinct_until_changed(
-    key_selector: Optional[TMapper[T, Any]] = None,
+    key_selector: Optional[Callable[[T], Any]] = None,
 ) -> RxOperator[T, T]:
     """
     Emits only items from an Observable that are distinct from their immediate
@@ -2263,7 +2261,7 @@ def rx_distinct_until_changed(
     return RX.distinct_until_changed(key_selector)
 
 
-def rx_tap(action: TParamAction[T]) -> RxOperator[T, T]:
+def rx_tap(action: Callable[[T], Any]) -> RxOperator[T, T]:
     """
     Performs a side-effect action for each item in the stream without
     modifying the item.
@@ -2341,7 +2339,7 @@ def rx_never() -> Subscribable[Any]:
 
 
 def rx_throw(
-    error_or_factory: TErrorOrFactory,
+    error_or_factory: Union[Exception, Callable[[], Exception]],
 ) -> Subscribable[T]:
     """
     Creates an Observable that emits no items and terminates with an error.
@@ -2356,7 +2354,7 @@ def rx_range(start: int, count: int) -> Flowable[int]:
     return RX.range(start, count)
 
 
-def rx_defer(factory: TFactory[Subscribable[T]]) -> Subscribable[T]:
+def rx_defer(factory: Callable[[], Subscribable[T]]) -> Subscribable[T]:
     """
     Creates an Observable that, for each subscriber, calls an Observable factory to make an Observable.
     """
@@ -2370,14 +2368,14 @@ def rx_map_to(value: V) -> RxOperator[Any, V]:
     return RX.map_to(value)
 
 
-def rx_scan(accumulator_fn: TAccumulator[A, T], seed: A) -> RxOperator[T, A]:
+def rx_scan(accumulator_fn: Callable[[A, T], A], seed: A) -> RxOperator[T, A]:
     """
     Applies an accumulator function over the source Observable, and returns each intermediate result.
     """
     return RX.scan(accumulator_fn, seed)
 
 
-def rx_distinct(key_selector: Optional[TMapper[T, K]] = None) -> RxOperator[T, T]:
+def rx_distinct(key_selector: Optional[Callable[[T], K]] = None) -> RxOperator[T, T]:
     """
     Returns an Observable that emits all items emitted by the source Observable that are distinct.
 

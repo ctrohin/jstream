@@ -1,8 +1,7 @@
-from typing import Any, Iterable, Optional, TypeVar
+from typing import Any, Callable, Iterable, Optional, TypeVar
 
 from jstreams.predicate import Predicate, is_none, not_, predicate_of
 from jstreams.stream import Stream
-from jstreams.types import TPredicate
 
 
 T = TypeVar("T")
@@ -39,7 +38,7 @@ def all_not_none(it: Iterable[Optional[Any]]) -> bool:
 
 
 def all_of(
-    predicates: Iterable[TPredicate[T]],
+    predicates: Iterable[Callable[[T], bool]],
 ) -> Predicate[T]:
     """
     Produces a predicate that returns True if the input value matches *all* provided predicates.
@@ -60,7 +59,7 @@ def all_of(
 
 
 def any_of(
-    predicates: Iterable[TPredicate[T]],
+    predicates: Iterable[Callable[[T], bool]],
 ) -> Predicate[T]:
     """
     Produces a predicate that returns True if the input value matches *any* of the provided predicates.
@@ -80,7 +79,7 @@ def any_of(
 
 
 def none_of(
-    predicates: Iterable[TPredicate[T]],
+    predicates: Iterable[Callable[[T], bool]],
 ) -> Predicate[T]:
     """
     Produces a predicate that returns True if the input value matches *none* of the provided predicates.

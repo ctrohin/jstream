@@ -1,5 +1,6 @@
 from collections import deque
 from typing import (
+    Callable,
     Iterable,
     Any,
     Iterator,
@@ -18,23 +19,6 @@ from jstreams.predicate import (
     is_none,
 )
 from jstreams.tuples import Pair, pair_of
-from jstreams.types import (
-    TAccumulator,
-    TAction,
-    TCollector,
-    TComparator,
-    TLogger,
-    TMapper,
-    TParamAction,
-    TParamMapper,
-    TParamPredicate,
-    TParamSupplier,
-    TPredicate,
-    TReducer,
-    TTwoParamAction,
-    TSupplier,
-    TGenerator,
-)
 from jstreams.utils import is_not_none, require_non_null, each, is_empty_or_none, sort
 
 A = TypeVar("A")
@@ -117,31 +101,31 @@ class Opt(Generic[T]):
         """
         return self.__val if self.__val is not None else val
 
-    def or_else_get_opt(self, supplier: TSupplier[Optional[T]]) -> Optional[T]:
+    def or_else_get_opt(self, supplier: Callable[[], Optional[T]]) -> Optional[T]:
         """
         Returns the value of the Opt if present, otherwise it will call the supplier
         function and return that value. This function is useful when the fallback value
         is compute heavy and should only be called when the value of the Opt is None
 
         Args:
-            supplier (TSupplier[Optional[T]]): The mandatory return supplier
+            supplier (Callable[[], T]): The mandatory return supplier
 
         Returns:
             Optional[T]: The resulting value
         """
         return self.__val if self.__val is not None else supplier()
 
-    def or_else_get(self, supplier: TSupplier[T]) -> T:
+    def or_else_get(self, supplier: Callable[[], T]) -> T:
         """
         Returns the value of the Opt if present, otherwise it will call the supplier
         function and return that value. This function is useful when the fallback value
         is compute heavy and should only be called when the value of the Opt is None
 
         Args:
-            supplier (TSupplier[T]): The mandatory value supplier
+            supplier (Callable[[], T]): The mandatory value supplier
 
         Returns:
-            Optional[T]: The returned optional
+            Optional[T]: _description_
         """
         return self.__val if self.__val is not None else supplier()
 
@@ -163,12 +147,12 @@ class Opt(Generic[T]):
         """
         return self.__val is None
 
-    def if_present(self, action: TParamAction[T]) -> "Opt[T]":
+    def if_present(self, action: Callable[[T], Any]) -> "Opt[T]":
         """
         Executes an action on the value of the Opt if the value is present
 
         Args:
-            action (TParamAction[T]): The action
+            action (Callable[[T], Any]): The action
         Returns:
             Opt[T]: This optional
         """
@@ -176,14 +160,14 @@ class Opt(Generic[T]):
             action(self.__val)
         return self
 
-    def if_present_with(self, with_val: K, action: TTwoParamAction[T, K]) -> "Opt[T]":
+    def if_present_with(self, with_val: K, action: Callable[[T, K], Any]) -> "Opt[T]":
         """
         Executes an action on the value of the Opt if the value is present, by providing
         the action an additional parameter
 
         Args:
             with_val (K): The additional parameter
-            action (TTwoParamAction[T, K]): The action
+            action (Callable[[T, K], Any]): The action
         Returns:
             Opt[T]: This optional
         """
@@ -191,12 +175,12 @@ class Opt(Generic[T]):
             action(self.__val, with_val)
         return self
 
-    def if_not_present(self, action: TAction) -> "Opt[T]":
+    def if_not_present(self, action: Callable[[], Any]) -> "Opt[T]":
         """
         Executes an action on if the value is not present
 
         Args:
-            action (TAction): The action
+            action (Callable[[], Any]): The action
         Returns:
             Opt[T]: This optional
         """
@@ -204,14 +188,14 @@ class Opt(Generic[T]):
             action()
         return self
 
-    def if_not_present_with(self, with_val: K, action: TParamAction[K]) -> "Opt[T]":
+    def if_not_present_with(self, with_val: K, action: Callable[[K], Any]) -> "Opt[T]":
         """
         Executes an action on if the value is not present, by providing
         the action an additional parameter
 
         Args:
             with_val (K): The additional parameter
-            action (TParamAction[K]): The action
+            action (Callable[[K], Any]): The action
         Returns:
             Opt[T]: This optional
         """
@@ -220,15 +204,15 @@ class Opt(Generic[T]):
         return self
 
     def if_present_or_else(
-        self, action: TParamAction[T], empty_action: TAction
+        self, action: Callable[[T], Any], empty_action: Callable[[], Any]
     ) -> "Opt[T]":
         """
         Executes an action on the value of the Opt if the value is present, or executes
         the empty_action if the Opt is empty
 
         Args:
-            action (TParamAction[T]): The action to be executed when present
-            empty_action (TAction): The action to be executed when empty
+            action (Callable[[T], Any]): The action to be executed when present
+            empty_action (Callable[[], Any]): The action to be executed when empty
         Returns:
             Opt[T]: This optional
         """
@@ -241,8 +225,8 @@ class Opt(Generic[T]):
     def if_present_or_else_with(
         self,
         with_val: K,
-        action: TTwoParamAction[T, K],
-        empty_action: TParamAction[K],
+        action: Callable[[T, K], Any],
+        empty_action: Callable[[K], Any],
     ) -> "Opt[T]":
         """
         Executes an action on the value of the Opt by providing the actions an additional parameter,
@@ -250,8 +234,8 @@ class Opt(Generic[T]):
 
         Args:
             with_val (K): The additional parameter
-            action (TTwoParamAction[T, K]): The action to be executed when present
-            empty_action (TParamAction[K]): The action to be executed when empty
+            action (Callable[[T, K], Any]): The action to be executed when present
+            empty_action (Callable[[K], Any]): The action to be executed when empty
         """
         if self.__val is not None:
             action(self.__val, with_val)
@@ -259,12 +243,12 @@ class Opt(Generic[T]):
             empty_action(with_val)
         return self
 
-    def filter(self, predicate: TPredicate[T]) -> "Opt[T]":
+    def filter(self, predicate: Callable[[T], bool]) -> "Opt[T]":
         """
         Returns the filtered value of the Opt if it matches the given predicate
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             Opt[T]: The resulting Opt
@@ -275,14 +259,14 @@ class Opt(Generic[T]):
             return self
         return self.__get_none()
 
-    def filter_with(self, with_val: K, predicate: TParamPredicate[T, K]) -> "Opt[T]":
+    def filter_with(self, with_val: K, predicate: Callable[[T, K], bool]) -> "Opt[T]":
         """
         Returns the filtered value of the Opt if it matches the given predicate, by
         providing the predicat with an additional value
 
         Args:
             with_val (K): the additional value
-            predicate (TParamPredicate[T, K]): The predicate
+            predicate (Callable[[T, K], bool]): The predicate
 
         Returns:
             Opt[T]: The resulting Opt
@@ -293,12 +277,12 @@ class Opt(Generic[T]):
             return self
         return self.__get_none()
 
-    def map(self, mapper: TMapper[T, V]) -> "Opt[V]":
+    def map(self, mapper: Callable[[T], V]) -> "Opt[V]":
         """
         Maps the Opt value into another Opt by applying the mapper function
 
         Args:
-            mapper (TMapper[T, V]): The mapper function
+            mapper (Callable[[T], V]): The mapper function
 
         Returns:
             Opt[V]: The resulting Opt
@@ -307,13 +291,13 @@ class Opt(Generic[T]):
             return cast(Opt[V], self.__get_none())
         return Opt(mapper(self.__val))
 
-    def map_with(self, with_val: K, mapper: TParamMapper[T, K, V]) -> "Opt[V]":
+    def map_with(self, with_val: K, mapper: Callable[[T, K], V]) -> "Opt[V]":
         """
         Maps the Opt value into another Opt by applying the mapper function with an additional parameter
 
         Args:
             with_val (K): The additional parameter
-            mapper (TParamMapper[T, K, V]): The mapper function
+            mapper (Callable[[T, K], V]): The mapper function
 
         Returns:
             Opt[V]: The resulting Opt
@@ -322,14 +306,14 @@ class Opt(Generic[T]):
             return cast(Opt[V], self.__get_none())
         return Opt(mapper(self.__val, with_val))
 
-    def or_else_get_with(self, with_val: K, supplier: TParamSupplier[K, T]) -> "Opt[T]":
+    def or_else_get_with(self, with_val: K, supplier: Callable[[K], T]) -> "Opt[T]":
         """
         Returns this Opt if present, otherwise will return the supplier result with
         the additional parameter
 
         Args:
             with_val (K): The additional parameter
-            supplier (TParamSupplier[K, T]): The supplier
+            supplier (Callable[[K], T]): The supplier
 
         Returns:
             Opt[T]: The resulting Opt
@@ -337,7 +321,7 @@ class Opt(Generic[T]):
         return self.or_else_get_with_opt(with_val, supplier)
 
     def or_else_get_with_opt(
-        self, with_val: K, supplier: TParamSupplier[K, Optional[T]]
+        self, with_val: K, supplier: Callable[[K], Optional[T]]
     ) -> "Opt[T]":
         """
         Returns this Opt if present, otherwise will return the supplier result with
@@ -345,7 +329,7 @@ class Opt(Generic[T]):
 
         Args:
             with_val (K): The additional parameter
-            supplier (TParamSupplier[K, Optional[T]]): The supplier
+            supplier (Callable[[K], Optional[T]]): The supplier
 
         Returns:
             Opt[T]: The resulting Opt
@@ -356,16 +340,16 @@ class Opt(Generic[T]):
 
     def if_matches(
         self,
-        predicate: TPredicate[T],
-        action: TParamAction[T],
+        predicate: Callable[[T], bool],
+        action: Callable[[T], Any],
     ) -> "Opt[T]":
         """
         Executes the given action on the value of this Opt, if the value is present and
         matches the given predicate. Returns the same Opt
 
         Args:
-            predicate (TPredicate[T]): The predicate
-            action (TParamAction[T]): The action to be executed
+            predicate (Callable[[T], bool]): The predicate
+            action (Callable[[T], Any]): The action to be executed
 
         Returns:
             Opt[T]: The same Opt
@@ -376,16 +360,16 @@ class Opt(Generic[T]):
 
     def if_matches_opt(
         self,
-        predicate: TPredicate[Optional[T]],
-        action: TParamAction[Optional[T]],
+        predicate: Callable[[Optional[T]], bool],
+        action: Callable[[Optional[T]], Any],
     ) -> "Opt[T]":
         """
         Executes the given action on the value of this Opt, regardless of whether the value
         is present, if the value matches the given predicate. Returns the same Opt
 
         Args:
-            predicate (TPredicate[Optional[T]]): The predicate
-            action (TParamAction[Optional[T]]): The action to be executed
+            predicate (Callable[[Optional[T]], bool]): The predicate
+            action (Callable[[Optional[T]], Any]): The action to be executed
 
         Returns:
             Opt[T]: The same Opt
@@ -434,12 +418,12 @@ class Opt(Generic[T]):
             return self.__val
         raise ValueError("Object is None")
 
-    def or_else_raise_from(self, exception_supplier: TSupplier[BaseException]) -> T:
+    def or_else_raise_from(self, exception_supplier: Callable[[], BaseException]) -> T:
         """
         Returns the value of the Opt or raise an exeption provided by the exception supplier
 
         Args:
-            exception_supplier (TSupplier[BaseException]): The exception supplier
+            exception_supplier (Callable[[], BaseException]): The exception supplier
 
         Raises:
             exception: The generated exception
@@ -453,16 +437,16 @@ class Opt(Generic[T]):
 
     def if_present_map(
         self,
-        is_present_mapper: TMapper[T, V],
-        or_else_supplier: TSupplier[Optional[V]],
+        is_present_mapper: Callable[[T], V],
+        or_else_supplier: Callable[[], Optional[V]],
     ) -> "Opt[V]":
         """
         If the optional value is present, returns the value mapped by is_present_mapper wrapped in an Opt.
         If the optional value is not present, returns the value produced by or_else_supplier
 
         Args:
-            is_present_mapper (TMapper[T, V]): The presence mapper
-            or_else_supplier (TSupplier[Optional[V]]): The missing value producer
+            is_present_mapper (Callable[[T], V]): The presence mapper
+            or_else_supplier (Callable[[], Optional[V]]): The missing value producer
 
         Returns:
             Opt[V]: An optional
@@ -474,8 +458,8 @@ class Opt(Generic[T]):
     def if_present_map_with(
         self,
         with_val: K,
-        is_present_mapper: TParamMapper[T, K, V],
-        or_else_supplier: TParamSupplier[K, Optional[V]],
+        is_present_mapper: Callable[[T, K], V],
+        or_else_supplier: Callable[[K], Optional[V]],
     ) -> "Opt[V]":
         """
         If the optional value is present, returns the value mapped by is_present_mapper wrapped in an Opt.
@@ -484,8 +468,8 @@ class Opt(Generic[T]):
 
         Args:
             with_val (K): The additional mapper value
-            is_present_mapper (TParamMapper[T, K, V]): The presence mapper
-            or_else_supplier (TParamSupplier[K, Optional[V]]): The missing value producer
+            is_present_mapper (Callable[[T, K], V]): The presence mapper
+            or_else_supplier (Callable[[K], V]): The missing value producer
 
         Returns:
             Opt[V]: An optional
@@ -521,7 +505,9 @@ class Opt(Generic[T]):
         return Opt(cast(V, self.__val))
 
     def if_matches_map(
-        self, predicate: TPredicate[T], mapper: TMapper[T, Optional[V]]
+        self,
+        predicate: Callable[[T], bool],
+        mapper: Callable[[T], Optional[V]],
     ) -> "Opt[V]":
         """
         If the optional value is present and matches the given predicate, returns the value mapped
@@ -529,8 +515,8 @@ class Opt(Generic[T]):
         If the optional value is not present, returns an empty Opt.
 
         Args:
-            predicate (TPredicate[T]): The predicate
-            mapper (TMapper[T, Optional[V]]): The the mapper
+            predicate (Callable[[T], bool]): The predicate
+            mapper (Callable[[T], Optional[V]]): The the mapper
 
         Returns:
             Opt[V]: An optional
@@ -542,8 +528,8 @@ class Opt(Generic[T]):
     def if_matches_map_with(
         self,
         with_val: K,
-        predicate: TParamPredicate[T, K],
-        mapper: TParamMapper[T, K, Optional[V]],
+        predicate: Callable[[T, K], bool],
+        mapper: Callable[[T, K], Optional[V]],
     ) -> "Opt[V]":
         """
         If the optional value is present and matches the given predicate, returns the value mapped by mapper wrapped in an Opt.
@@ -552,8 +538,8 @@ class Opt(Generic[T]):
 
         Args:
             with_val (K): The additional mapper value
-            predicate (TParamPredicate[T, K]): The predicate
-            mapper (TParamMapper[T, K, Optional[V]]): The mapper
+            predicate (Callable[[T, K], bool]): The predicate
+            mapper (Callable[[T, K], Optional[V]]): The mapper
 
         Returns:
             Opt[V]: An optional
@@ -580,7 +566,7 @@ class Opt(Generic[T]):
             return cast(Opt[U], self.__get_none())
         return cast(Opt[U], self.__get_none())  # Outer Opt was empty
 
-    def flat_map(self, mapper: TMapper[T, "Opt[V]"]) -> "Opt[V]":
+    def flat_map(self, mapper: Callable[[T], "Opt[V]"]) -> "Opt[V]":
         """
         If a value is present, applies the provided mapping function to it,
         returning the Opt result of the function. Otherwise returns an empty Opt.
@@ -616,7 +602,7 @@ class Opt(Generic[T]):
             )
         return cast(Opt[Pair[T, V]], self.__get_none())
 
-    def zip_with(self, other: "Opt[V]", zipper: TParamMapper[T, V, K]) -> "Opt[K]":
+    def zip_with(self, other: "Opt[V]", zipper: Callable[[T, V], K]) -> "Opt[K]":
         """
         Combines this Opt with another Opt using a zipper function. If both contain
         a value, applies the zipper function to them and returns an Opt containing
@@ -650,17 +636,7 @@ class Opt(Generic[T]):
         """
         return self if self.is_present() else other
 
-    def peek(self, action: TParamAction[T]) -> "Opt[T]":
-        """
-        Executes an action on the value of this Opt.
-        Returns the same Opt
-
-        Args:
-            action (TParamAction[T]): The action
-
-        Returns:
-            Opt[T]: The same opt
-        """
+    def peek(self, action: Callable[[T], Any]) -> "Opt[T]":
         return self.if_present(action)
 
     def unzip(self: "Opt[Pair[A, B]]") -> "Pair[Opt[A], Opt[B]]":
@@ -738,7 +714,7 @@ class Opt(Generic[T]):
         return Opt(value) if condition else Opt.empty()
 
     @staticmethod
-    def when_supplied(condition: bool, supplier: TSupplier[T]) -> "Opt[T]":
+    def when_supplied(condition: bool, supplier: Callable[[], T]) -> "Opt[T]":
         """
         If the condition is true, calls the supplier and returns an Opt
         containing the supplied value. Otherwise, returns an empty Opt.
@@ -746,7 +722,7 @@ class Opt(Generic[T]):
 
         Args:
             condition (bool): The condition to evaluate.
-            supplier (TSupplier[T]): A function that supplies the value if the condition is true.
+            supplier (Callable[[], T]): A function that supplies the value if the condition is true.
 
         Returns:
             Opt[T]: An Opt containing the supplied value if the condition is true, else an empty Opt.
@@ -755,7 +731,7 @@ class Opt(Generic[T]):
 
     @staticmethod
     def try_or_empty(
-        callable_fn: TSupplier[T], *catch_exceptions: type[BaseException]
+        callable_fn: Callable[[], T], *catch_exceptions: type[BaseException]
     ) -> "Opt[T]":
         """
         Executes the given callable. If it succeeds, returns an Opt containing its result.
@@ -763,7 +739,7 @@ class Opt(Generic[T]):
         are raised during execution, returns an empty Opt.
 
         Args:
-            callable_fn (TSupplier[T]): The function to call.
+            callable_fn (Callable[[], T]): The function to call.
             *catch_exceptions (type[BaseException]): Specific exception types to catch.
                 If not provided, defaults to `(Exception,)`.
 
@@ -804,7 +780,7 @@ class _GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
 class _FilterIterable(_GenericIterable[T]):
     __slots__ = ("__predicate",)
 
-    def __init__(self, it: Iterable[T], predicate: TPredicate[T]) -> None:
+    def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
         super().__init__(it)
         self.__predicate = predicate
 
@@ -818,7 +794,7 @@ class _FilterIterable(_GenericIterable[T]):
 class _MapIndexedIterable(Generic[T, V], Iterator[V], Iterable[V]):
     __slots__ = ("_iterable", "_iterator", "__mapper", "__index")
 
-    def __init__(self, it: Iterable[T], mapper: TParamMapper[int, T, V]) -> None:
+    def __init__(self, it: Iterable[T], mapper: Callable[[int, T], V]) -> None:
         self._iterable = it
         self._iterator = self._iterable.__iter__()
         self.__mapper = mapper
@@ -851,7 +827,7 @@ class _GroupAdjacentIterable(Generic[T, K], Iterator[list[T]], Iterable[list[T]]
         "_current_key",
     )
 
-    def __init__(self, it: Iterable[T], key_func: TMapper[T, K]) -> None:
+    def __init__(self, it: Iterable[T], key_func: Callable[[T], K]) -> None:
         self._iterable = it
         self._iterator = iter(self._iterable)
         self.__key_func = key_func
@@ -996,7 +972,7 @@ class _TakeWhileIterable(_GenericIterable[T]):
     __slots__ = ("__predicate", "__done", "__include_stop_value")
 
     def __init__(
-        self, it: Iterable[T], predicate: TPredicate[T], include_stop_value: bool
+        self, it: Iterable[T], predicate: Callable[[T], bool], include_stop_value: bool
     ) -> None:
         super().__init__(it)
         self.__done = False
@@ -1022,7 +998,7 @@ class _TakeWhileIterable(_GenericIterable[T]):
 class _DropWhileIterable(_GenericIterable[T]):
     __slots__ = ("__predicate", "__done")
 
-    def __init__(self, it: Iterable[T], predicate: TPredicate[T]) -> None:
+    def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
         super().__init__(it)
         self.__done = False
         self.__predicate = predicate
@@ -1069,7 +1045,7 @@ class _DistinctIterable(_GenericIterable[T]):
     __slots__ = ("__seen", "__key_func")  # Use __seen instead of __set for clarity
 
     def __init__(
-        self, it: Iterable[T], key_func: Optional[TMapper[T, Any]] = None
+        self, it: Iterable[T], key_func: Optional[Callable[[T], Any]] = None
     ) -> None:
         super().__init__(it)
         self.__seen: set[Any] = (
@@ -1092,7 +1068,7 @@ class _DistinctIterable(_GenericIterable[T]):
 class _MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
     __slots__ = ("_iterable", "_iterator", "__mapper")
 
-    def __init__(self, it: Iterable[T], mapper: TMapper[T, V]) -> None:
+    def __init__(self, it: Iterable[T], mapper: Callable[[T], V]) -> None:
         self._iterable = it
         self._iterator = self._iterable.__iter__()
         self.__mapper = mapper
@@ -1115,8 +1091,8 @@ class _PeekIterable(_GenericIterable[T]):
     def __init__(
         self,
         it: Iterable[T],
-        action: TParamAction[T],
-        logger: Optional[TLogger] = None,
+        action: Callable[[T], Any],
+        logger: Optional[Callable[[Exception], Any]] = None,
     ) -> None:
         super().__init__(it)
         self.__action = action
@@ -1193,7 +1169,7 @@ class _TakeUntilIterable(_GenericIterable[T]):
     __slots__ = ("__predicate", "__done", "__include_stop_value")
 
     def __init__(
-        self, it: Iterable[T], predicate: TPredicate[T], include_stop_value: bool
+        self, it: Iterable[T], predicate: Callable[[T], bool], include_stop_value: bool
     ) -> None:
         super().__init__(it)
         self.__predicate = predicate
@@ -1219,7 +1195,7 @@ class _TakeUntilIterable(_GenericIterable[T]):
 class _DropUntilIterable(_GenericIterable[T]):
     __slots__ = ("__predicate", "__dropping")
 
-    def __init__(self, it: Iterable[T], predicate: TPredicate[T]) -> None:
+    def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
         super().__init__(it)
         self.__predicate = predicate
         self.__dropping = True  # Start in dropping mode
@@ -1248,7 +1224,7 @@ class _ScanIterable(Generic[T, V], Iterator[V], Iterable[V]):
     )
 
     def __init__(
-        self, it: Iterable[T], accumulator: TAccumulator[V, T], initial_value: V
+        self, it: Iterable[T], accumulator: Callable[[V, T], V], initial_value: V
     ) -> None:
         # Store original iterable to allow re-iteration if needed
         self._iterable = it
@@ -1464,7 +1440,7 @@ class _IntersperseIterable(Generic[T], Iterator[T], Iterable[T]):
 class _UnfoldIterable(Generic[T, S], Iterator[T], Iterable[T]):
     __slots__ = ("_initial_seed", "_generator", "_current_seed", "_next_pair")
 
-    def __init__(self, seed: S, generator: TGenerator[S, Optional[Pair[T, S]]]) -> None:
+    def __init__(self, seed: S, generator: Callable[[S], Optional[Pair[T, S]]]) -> None:
         self._initial_seed = seed
         self._generator = generator
         # State for iteration
@@ -1585,7 +1561,7 @@ class _CycleIterable(Generic[T], Iterator[T], Iterable[T]):
 class _DeferIterable(Generic[T], Iterator[T], Iterable[T]):
     __slots__ = ("_supplier", "_current_iterator")
 
-    def __init__(self, supplier: TSupplier[Iterable[T]]) -> None:
+    def __init__(self, supplier: Callable[[], Iterable[T]]) -> None:
         self._supplier = supplier
         self._current_iterator: Optional[Iterator[T]] = None  # Initialized in __iter__
 
@@ -1609,11 +1585,11 @@ class Stream(Generic[T]):
     def __init__(self, arg: Iterable[T]) -> None:
         self.__arg = require_non_null(arg)
 
-    def map(self, mapper: TMapper[T, V]) -> "Stream[V]":
+    def map(self, mapper: Callable[[T], V]) -> "Stream[V]":
         """
         Produces a new stream by mapping the stream elements using the given mapper function.
         Args:
-            mapper (TMapper[T, V]): The mapper
+            mapper (Callable[[T], V]): The mapper
 
         Returns:
             Stream[V]: The result stream
@@ -1641,12 +1617,12 @@ class Stream(Generic[T]):
         # Pair[Optional[T], Optional[V]] is correct.
         return Stream(_ZipLongestIterable(self.__arg, other, fillvalue))
 
-    def flat_map(self, mapper: TMapper[T, Iterable[V]]) -> "Stream[V]":
+    def flat_map(self, mapper: Callable[[T], Iterable[V]]) -> "Stream[V]":
         """
         Produces a flat stream by mapping an element of this stream to an iterable, then concatenates
         the iterables into a single stream.
         Args:
-            mapper (TMapper[T, Iterable[V]]): The mapper
+            mapper (Callable[[T], Iterable[V]]): The mapper
 
         Returns:
             Stream[V]: the result stream
@@ -1674,24 +1650,24 @@ class Stream(Generic[T]):
         """
         return self.find_first(lambda e: True)
 
-    def find_first(self, predicate: TPredicate[T]) -> Opt[T]:
+    def find_first(self, predicate: Callable[[T], bool]) -> Opt[T]:
         """
         Finds and returns the first element matching the predicate
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             Opt[T]: The firs element found
         """
         return Opt(find_first(self.__arg, predicate))
 
-    def filter(self, predicate: TPredicate[T]) -> "Stream[T]":
+    def filter(self, predicate: Callable[[T], bool]) -> "Stream[T]":
         """
         Returns a stream of objects that match the given predicate
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             Stream[T]: The stream of filtered objects
@@ -1712,12 +1688,12 @@ class Stream(Generic[T]):
         """
         return Stream(_CastIterable(self.__arg, cast_to))
 
-    def any_match(self, predicate: TPredicate[T]) -> bool:
+    def any_match(self, predicate: Callable[[T], bool]) -> bool:
         """
         Checks if any stream object matches the given predicate
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             bool: True if any object matches, False otherwise
@@ -1729,12 +1705,12 @@ class Stream(Generic[T]):
                 return True
         return False
 
-    def none_match(self, predicate: TPredicate[T]) -> bool:
+    def none_match(self, predicate: Callable[[T], bool]) -> bool:
         """
         Checks if none of the stream objects matches the given predicate. This is the inverse of 'any_match`
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             bool: True if no object matches, False otherwise
@@ -1744,12 +1720,12 @@ class Stream(Generic[T]):
 
         return not self.any_match(predicate)
 
-    def all_match(self, predicate: TPredicate[T]) -> bool:
+    def all_match(self, predicate: Callable[[T], bool]) -> bool:
         """
         Checks if all of the stream objects matche the given predicate.
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             bool: True if all objects matche, False otherwise
@@ -1780,7 +1756,7 @@ class Stream(Generic[T]):
         """
         return not is_empty_or_none(self.__arg)
 
-    def scan(self, accumulator: TAccumulator[V, T], initial_value: V) -> "Stream[V]":
+    def scan(self, accumulator: Callable[[V, T], V], initial_value: V) -> "Stream[V]":
         """
         Performs a cumulative reduction operation on the stream elements,
         yielding each intermediate result, starting with the initial_value.
@@ -1823,7 +1799,7 @@ class Stream(Generic[T]):
         """
         return self.__arg
 
-    def collect_using(self, collector: TCollector[T, K]) -> K:
+    def collect_using(self, collector: Callable[[Iterable[T]], K]) -> K:
         """
         Returns a transformed version of the stream. The transformation is provided by the collector
 
@@ -1831,7 +1807,7 @@ class Stream(Generic[T]):
         infinite generators, calling this method may block the execution of the program.
 
         Args:
-            collector (TCollector[T, K]): The collector
+            collector (Callable[[Iterable[T]], K]): The collector
 
         Returns:
             K: The tranformed type
@@ -1862,8 +1838,8 @@ class Stream(Generic[T]):
 
     def to_dict(
         self,
-        key_mapper: TMapper[T, V],
-        value_mapper: TMapper[T, K],
+        key_mapper: Callable[[T], V],
+        value_mapper: Callable[[T], K],
     ) -> dict[V, K]:
         """
         Creates a dictionary with the contents of the stream creating keys using
@@ -1872,15 +1848,15 @@ class Stream(Generic[T]):
         infinite generators, calling this method will block the execution of the program.
 
         Args:
-            key_mapper (TMapper[T, V]): The key mapper
-            value_mapper (TMapper[T, K]): The value mapper
+            key_mapper (Callable[[T], V]): The key mapper
+            value_mapper (Callable[[T], K]): The value mapper
 
         Returns:
             dict[V, K]: The resulting dictionary
         """
         return {key_mapper(v): value_mapper(v) for v in self.__arg}
 
-    def to_dict_as_values(self, key_mapper: TMapper[T, V]) -> dict[V, T]:
+    def to_dict_as_values(self, key_mapper: Callable[[T], V]) -> dict[V, T]:
         """
         Creates a dictionary with the contents of the stream creating keys using
         the given key mapper
@@ -1888,14 +1864,14 @@ class Stream(Generic[T]):
         infinite generators, calling this method will block the execution of the program.
 
         Args:
-            key_mapper (TMapper[T, V]): The key mapper
+            key_mapper (Callable[[T], V]): The key mapper
 
         Returns:
             dict[V, T]: The resulting dictionary
         """
         return {key_mapper(v): v for v in self.__arg}
 
-    def to_dict_as_keys(self, value_mapper: TMapper[T, V]) -> dict[T, V]:
+    def to_dict_as_keys(self, value_mapper: Callable[[T], V]) -> dict[T, V]:
         """
         Creates a dictionary using the contents of the stream as keys and mapping
         the dictionary values using the given value mapper
@@ -1903,7 +1879,7 @@ class Stream(Generic[T]):
         infinite generators, calling this method will block the execution of the program.
 
         Args:
-            value_mapper (TMapper[T, V]): The value mapper
+            value_mapper (Callable[[T], V]): The value mapper
 
         Returns:
             dict[V, T]: The resulting dictionary
@@ -1920,14 +1896,14 @@ class Stream(Generic[T]):
         """
         return tuple(self.__arg)
 
-    def each(self, action: TParamAction[T]) -> "Stream[T]":
+    def each(self, action: Callable[[T], Any]) -> "Stream[T]":
         """
         Executes the action callable for each of the stream's elements.
         CAUTION: This method will actually iterate the entire stream, so if you're using
         infinite generators, calling this method will block the execution of the program.
 
         Args:
-            action (TParamAction[T]): The action
+            action (Callable[[T], Any]): The action
         """
         each(self.__arg, action)
         return self
@@ -1983,26 +1959,26 @@ class Stream(Generic[T]):
 
     def take_while(
         self,
-        predicate: TPredicate[T],
+        predicate: Callable[[T], bool],
         include_stop_value: bool = False,
     ) -> "Stream[T]":
         """
         Returns a stream of elements until the first element that DOES NOT match the given predicate
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             Stream[T]: The result stream
         """
         return Stream(_TakeWhileIterable(self.__arg, predicate, include_stop_value))
 
-    def drop_while(self, predicate: TPredicate[T]) -> "Stream[T]":
+    def drop_while(self, predicate: Callable[[T], bool]) -> "Stream[T]":
         """
         Returns a stream of elements by dropping the first elements that match the given predicate
 
         Args:
-            predicate (TPredicate[T]): The predicate
+            predicate (Callable[[T], bool]): The predicate
 
         Returns:
             Stream[T]: The result stream
@@ -2011,7 +1987,7 @@ class Stream(Generic[T]):
 
     def take_until(
         self,
-        predicate: TPredicate[T],
+        predicate: Callable[[T], bool],
         include_stop_value: bool = False,
     ) -> "Stream[T]":
         """
@@ -2027,7 +2003,7 @@ class Stream(Generic[T]):
         """
         return Stream(_TakeUntilIterable(self.__arg, predicate, include_stop_value))
 
-    def drop_until(self, predicate: TPredicate[T]) -> "Stream[T]":
+    def drop_until(self, predicate: Callable[[T], bool]) -> "Stream[T]":
         """
         Returns a stream consisting of the remaining elements after dropping
         elements until the predicate returns True for the first time. The element
@@ -2041,7 +2017,7 @@ class Stream(Generic[T]):
         """
         return Stream(_DropUntilIterable(self.__arg, predicate))
 
-    def reduce(self, reducer: TReducer[T]) -> Opt[T]:
+    def reduce(self, reducer: Callable[[T, T], T]) -> Opt[T]:
         """
         Reduces a stream to a single value. The reducer takes two values and
         returns only one. This function can be used to find min or max from a stream of ints.
@@ -2049,7 +2025,7 @@ class Stream(Generic[T]):
         infinite generators, calling this method will block the execution of the program.
 
         Args:
-            reducer (TReducer[T]): The reducer
+            reducer (Callable[[T, T], T]): The reducer
 
         Returns:
             Opt[T]: The resulting optional
@@ -2065,14 +2041,14 @@ class Stream(Generic[T]):
         """
         return self.filter(is_not_none)
 
-    def sort(self, comparator: TComparator[T]) -> "Stream[T]":
+    def sort(self, comparator: Callable[[T, T], int]) -> "Stream[T]":
         """
         Returns a stream with the elements sorted according to the comparator function.
         CAUTION: This method will actually iterate the entire stream, so if you're using
         infinite generators, calling this method will block the execution of the program.
 
         Args:
-            comparator (TComparator[T]): The comparator function
+            comparator (Callable[[T, T], int]): The comparator function
 
         Returns:
             Stream[T]: The resulting stream
@@ -2092,7 +2068,7 @@ class Stream(Generic[T]):
         elems.reverse()
         return Stream(elems)
 
-    def distinct(self, key: Optional[TMapper[T, Any]] = None) -> "Stream[T]":
+    def distinct(self, key: Optional[Callable[[T], Any]] = None) -> "Stream[T]":
         """
         Returns a stream consisting of the distinct elements of this stream.
         Uniqueness is determined by the element itself or by the result of applying the key function.
@@ -2101,7 +2077,7 @@ class Stream(Generic[T]):
                  This operation requires storing seen keys/elements, potentially consuming memory.
 
         Args:
-            key (Optional[TMapper[T, Any]]): A function to extract the key for uniqueness comparison. If None, the element itself is used. Defaults to None.
+            key (Optional[Callable[[T], Ay]]): A function to extract the key for uniqueness comparison. If None, the element itself is used. Defaults to None.
         """
         return Stream(_DistinctIterable(self.__arg, key))
 
@@ -2120,17 +2096,15 @@ class Stream(Generic[T]):
 
     def peek(
         self,
-        action: TParamAction[T],
-        logger: Optional[TParamAction[Exception]] = None,
+        action: Callable[[T], Any],
+        logger: Optional[Callable[[Exception], Any]] = None,
     ) -> "Stream[T]":
         """
         Performs an action on each element of the stream as it passes through.
         Useful for debugging or logging intermediate values. Does not modify the stream elements.
 
         Args:
-            action (TParamAction[T]): The action to perform on each element.
-            logger (TParamAction[Exception]): The logging action that will be called in case of an exception.
-                                              Defaults to None.
+            action (Callable[[T], Any]): The action to perform on each element.
 
         Returns:
             Stream[T]: The same stream, allowing further chaining.
@@ -2184,20 +2158,20 @@ class Stream(Generic[T]):
         """
         return Stream(_ChunkedIterable(self.__arg, size))
 
-    def find_last(self, predicate: TPredicate[T]) -> Opt[T]:
+    def find_last(self, predicate: Callable[[T], bool]) -> Opt[T]:
         """
         Finds the last element in the stream that matches the given predicate.
         This is a terminal operation and consumes the stream.
 
         Args:
-            predicate (TPredicate[T]): The predicate to match.
+            predicate (Callable[[T], bool]): The predicate to match.
 
         Returns:
             Opt[T]: An Opt containing the last matching element, or empty if none match or the stream is empty.
         """
         return Opt(find_last(self.__arg, predicate))
 
-    def map_indexed(self, mapper: TParamMapper[int, T, V]) -> "Stream[V]":
+    def map_indexed(self, mapper: Callable[[int, T], V]) -> "Stream[V]":
         """
         Applies a mapping function to each element of the stream, along with its index.
 
@@ -2209,7 +2183,7 @@ class Stream(Generic[T]):
         """
         return Stream(_MapIndexedIterable(self.__arg, mapper))
 
-    def filter_indexed(self, predicate: TParamPredicate[int, T]) -> "Stream[T]":
+    def filter_indexed(self, predicate: Callable[[int, T], bool]) -> "Stream[T]":
         """
         Filters the elements of the stream based on a predicate that takes both the index and the element.
 
@@ -2225,7 +2199,7 @@ class Stream(Generic[T]):
 
         return self.indexed().filter(indexed_predicate).map(lambda p: p.right())
 
-    def group_adjacent(self, key_func: TMapper[T, K]) -> "Stream[list[T]]":
+    def group_adjacent(self, key_func: Callable[[T], K]) -> "Stream[list[T]]":
         """
         Groups consecutive elements of the stream that have the same key. The order is preserved.
 
@@ -2562,7 +2536,7 @@ class Stream(Generic[T]):
         return Stream(dictionary.items()).map(pair_of)
 
     @staticmethod
-    def defer(supplier: TSupplier[Iterable[T]]) -> "Stream[T]":
+    def defer(supplier: Callable[[], Iterable[T]]) -> "Stream[T]":
         """
         Creates a stream whose underlying iterable is obtained by calling the
         supplier function only when the stream is iterated.
@@ -2589,7 +2563,7 @@ class Stream(Generic[T]):
         return Stream(range(start, stop, step))
 
     @staticmethod
-    def iterate(initial_value: T, next_value_fn: TGenerator[T, T]) -> "Stream[T]":
+    def iterate(initial_value: T, next_value_fn: Callable[[T], T]) -> "Stream[T]":
         """
         Creates an infinite ordered stream produced by iterative application
         of a function f to an initial element seed.
@@ -2609,7 +2583,7 @@ class Stream(Generic[T]):
         return Stream(_iterate_generator(initial_value, next_value_fn))
 
     @staticmethod
-    def generate(supplier: TSupplier[T]) -> "Stream[T]":
+    def generate(supplier: Callable[[], T]) -> "Stream[T]":
         """
         Creates an infinite unordered stream where each element is generated
         by the provided supplier function.
@@ -2659,7 +2633,7 @@ class Stream(Generic[T]):
         return Stream(_MultiConcatIterable(iterables))
 
     @staticmethod
-    def unfold(seed: S, generator: TGenerator[S, Optional[Pair[T, S]]]) -> "Stream[T]":
+    def unfold(seed: S, generator: Callable[[S], Optional[Pair[T, S]]]) -> "Stream[T]":
         """
         Creates a stream by repeatedly applying a generator function to a seed value.
 
@@ -2687,7 +2661,7 @@ class Stream(Generic[T]):
 
         Args:
             seed (S): The initial state.
-            generator (TGenerator[S, Optional[Pair[T, S]]]): Function that takes the
+            generator (Callable[[S], Optional[Pair[T, S]]]): Function that takes the
                 current state and returns an Optional Pair(next_element, next_state).
 
         Returns:
@@ -2750,13 +2724,13 @@ def pair_stream(left: Iterable[T], right: Iterable[V]) -> Stream[Pair[T, V]]:
     return Stream(_PairIterable(left, right))
 
 
-def _generate_generator(supplier: TSupplier[T]) -> Iterator[T]:
+def _generate_generator(supplier: Callable[[], T]) -> Iterator[T]:
     while True:
         yield supplier()
 
 
 def _iterate_generator(
-    initial_value: T, next_value_fn: TGenerator[T, T]
+    initial_value: T, next_value_fn: Callable[[T], T]
 ) -> Iterator[T]:
     current = initial_value
     while True:

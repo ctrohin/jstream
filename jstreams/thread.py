@@ -1,8 +1,6 @@
 import abc
 from threading import Thread
-from typing import Protocol
-
-from jstreams.types import TAction
+from typing import Any, Callable, Protocol
 
 
 class Cancellable(Protocol):
@@ -57,12 +55,12 @@ class CallbackLoopingThread(LoopingThread):
 
     __slots__ = ("__target",)
 
-    def __init__(self, callback: TAction) -> None:
+    def __init__(self, callback: Callable[[], Any]) -> None:
         """
         Constructor. All sleeps must be handled in the callback
 
         Args:
-            callback (TAction): The callback to be executed in a loop
+            callback (Callable[[], Any]): The callback to be executed in a loop
         """
         LoopingThread.__init__(self)
         self.__target = callback
