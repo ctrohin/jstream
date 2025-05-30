@@ -26,14 +26,14 @@ class ValidationInterface(abc.ABC):
 
 
 # This validator will check if the string is lowercase
-@component(ValidationInterface, "only_lower_case")
+@component(class_name=ValidationInterface, qualifier="only_lower_case")
 class OnlyLowerCaseValidator(ValidationInterface):
     def is_valid(self, obj: Optional[str]) -> bool:
         return obj is not None and obj.lower() == obj
 
 
 # This validator will validate if the string has a certain length
-@component(ValidationInterface, "length_validator")
+@component(class_name=ValidationInterface, qualifier="length_validator")
 class MaxLengthValidator(ValidationInterface):
     # Here we use the injection mechanism to inject the max_len variable to this validator
     @inject_args({"max_len": Variable(int, "max_len")})
