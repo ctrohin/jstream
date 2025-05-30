@@ -1,3 +1,4 @@
+import sys
 from typing import Any, Callable, Iterable, Optional, TypeVar, Union
 
 T = TypeVar("T")
@@ -39,3 +40,9 @@ TLogger = TParamAction[Exception]
 TExceptionHandler = TLogger
 TSetter = Callable[[T], None]
 TGetter = TSupplier[T]
+
+if sys.version_info >= (3, 10):
+    from typing import ParamSpec
+else:
+    from typing_extensions import ParamSpec
+__all__ = ["ParamSpec"]

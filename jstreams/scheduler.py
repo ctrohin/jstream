@@ -150,7 +150,6 @@ class _Job:
         "has_ran",
         "on_success",
         "on_error",
-        "__logger",
     )
 
     def __init__(
@@ -162,7 +161,6 @@ class _Job:
         start_at: int = 0,
         on_success: Optional[TParamAction[Any]] = None,
         on_error: Optional[TParamAction[Exception]] = None,
-        logger: Optional[TLogger] = None,
     ) -> None:
         """
         Initializes a _Job instance.
@@ -187,7 +185,6 @@ class _Job:
         self.has_ran = False
         self.on_success = on_success
         self.on_error = on_error
-        self.__logger = logger
 
     def should_run(self) -> bool:
         """
@@ -226,17 +223,12 @@ class _Job:
         """Internal wrapper to execute the job function, handle errors, and call callbacks."""
         (
             Try(self.func)
-            .with_logger(self.__logger)
             .and_then(
                 lambda result: Opt(self.on_success).if_present(
                     lambda success: success(result)
                 )
             )
-            .on_failure(
-                lambda e: Opt(self.on_error or self.__logger).if_present(
-                    lambda error: error(e)
-                )
-            )
+            .on_failure(lambda e: Opt(self.on_error).if_present(lambda error: error(e)))
             .get()
         )
 
@@ -450,7 +442,6 @@ class _Scheduler(LoopingThread):
                 one_time,
                 on_success=on_success,
                 on_error=on_error,
-                logger=self.__logger,
             )
         )
         return self
