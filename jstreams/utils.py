@@ -5,12 +5,13 @@ from typing import (
     Generic,
     Iterable,
     Optional,
-    Sized,
     Sequence,
     TypeVar,
     Union,
     cast,
 )
+
+from collections.abc import Sized
 
 import itertools
 
