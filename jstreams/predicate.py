@@ -6,12 +6,13 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
-    Sized,
     TypeVar,
     Union,
     cast,
     Generic,
 )
+
+from collections.abc import Sized
 
 T = TypeVar("T")
 K = TypeVar("K")

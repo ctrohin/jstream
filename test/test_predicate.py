@@ -1,5 +1,5 @@
-from typing import Any, Mapping, Sized
-
+from typing import Any, Mapping
+from collections.abc import Sized
 from baseTest import BaseTestCase
 from jstreams import (
     stream,
