@@ -1,6 +1,7 @@
-from typing import Any, Callable, Iterable, Optional, TypeVar
+from typing import Any, Iterable, Optional, TypeVar
 
 from jstreams.stream import Opt
+from jstreams.types import TCollector, TComparator, TKeyMapper, TMapper, TPredicate
 from jstreams.utils import cmp_to_key
 
 T = TypeVar("T")
@@ -9,7 +10,7 @@ V = TypeVar("V")
 K = TypeVar("K")
 
 
-def grouping_by(group_by: Callable[[T], K], elements: Iterable[T]) -> dict[K, list[T]]:
+def grouping_by(group_by: TKeyMapper[T, K], elements: Iterable[T]) -> dict[K, list[T]]:
     """
     Groups elements of an iterable into a dictionary based on a classification function.
 
@@ -18,7 +19,7 @@ def grouping_by(group_by: Callable[[T], K], elements: Iterable[T]) -> dict[K, li
     is a list of elements that produced the corresponding key.
 
     Args:
-        group_by (Callable[[T], K]): The function to classify elements into groups.
+        group_by (TKeyMapper[T, K]): The function to classify elements into groups.
                                     It takes an element and returns a key.
         elements (Iterable[T]): The iterable containing elements to be grouped.
 
@@ -37,7 +38,7 @@ def grouping_by(group_by: Callable[[T], K], elements: Iterable[T]) -> dict[K, li
 
 
 def grouping_by_mapping(
-    group_by: Callable[[T], K], elements: Iterable[T], mapper: Callable[[T], R]
+    group_by: TKeyMapper[T, K], elements: Iterable[T], mapper: TMapper[T, R]
 ) -> dict[K, list[R]]:
     """
     Groups elements of an iterable into a dictionary based on a classification function.
@@ -47,10 +48,10 @@ def grouping_by_mapping(
     is a list of elements that produced the corresponding key.
 
     Args:
-        group_by (Callable[[T], K]): The function to classify elements into groups.
+        group_by (TKeyMapper[T, K]): The function to classify elements into groups.
                                     It takes an element and returns a key.
         elements (Iterable[T]): The iterable containing elements to be grouped.
-        mapper (Callable[[T], R]): The mapping function that transforms the iterable
+        mapper (TMapper[T, R]): The mapping function that transforms the iterable
                                     elements into resulting elements
 
     Returns:
@@ -92,7 +93,7 @@ class Collectors:
     """
 
     @staticmethod
-    def to_list() -> Callable[[Iterable[T]], list[T]]:
+    def to_list() -> TCollector[T, list[T]]:
         """
         Returns a collector function that accumulates stream elements into a list.
 
@@ -100,7 +101,7 @@ class Collectors:
             my_list = stream_instance.collect_using(Collectors.to_list())
 
         Returns:
-            Callable[[Iterable[T]], list[T]]: A function that takes an iterable and returns a list.
+            TCollector[T, list[T]]: A function that takes an iterable and returns a list.
         """
 
         def transform(elements: Iterable[T]) -> list[T]:
@@ -110,7 +111,7 @@ class Collectors:
         return transform
 
     @staticmethod
-    def to_set() -> Callable[[Iterable[T]], set[T]]:
+    def to_set() -> TCollector[T, set[T]]:
         """
         Returns a collector function that accumulates stream elements into a set.
         Duplicate elements will be removed.
@@ -119,7 +120,7 @@ class Collectors:
             my_set = stream_instance.collect_using(Collectors.to_set())
 
         Returns:
-            Callable[[Iterable[T]], set[T]]: A function that takes an iterable and returns a set.
+            TCollector[T, set[T]]: A function that takes an iterable and returns a set.
         """
 
         def transform(elements: Iterable[T]) -> set[T]:
@@ -130,8 +131,8 @@ class Collectors:
 
     @staticmethod
     def grouping_by(
-        group_by_func: Callable[[T], K],
-    ) -> Callable[[Iterable[T]], dict[K, list[T]]]:
+        group_by_func: TKeyMapper[T, K],
+    ) -> TCollector[T, dict[K, list[T]]]:
         """
         Returns a collector function that groups elements into a dictionary based on a
         classification function.
@@ -144,10 +145,10 @@ class Collectors:
             grouped_dict = stream_instance.collect_using(Collectors.grouping_by(lambda x: x.category))
 
         Args:
-            group_by_func (Callable[[T], K]): The function to classify elements into groups.
+            group_by_func (TKeyMapper[T, K]): The function to classify elements into groups.
 
         Returns:
-            Callable[[Iterable[T]], dict[K, list[T]]]: A function that takes an iterable
+            TCollector[T, dict[K, list[T]]]: A function that takes an iterable
             and returns a dictionary grouped by the classification function.
         """
 
@@ -160,9 +161,9 @@ class Collectors:
 
     @staticmethod
     def grouping_by_mapping(
-        group_by_func: Callable[[T], K],
-        mapper: Callable[[T], R],
-    ) -> Callable[[Iterable[T]], dict[K, list[R]]]:
+        group_by_func: TKeyMapper[T, K],
+        mapper: TMapper[T, R],
+    ) -> TCollector[T, dict[K, list[R]]]:
         """
         Returns a collector function that groups mapped elements into a dictionary based on a
         classification function.
@@ -175,10 +176,11 @@ class Collectors:
             grouped_dict = stream_instance.collect_using(Collectors.grouping_by(lambda x: x.category, lambda x: x.value))
 
         Args:
-            group_by_func (Callable[[T], R]): The function to classify mapped elements into groups.
+            group_by_func (TKeyMapper[T, K]): The function to classify mapped elements into groups.
+            mapper (TMapper[T, R]): The function to transform mapped elements.
 
         Returns:
-            Callable[[Iterable[T]], dict[K, list[R]]]: A function that takes an iterable
+            TCollector[T, dict[K, list[R]]]: A function that takes an iterable
             and returns a dictionary grouped by the classification function.
         """
 
@@ -190,7 +192,7 @@ class Collectors:
         return transform
 
     @staticmethod
-    def joining(separator: str = "") -> Callable[[Iterable[str]], str]:
+    def joining(separator: str = "") -> TCollector[str, str]:
         """
         Returns a collector function that concatenates string elements into a single string,
         separated by the specified separator.
@@ -203,16 +205,14 @@ class Collectors:
             separator (str, optional): The string to use as a separator. Defaults to "".
 
         Returns:
-            Callable[[Iterable[str]], str]: A function that takes an iterable of strings
+            TCollector[str, str]: A function that takes an iterable of strings
             and returns a single joined string.
         """
         # Delegates to the standalone joining function using a lambda
         return lambda it: joining(separator, it)
 
     @staticmethod
-    def partitioning_by(
-        condition: Callable[[T], bool],
-    ) -> Callable[[Iterable[T]], dict[bool, list[T]]]:
+    def partitioning_by(condition: TPredicate[T]) -> TCollector[T, dict[bool, list[T]]]:
         """
         Returns a collector function that partitions elements into a dictionary
         based on whether they satisfy a given predicate (condition).
@@ -226,10 +226,10 @@ class Collectors:
             partitioned_dict = stream_instance.collect_using(Collectors.partitioning_by(lambda x: x > 10))
 
         Args:
-            condition (Callable[[T], bool]): The predicate used to partition elements.
+            condition (TPredicate[T]): The predicate used to partition elements.
 
         Returns:
-            Callable[[Iterable[T]], dict[bool, list[T]]]: A function that takes an iterable
+            TCollector[T, dict[bool, list[T]]]: A function that takes an iterable
             and returns a dictionary partitioned by the condition.
         """
 
@@ -237,9 +237,8 @@ class Collectors:
 
     @staticmethod
     def partitioning_by_mapping(
-        condition: Callable[[T], bool],
-        mapper: Callable[[T], R],
-    ) -> Callable[[Iterable[T]], dict[bool, list[R]]]:
+        condition: TPredicate[T], mapper: TMapper[T, R]
+    ) -> TCollector[T, dict[bool, list[R]]]:
         """
         Returns a collector function that partitions mapped elements into a dictionary
         based on whether they satisfy a given predicate (condition).
@@ -253,18 +252,18 @@ class Collectors:
             partitioned_dict = stream_instance.collect_using(Collectors.partitioning_by(lambda x: x > 10, lambda x: x*x))
 
         Args:
-            condition (Callable[[T], bool]): The predicate used to partition elements.
-            mapper (Callable[[T], R]): The mapper function
+            condition (TPredicate[T]): The predicate used to partition elements.
+            mapper (TMapper[T, R]): The mapper function
 
         Returns:
-            Callable[[Iterable[T]], dict[bool, list[R]]]: A function that takes an iterable
+            TCollector[T, dict[bool, list[R]]]: A function that takes an iterable
             and returns a dictionary partitioned by the condition.
         """
 
         return Collectors.grouping_by_mapping(condition, mapper)
 
     @staticmethod
-    def counting() -> Callable[[Iterable[Any]], int]:
+    def counting() -> TCollector[Any, int]:
         """
         Returns a collector function that counts the number of elements.
 
@@ -272,7 +271,7 @@ class Collectors:
             count = stream_instance.collect_using(Collectors.counting())
 
         Returns:
-            Callable[[Iterable[Any]], int]: A function that takes an iterable and returns its count.
+            TCollector[Any, int]: A function that takes an iterable and returns its count.
         """
 
         def transform(elements: Iterable[Any]) -> int:
@@ -283,7 +282,7 @@ class Collectors:
         return transform
 
     @staticmethod
-    def summing_int() -> Callable[[Iterable[int]], int]:
+    def summing_int() -> TCollector[int, int]:
         """
         Returns a collector function that sums integer elements.
         Assumes the iterable contains integers.
@@ -292,7 +291,7 @@ class Collectors:
             total = stream_of_ints.collect_using(Collectors.summing_int())
 
         Returns:
-            Callable[[Iterable[int]], int]: A function that takes an iterable of ints and returns their sum.
+            TCollector[int, int]: A function that takes an iterable of ints and returns their sum.
         """
 
         def transform(elements: Iterable[int]) -> int:
@@ -302,7 +301,7 @@ class Collectors:
         return transform
 
     @staticmethod
-    def averaging_float() -> Callable[[Iterable[float]], Optional[float]]:
+    def averaging_float() -> TCollector[float, Optional[float]]:
         """
         Returns a collector function that calculates the average of float elements.
         Returns None if the iterable is empty. Assumes the iterable contains floats.
@@ -311,8 +310,8 @@ class Collectors:
             avg = stream_of_floats.collect_using(Collectors.averaging_float())
 
         Returns:
-            Callable[[Iterable[float]], Optional[float]]: A function that takes an iterable of floats
-                                                        and returns their average, or None if empty.
+            TCollector[float, float]: A function that takes an iterable of floats
+                                    and returns their average, or None if empty.
         """
 
         def transform(elements: Iterable[float]) -> Optional[float]:
@@ -327,7 +326,7 @@ class Collectors:
         return transform
 
     @staticmethod
-    def max_by(comparator: Callable[[T, T], int]) -> Callable[[Iterable[T]], Opt[T]]:
+    def max_by(comparator: TComparator[T]) -> TCollector[T, Opt[T]]:
         """
         Returns a collector function that finds the maximum element according to the
         provided comparator. Returns an empty Opt if the iterable is empty.
@@ -336,12 +335,12 @@ class Collectors:
             max_opt = stream_instance.collect_using(Collectors.max_by(my_comparator))
 
         Args:
-            comparator (Callable[[T, T], int]): A function that compares two elements,
-                                                returning > 0 if first is greater, < 0 if second is greater, 0 if equal.
+            comparator (TComparator[T]): A function that compares two elements,
+                                         returning > 0 if first is greater, < 0 if second is greater, 0 if equal.
 
         Returns:
-            Callable[[Iterable[T]], Opt[T]]: A function that takes an iterable and returns an Opt
-                                            containing the maximum element, or empty Opt if none.
+            TCollector[T, Opt[T]]: A function that takes an iterable and returns an Opt
+                                   containing the maximum element, or empty Opt if none.
         """
         key_func = cmp_to_key(comparator)
 
@@ -356,14 +355,14 @@ class Collectors:
         return transform
 
     @staticmethod
-    def to_tuple() -> Callable[[Iterable[T]], tuple[T, ...]]:
+    def to_tuple() -> TCollector[T, tuple[T, ...]]:
         """
         Returns a collector function that accumulates stream elements into a tuple.
         """
         return tuple
 
     @staticmethod
-    def summing_float() -> Callable[[Iterable[float]], float]:
+    def summing_float() -> TCollector[float, float]:
         """
         Returns a collector function that sums float elements.
         Assumes the iterable contains floats.
@@ -372,7 +371,7 @@ class Collectors:
             total = stream_of_floats.collect_using(Collectors.summing_float())
 
         Returns:
-            Callable[[Iterable[float]], float]: A function that takes an iterable of floats and returns their sum.
+            TCollector[float, float]: A function that takes an iterable of floats and returns their sum.
         """
 
         def transform(elements: Iterable[float]) -> float:
@@ -382,7 +381,7 @@ class Collectors:
         return transform
 
     @staticmethod
-    def averaging_int() -> Callable[[Iterable[int]], Optional[float]]:
+    def averaging_int() -> TCollector[int, Optional[float]]:
         """
         Returns a collector function that calculates the average of integer elements.
         Returns None if the iterable is empty. Assumes the iterable contains integers.
@@ -392,8 +391,8 @@ class Collectors:
             avg = stream_of_ints.collect_using(Collectors.averaging_int())
 
         Returns:
-            Callable[[Iterable[int]], Optional[float]]: A function that takes an iterable of ints
-                                                        and returns their average as a float, or None if empty.
+            TCollector[int, Optional[float]]: A function that takes an iterable of ints
+                                    and returns their average as a float, or None if empty.
         """
 
         def transform(elements: Iterable[int]) -> Optional[float]:
@@ -408,7 +407,7 @@ class Collectors:
         return transform
 
     @staticmethod
-    def min_by(comparator: Callable[[T, T], int]) -> Callable[[Iterable[T]], Opt[T]]:
+    def min_by(comparator: TComparator[T]) -> TCollector[T, Opt[T]]:
         """
         Returns a collector function that finds the minimum element according to the
         provided comparator. Returns an empty Opt if the iterable is empty.
@@ -417,12 +416,12 @@ class Collectors:
             min_opt = stream_instance.collect_using(Collectors.min_by(my_comparator))
 
         Args:
-            comparator (Callable[[T, T], int]): A function that compares two elements,
-                                                returning > 0 if first is greater, < 0 if second is greater, 0 if equal.
+            comparator (TComparator[T]): A function that compares two elements,
+                                        returning > 0 if first is greater, < 0 if second is greater, 0 if equal.
 
         Returns:
-            Callable[[Iterable[T]], Opt[T]]: A function that takes an iterable and returns an Opt
-                                            containing the minimum element, or empty Opt if none.
+            TCollector[T, Opt[T]]: A function that takes an iterable and returns an Opt
+                                    containing the minimum element, or empty Opt if none.
         """
         key_func = cmp_to_key(comparator)
 
@@ -437,9 +436,7 @@ class Collectors:
         return transform
 
     @staticmethod
-    def to_sorted_list(
-        comparator: Callable[[T, T], int],
-    ) -> Callable[[Iterable[T]], list[T]]:
+    def to_sorted_list(comparator: TComparator[T]) -> TCollector[T, list[T]]:
         """
         Returns a collector that gathers elements into a list and sorts them using the provided comparator.
         """

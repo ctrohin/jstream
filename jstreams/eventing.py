@@ -1,11 +1,16 @@
 import inspect
 from threading import Lock, Event as ThreadingEvent
-from typing import Any, Callable, Generic, Optional, TypeVar, Union, overload
+from typing import Any, Callable, Generic, Optional, TypeVar, overload
 
-from jstreams.predicate import Predicate
+from jstreams.types import (
+    DisposeHandler,
+    TFuncDecorator,
+    TFunction,
+    TParamAction,
+    TPredicate,
+)
 from jstreams.rx import (
     RX,
-    DisposeHandler,
     ObservableSubscription,
     Pipe,
     PipeObservable,
@@ -90,14 +95,14 @@ class _Event(Generic[T]):
 
     def subscribe(
         self,
-        on_publish: Callable[[T], Any],
+        on_publish: TParamAction[T],
         on_dispose: DisposeHandler = None,
     ) -> EventSubscription[T]:
         """
         Subscribes to events published on this channel.
 
         Args:
-            on_publish (Callable[[T], Any]): The function to call whenever an event is published.
+            on_publish (TAction[T]): The function to call whenever an event is published.
                                             It receives the published event object as its argument.
             on_dispose (DisposeHandler, optional): A function to call when the subscription is disposed.
                                                 Defaults to None.
@@ -112,14 +117,12 @@ class _Event(Generic[T]):
             )
         )
 
-    def publish_if(
-        self, event_payload: T, condition: Union[Callable[[T], bool], Predicate[T]]
-    ) -> bool:
+    def publish_if(self, event_payload: T, condition: TPredicate[T]) -> bool:
         """
         Publishes the event only if the condition is met.
         Args:
             event_payload (T): The event to potentially publish.
-            condition (Callable[[T], bool]): A function that takes the event and returns True if it should be published.
+            condition (TPredicate[T]): A function that takes the event and returns True if it should be published.
         Returns:
             bool: True if the event was published, False otherwise.
         """
@@ -129,16 +132,14 @@ class _Event(Generic[T]):
         return False
 
     def subscribe_once(
-        self,
-        on_publish: Callable[[T], Any],
-        on_dispose: DisposeHandler = None,
+        self, on_publish: TParamAction[T], on_dispose: DisposeHandler = None
     ) -> EventSubscription[T]:
         """
         Subscribes to the event channel for only the very next event.
         The subscription is automatically canceled after the first event is received.
 
         Args:
-            on_publish (Callable[[T], Any]): The function to call when the next event is published.
+            on_publish (TAction[T]): The function to call when the next event is published.
             on_dispose (DisposeHandler, optional): A function to call when the subscription is disposed
                                                 (either after the event or if canceled manually).
                                                 Defaults to None.
@@ -567,7 +568,7 @@ def event(event_type: type[T], event_name: str = __DEFAULT_EVENT_NAME__) -> _Eve
 
 def on_event(
     event_type: type, event_name: str = __DEFAULT_EVENT_NAME__
-) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+) -> TFuncDecorator:
     """
     Method decorator to mark a method as a listener for a specific event.
 
@@ -585,7 +586,7 @@ def on_event(
                                     Defaults to `__DEFAULT_EVENT_NAME__`.
     """
 
-    def decorator(method: Callable[..., Any]) -> Callable[..., Any]:
+    def decorator(method: TFunction) -> TFunction:
         if not hasattr(method, _EVENT_LISTENERS_METADATA_ATTR):
             setattr(method, _EVENT_LISTENERS_METADATA_ATTR, [])
         # Store as a list of tuples (event_type, event_name)
@@ -633,7 +634,7 @@ def managed_events() -> Callable[[ClsT], ClsT]:
                 # Stores (function_object, event_type, event_name) to avoid double setup
                 # for the same handler on the same instance, especially with inheritance.
                 self._already_setup_managed_handlers: set[  # type: ignore[attr-defined,misc]
-                    tuple[Callable[..., Any], type, str]
+                    tuple[TFunction, type, str]
                 ] = set()
 
             # Discover and subscribe event handlers from this class and its bases.
@@ -705,7 +706,7 @@ def wait_for_event(
     event_type: type[T],
     event_name: str = __DEFAULT_EVENT_NAME__,
     timeout: Optional[float] = None,
-    condition: Optional[Callable[[T], bool]] = None,
+    condition: Optional[TPredicate[T]] = None,
 ) -> Opt[T]:
     received_signal = ThreadingEvent()
     payload_holder: list[T] = []  # Use list for closure modification

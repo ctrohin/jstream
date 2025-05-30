@@ -1,7 +1,6 @@
 import json
 from typing import (
     Any,
-    Callable,
     Generic,
     Iterable,
     Optional,
@@ -17,6 +16,7 @@ import itertools
 from types import FunctionType, MethodType
 
 from jstreams.annotations import locked
+from jstreams.types import TComparator, TKeyMapper, TLogger, TParamAction
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -136,7 +136,7 @@ def load_json(
 
 
 def load_json_ex(
-    s: Union[str, bytes, bytearray], handler: Optional[Callable[[Exception], Any]]
+    s: Union[str, bytes, bytearray], handler: Optional[TLogger]
 ) -> Optional[Union[list[Any], dict[Any, Any]]]:
     try:
         return json.loads(s)  # type: ignore[no-any-return]
@@ -234,7 +234,7 @@ def is_empty_or_none(
     return False
 
 
-def cmp_to_key(mycmp: Callable[[C, C], int]) -> type:
+def cmp_to_key(mycmp: TComparator[C]) -> type:
     """Convert a cmp= function into a key= function"""
 
     class Key(Generic[C]):  # type: ignore[misc]
@@ -263,13 +263,13 @@ def cmp_to_key(mycmp: Callable[[C, C], int]) -> type:
     return Key
 
 
-def each(target: Optional[Iterable[T]], action: Callable[[T], Any]) -> None:
+def each(target: Optional[Iterable[T]], action: TParamAction[T]) -> None:
     """
     Executes an action on each element of the given iterable
 
     Args:
         target (Optional[Iterable[T]]): The target iterable
-        action (Callable[[T], Any]): The action to be executed
+        action (TParamAction[T]): The action to be executed
     """
     if target is None:
         return
@@ -282,14 +282,14 @@ def dict_update(target: dict[K, V], key: K, value: V) -> None:
     target[key] = value
 
 
-def sort(target: list[T], comparator: Callable[[T, T], int]) -> list[T]:
+def sort(target: list[T], comparator: TComparator[T]) -> list[T]:
     """
     Returns a list with the elements sorted according to the comparator function.
     CAUTION: This method will actually iterate the entire iterable, so if you're using
     infinite generators, calling this method will block the execution of the program.
 
     Args:
-        comparator (Callable[[T, T], int]): The comparator function
+        comparator (TComparator[T]): The comparator function
 
     Returns:
         list[T]: The resulting list
@@ -423,7 +423,7 @@ def uniq(data: Iterable[T]) -> list[T]:
     return result
 
 
-def key_by(data: Iterable[T], key_fn: Callable[[T], K]) -> dict[K, T]:
+def key_by(data: Iterable[T], key_fn: TKeyMapper[T, K]) -> dict[K, T]:
     """
     Creates a dictionary composed of keys generated from the results of running
     each element of iterable thru key_fn. The value for each key is the last
@@ -431,7 +431,7 @@ def key_by(data: Iterable[T], key_fn: Callable[[T], K]) -> dict[K, T]:
 
     Args:
         data (Iterable[T]): The iterable to process.
-        key_fn (Callable[[T], K]): A function to compute the key for each element.
+        key_fn (TKeyMapper[T, K]): A function to compute the key for each element.
                                    The key K must be hashable.
 
     Returns:

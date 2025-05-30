@@ -1,10 +1,13 @@
 from threading import Lock, Thread
 from typing import Any, Callable, Generic, Optional, TypeVar
 
+from jstreams.types import TGetter, TSetter
 from jstreams.utils import each
 
 T = TypeVar("T")
 V = TypeVar("V")
+
+StateChangeHandler = Callable[[T, T], Any]
 
 
 class _State(Generic[T]):
@@ -15,8 +18,8 @@ class _State(Generic[T]):
         value: T,
     ) -> None:
         self.__value = value
-        self.__on_change_list: list[Callable[[T, T], Any]] = []
-        self.__on_change_async_list: list[Callable[[T, T], Any]] = []
+        self.__on_change_list: list[StateChangeHandler[T]] = []
+        self.__on_change_async_list: list[StateChangeHandler[T]] = []
 
     def set_value(self, value: T) -> None:
         old_value = self.__value
@@ -33,7 +36,7 @@ class _State(Generic[T]):
         return self.__value
 
     def add_on_change(
-        self, on_change: Optional[Callable[[T, T], Any]], asynchronous: bool
+        self, on_change: Optional[StateChangeHandler[T]], asynchronous: bool
     ) -> None:
         if on_change is not None:
             if asynchronous:
@@ -41,7 +44,7 @@ class _State(Generic[T]):
             else:
                 self.__on_change_list.append(on_change)
 
-    def expand(self) -> tuple[Callable[[], T], Callable[[T], None]]:
+    def expand(self) -> tuple[TGetter[T], TSetter[T]]:
         return self.get_value, self.set_value
 
 
@@ -56,7 +59,7 @@ class _StateManager:
         self,
         key: str,
         value: T,
-        on_change: Optional[Callable[[T, T], Any]],
+        on_change: Optional[StateChangeHandler[T]],
         asynchronous: bool,
     ) -> _State[T]:
         if key in self.__states:
@@ -99,21 +102,21 @@ def null_state(typ: type[T]) -> Optional[T]:
 def use_state(
     key: str,
     default_value: T,
-    on_change: Optional[Callable[[T, T], Any]] = None,
-) -> tuple[Callable[[], T], Callable[[T], None]]:
+    on_change: Optional[StateChangeHandler[T]] = None,
+) -> tuple[TGetter[T], TSetter[T]]:
     """
     Returns a state (getter,setter) tuple for a managed state.
 
     Args:
         key (str): The key of the state
         default_value (T): The default value of the state
-        on_change (Optional[Callable[[T, T], Any]], optional): A function or method where the caller is notified about changes in the state.
+        on_change (Optional[StateChangeHandler], optional): A function or method where the caller is notified about changes in the state.
             The first argument in this function will be the new state value, and the second will be the old state value.
             The on change will be called synchonously.
             Defaults to None.
 
     Returns:
-        tuple[Callable[[], T], Callable[[T], None]]: The getter and setter
+        tuple[TGetter[T], TSetter[T]]: The getter and setter
     """
     return _state_manager().get_state(key, default_value, on_change, False).expand()
 
@@ -121,20 +124,20 @@ def use_state(
 def use_async_state(
     key: str,
     default_value: T,
-    on_change: Optional[Callable[[T, T], Any]] = None,
-) -> tuple[Callable[[], T], Callable[[T], None]]:
+    on_change: Optional[StateChangeHandler[T]] = None,
+) -> tuple[TGetter[T], TSetter[T]]:
     """
     Returns a state (getter,setter) tuple for a managed state.
 
     Args:
         key (str): The key of the state
         default_value (T): The default value of the state
-        on_change (Optional[Callable[[T, T], Any]], optional): A function or method where the caller is notified about changes in the state.
+        on_change (Optional[StateChangeHandler], optional): A function or method where the caller is notified about changes in the state.
             The first argument in this function will be the new state value, and the second will be the old state value.
             The on change will be called asynchonously.
             Defaults to None.
 
     Returns:
-        tuple[Callable[[], T], Callable[[T], None]]: The getter and setter
+        tuple[TGetter[T], TSetter[T]]: The getter and setter
     """
     return _state_manager().get_state(key, default_value, on_change, True).expand()

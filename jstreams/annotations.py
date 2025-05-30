@@ -12,7 +12,7 @@ from typing import (
     get_type_hints,
 )
 
-from jstreams.predicate import Predicate
+from jstreams.types import TFunction, TPredicate, TTransformer
 
 NoneType = type(None)
 T = TypeVar("T")
@@ -260,7 +260,7 @@ def locked() -> Callable[[type[T]], type[T]]:
 
 
 # Type variable for the decorated function, bound to Callable
-F = TypeVar("F", bound=Callable[..., Any])
+F = TypeVar("F", bound=TFunction)
 
 # --- Lock Management ---
 
@@ -273,7 +273,7 @@ _lock_registry: dict[str, RLock] = {}
 _registry_access_lock = Lock()
 
 
-def _get_or_create_lock(func: Callable[..., Any], lock_name: Optional[str]) -> RLock:
+def _get_or_create_lock(func: TFunction, lock_name: Optional[str]) -> RLock:
     """
     Retrieves or creates the appropriate RLock for the given function and lock name.
 
@@ -305,7 +305,7 @@ def _get_or_create_lock(func: Callable[..., Any], lock_name: Optional[str]) -> R
         return _lock_registry[final_lock_name]
 
 
-def synchronized_static(lock_name: Optional[str] = None) -> Callable[[F], F]:
+def synchronized_static(lock_name: Optional[str] = None) -> TTransformer[F]:
     """
     Decorator to synchronize access to a function or method using a static reentrant lock.
 
@@ -329,7 +329,7 @@ def synchronized_static(lock_name: Optional[str] = None) -> Callable[[F], F]:
                 the same lock for that specific method.
 
     Returns:
-        Callable[[F], F]: A decorator that wraps the input function `F`, returning
+        TTransformer[F]: A decorator that wraps the input function `F`, returning
                         a new function with the same signature but added locking.
     """
 
@@ -381,7 +381,7 @@ DEFAULT_INSTANCE_LOCK_ATTR = "_default_instance_sync_lock"
 
 def synchronized(
     lock_attribute_name: Optional[str] = None,
-) -> Callable[[F], F]:
+) -> TTransformer[F]:
     """
     Decorator to synchronize access to an instance method using an instance-specific reentrant lock.
 
@@ -407,7 +407,7 @@ def synchronized(
                 instance-level locks within the same object (e.g., one for reading, one for writing).
 
     Returns:
-        Callable[[F], F]: A decorator that wraps the input method `F`, returning
+        TTransformer[F]: A decorator that wraps the input method `F`, returning
                         a new method with the same signature but added instance-level locking.
 
     Raises:
@@ -577,8 +577,8 @@ def all_args() -> Callable[[type[T]], type[T]]:
 
 
 def validate_args(
-    rules: Optional[dict[str, Predicate[Any]]] = None,
-) -> Callable[[F], F]:
+    rules: Optional[dict[str, TPredicate[Any]]] = None,
+) -> TTransformer[F]:
     """
     Decorator to validate function arguments against their type hints at runtime.
 
@@ -601,7 +601,7 @@ def validate_args(
         process_data(123, 40)           # Raises TypeError (name should be str)
 
     Returns:
-        Callable[[F], F]: A decorator function.
+        TTransformer[F]: A decorator function.
     """
 
     def decorator(func: F) -> F:
@@ -702,7 +702,7 @@ def default_on_error(
         Any
     ] = None,  # Using Any for logger to avoid strict logging dependency
     log_message: str = "Caught exception in {func_name} ({exception}), returning default value.",
-) -> Callable[[F], F]:
+) -> TTransformer[F]:
     """
     Decorator factory: returns a default value if the decorated function raises specific exceptions.
 
@@ -716,7 +716,7 @@ def default_on_error(
             {func_name}, {exception}, {args}, {kwargs}. Defaults to a standard message.
 
     Returns:
-        Callable[[F], F]: The decorator.
+        TTransformer[F]: The decorator.
 
     Example:
         @default_on_error(default_value=-1, catch_exceptions=[ValueError, TypeError])

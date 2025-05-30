@@ -6,6 +6,14 @@ from typing import Any, Callable, Generic, Optional, TypeVar, Union, cast
 
 from jstreams.noop import NoOp, NoOpCls
 from jstreams.stream import Opt, Stream
+from jstreams.types import (
+    TFactoryOrValue,
+    TNoReturnFunction,
+    TSupplier,
+    TTransformer,
+    TTypedFunction,
+    TTypedReturnFunction,
+)
 from jstreams.utils import is_mth_or_fn, require_non_null
 
 
@@ -54,6 +62,10 @@ class Variable:
 
     def is_optional(self) -> bool:
         return self.__is_optional
+
+
+TDependency = Union[type, Dependency]
+TVariableOrDependency = Union[type, Variable, Dependency]
 
 
 class StrVariable(Variable):
@@ -249,7 +261,7 @@ class _Injector:
     def find_or(
         self,
         class_name: type[T],
-        or_call: Callable[[], T],
+        or_call: TSupplier[T],
         qualifier: Optional[str] = None,
     ) -> T:
         found_obj = self.find(class_name, qualifier)
@@ -311,7 +323,7 @@ class _Injector:
     def provide(
         self,
         class_name: type,
-        comp: Union[Any, Callable[[], Any]],
+        comp: TFactoryOrValue[Any],
         qualifier: Optional[str] = None,
         profiles: Optional[list[str]] = None,
     ) -> "_Injector":
@@ -333,7 +345,7 @@ class _Injector:
     def __provide(
         self,
         class_name: type,
-        comp: Union[Any, Callable[[], Any]],
+        comp: TFactoryOrValue[Any],
         qualifier: Optional[str] = None,
         profiles: Optional[list[str]] = None,
         override_qualifier: bool = False,
@@ -627,7 +639,7 @@ def configuration(profiles: Optional[list[str]] = None) -> Callable[[type[T]], t
 
 def provide(
     class_name: type[T], qualifier: Optional[str] = None
-) -> Callable[[Callable[..., T]], Callable[..., None]]:
+) -> TTypedFunction[TTypedReturnFunction[T], TNoReturnFunction]:
     """
     Provide decorator. Used for methods inside @configuration classes.
     This decorator is meant to be used in @configuration classes, in order to mark the methods that
@@ -638,10 +650,10 @@ def provide(
         qualifier (Optional[str], optional): Optional dependency qualifier. Defaults to None.
 
     Returns:
-        Callable[[Callable[..., T]], Callable[..., None]]: The decorated method
+        TTypedFunction[TTypedReturnFunction[T], TNoReturnFunction]: The decorated method
     """
 
-    def wrapper(func: Callable[..., T]) -> Callable[..., None]:
+    def wrapper(func: TTypedReturnFunction[T]) -> TNoReturnFunction:
         def wrapped(*args: Any, **kwds: Any) -> None:
             profiles: Optional[list[str]] = None
             if "profiles" in kwds:
@@ -656,7 +668,7 @@ def provide(
 
 def provide_variable(
     class_name: type[T], qualifier: str
-) -> Callable[[Callable[..., T]], Callable[..., None]]:
+) -> TTypedFunction[TTypedReturnFunction[T], TNoReturnFunction]:
     """
     Provide variable decorator. Used for methods inside @configuration classes.
     This decorator is meant to be used in @configuration classes, in order to mark the methods that
@@ -667,10 +679,10 @@ def provide_variable(
         qualifier (str): Mandatory variable qualifier. Defaults to None.
 
     Returns:
-        Callable[[Callable[..., T]], Callable[..., None]]: The decorated method
+        TTypedFunction[TTypedReturnFunction[T], TNoReturnFunction]: The decorated method
     """
 
-    def wrapper(func: Callable[..., T]) -> Callable[..., None]:
+    def wrapper(func: TTypedReturnFunction[T]) -> TNoReturnFunction:
         def wrapped(*args: Any, **kwds: Any) -> None:
             profiles: Optional[list[str]] = None
             if "profiles" in kwds:
@@ -693,7 +705,7 @@ def validate_dependencies(dependencies: dict[str, Any]) -> None:
 
 
 def resolve_dependencies(
-    dependencies: dict[str, Union[type, Dependency]],
+    dependencies: dict[str, TDependency],
     eager: bool = False,
 ) -> Callable[[type[T]], type[T]]:
     """
@@ -708,19 +720,17 @@ def resolve_dependencies(
     Will inject the dependency associated with 'ClassName' into the 'test_field' member
 
     Args:
-        dependencies (dict[str, Union[type, Dependency]]): A map of dependencies
+        dependencies (dict[str, TDependency]): A map of dependencies
         eager (bool): Flag determining if the dependencies should be injected as soon as possible. Defaults to False.
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
-    return resolve(
-        cast(dict[str, Union[type, Dependency, Variable]], dependencies), eager
-    )
+    return resolve(cast(dict[str, TVariableOrDependency], dependencies), eager)
 
 
 def resolve(
-    dependencies: dict[str, Union[type, Dependency, Variable]],
+    dependencies: dict[str, TVariableOrDependency],
     eager: bool = False,
 ) -> Callable[[type[T]], type[T]]:
     """
@@ -737,7 +747,7 @@ def resolve(
     and the variable associated with 'strQualifier' into the 'str_value' member
 
     Args:
-        dependencies (dict[str, Union[type, Dependency, Variable]]): A map of dependencies
+        dependencies (dict[str, TVariableOrDependency]): A map of dependencies
         eager (bool): Flag determining if the dependencies should be injected as soon as possible. Defaults to False.
 
 
@@ -799,10 +809,10 @@ def resolve_variables(
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
 
-    return resolve(cast(dict[str, Union[type, Dependency, Variable]], variables), eager)
+    return resolve(cast(dict[str, TVariableOrDependency], variables), eager)
 
 
-def _get_dep(dep: Union[type, Dependency, Variable]) -> Any:
+def _get_dep(dep: TVariableOrDependency) -> Any:
     qualifier: Optional[str] = None
     is_optional = False
     is_variable = False
@@ -832,8 +842,8 @@ def _get_dep(dep: Union[type, Dependency, Variable]) -> Any:
 
 
 def inject_args(
-    dependencies: dict[str, Union[type, Dependency, Variable]],
-) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    dependencies: dict[str, TVariableOrDependency],
+) -> TTransformer[TTypedReturnFunction[T]]:
     """
     Injects dependencies/variables into function/method arguments if they are not already provided by the caller.
 
@@ -869,12 +879,12 @@ def inject_args(
         # Output: arg1='explicit', arg2=50, arg3=9.99, arg4=False
 
     Args:
-        dependencies (dict[str, Union[type, Dependency, Variable]]):
+        dependencies (dict[str, TVariableOrDependency]):
             A dictionary mapping argument names to their corresponding dependency type,
             Dependency object, or Variable object.
 
     Returns:
-        Callable[[Callable[..., T]], Callable[..., T]]: The decorated function or method.
+        TTransformer[TTypedReturnFunction[T]]: The decorated function or method.
 
     Raises:
         ValueError: If a required dependency/variable cannot be resolved by the injector.
@@ -883,7 +893,7 @@ def inject_args(
     """
     validate_dependencies(dependencies)  # Keep validation
 
-    def wrapper(func: Callable[..., T]) -> Callable[..., T]:
+    def wrapper(func: TTypedReturnFunction[T]) -> TTypedReturnFunction[T]:
         sig = inspect.signature(func)
 
         def wrapped(*args: Any, **kwds: Any) -> T:
@@ -937,7 +947,7 @@ def inject_args(
 
 
 # def inject_args(
-#     dependencies: dict[str, Union[type, Dependency, Variable]],
+#     dependencies: dict[str, TVariableOrDependency],
 # ) -> Callable[[Callable[..., T]], Callable[..., T]]:
 #     """
 #     Injects dependencies to a function, method or constructor using args and kwargs.
@@ -978,7 +988,7 @@ def inject_args(
 #     TestArgInjection("other", 5).print() # Will print out "other5" as all args are overriden
 
 #         Args:
-#         dependencies (dict[str, Union[type, Dependency, Variable]]): A dictionary of dependecies that specify the argument name and the dependency or variable mapping.
+#         dependencies (dict[str, TVariableOrDependency]): A dictionary of dependecies that specify the argument name and the dependency or variable mapping.
 
 #     Returns:
 #         Callable[[Callable[..., T]], Callable[..., T]]: The decorated function or method
@@ -1008,7 +1018,7 @@ def inject_args(
 
 def autowired(
     class_name: type[T], qualifier: Optional[str] = None
-) -> Callable[[Callable[..., T]], Callable[..., T]]:
+) -> TTransformer[TTypedReturnFunction[T]]:
     """
     Decorator that replaces the decorated function's body entirely.
     When the decorated function is called, it will instead retrieve and return
@@ -1029,12 +1039,12 @@ def autowired(
         qualifier (Optional[str], optional): The qualifier name. Defaults to None.
 
     Returns:
-        Callable[[Callable[..., T]], Callable[..., T]]: The decorator function.
+        TTransformer[TTypedReturnFunction[T]]: The decorator function.
     """
 
     dependency = InjectedDependency(class_name, qualifier)
 
-    def wrapper(func: Callable[..., T]) -> Callable[..., T]:  # pylint: disable=unused-argument
+    def wrapper(func: TTypedReturnFunction[T]) -> TTypedReturnFunction[T]:  # pylint: disable=unused-argument
         def wrapped(*args: Any, **kwds: Any) -> T:  # pylint: disable=unused-argument
             return dependency.get()
 
@@ -1075,7 +1085,7 @@ def return_wired_optional(class_name: type[T]) -> Optional[T]:  # pylint: disabl
 
 def autowired_optional(
     class_name: type[T], qualifier: Optional[str] = None
-) -> Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]:
+) -> TTransformer[TTypedReturnFunction[Optional[T]]]:
     """
     Decorator that replaces the decorated function's body entirely.
     When the decorated function is called, it will instead retrieve and return
@@ -1096,12 +1106,14 @@ def autowired_optional(
         qualifier (Optional[str], optional): The qualifier name. Defaults to None.
 
     Returns:
-        Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]: The decorator function.
+        TTransformer[TTypedReturnFunction[Optional[T]]]: The decorator function.
     """
 
     optional_dependency = OptionalInjectedDependency(class_name, qualifier)
 
-    def wrapper(func: Callable[..., Optional[T]]) -> Callable[..., Optional[T]]:  # pylint: disable=unused-argument
+    def wrapper(
+        _: TTypedReturnFunction[Optional[T]],
+    ) -> TTypedReturnFunction[Optional[T]]:  # pylint: disable=unused-argument
         def wrapped(*args: Any, **kwds: Any) -> Optional[T]:  # pylint: disable=unused-argument
             return optional_dependency.get()
 
@@ -1350,7 +1362,7 @@ def resolve_all(eager: bool = False) -> Callable[[type[T]], type[T]]:
     def wrap(cls: type[T]) -> type[T]:
         original_get_attribute = cls.__getattribute__
         dependencies_list = _get_class_attributes(cls)
-        dependencies: dict[str, Union[type, Dependency, Variable]] = {}
+        dependencies: dict[str, TVariableOrDependency] = {}
         for element in dependencies_list:
             dependencies[element.element_name] = (
                 element.element_type

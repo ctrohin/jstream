@@ -1,7 +1,8 @@
-from typing import Callable, Generic, Optional, TypeVar, Union, cast, overload
+from typing import Generic, Optional, TypeVar, cast, overload
 
 from jstreams.stream import Opt, Stream
 from jstreams.predicate import Predicate, predicate_of
+from jstreams.types import TPredicateOrValue, TSupplierOrValue
 from jstreams.utils import require_non_null
 
 T = TypeVar("T")
@@ -20,8 +21,8 @@ class Case(Generic[T, V]):
 
     def __init__(
         self,
-        matching: Union[T, Callable[[T], bool], Predicate[T]],
-        resulting: Union[V, Callable[[], V]],
+        matching: TPredicateOrValue[T],
+        resulting: TSupplierOrValue[V],
     ) -> None:
         """
         Initializes a Case.
@@ -87,7 +88,7 @@ class DefaultCase(Case[T, V]):
 
     def __init__(
         self,
-        resulting: Union[V, Callable[[], V]],
+        resulting: TSupplierOrValue[V],
     ) -> None:
         """
         Initializes a DefaultCase.
@@ -677,8 +678,8 @@ class Match(Generic[T]):
 
 
 def case(
-    matching: Union[T, Callable[[T], bool], Predicate[T]],
-    resulting: Union[V, Callable[[], V]],
+    matching: TPredicateOrValue[T],
+    resulting: TSupplierOrValue[V],
 ) -> Case[T, V]:
     """
     Factory function to create a Case instance.
@@ -744,7 +745,7 @@ def match_opt(value: Optional[T]) -> Match[Optional[T]]:
     return Match(value)
 
 
-def default_case(resulting: Union[V, Callable[[], V]]) -> Case[T, V]:
+def default_case(resulting: TSupplierOrValue[V]) -> Case[T, V]:
     """
     Factory function to create a DefaultCase instance.
 

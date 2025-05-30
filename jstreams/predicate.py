@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 import re
 from typing import (
     Any,
-    Callable,
     Iterable,
     Mapping,
     Optional,
@@ -11,6 +10,12 @@ from typing import (
     Union,
     cast,
     Generic,
+)
+
+from jstreams.types import (
+    TParamPredicate,
+    TParamSupplier,
+    TPredicate,
 )
 
 T = TypeVar("T")
@@ -30,10 +35,10 @@ class Predicate(ABC, Generic[T]):
             bool: True if the value matches, False otherwise
         """
 
-    def or_(self, other: Callable[[T], bool]) -> "Predicate[T]":
+    def or_(self, other: TPredicate[T]) -> "Predicate[T]":
         return Predicate.of(lambda v: self.apply(v) or predicate_of(other).apply(v))
 
-    def and_(self, other: Callable[[T], bool]) -> "Predicate[T]":
+    def and_(self, other: TPredicate[T]) -> "Predicate[T]":
         return Predicate.of(lambda v: self.apply(v) and predicate_of(other).apply(v))
 
     def __call__(self, value: T) -> bool:
@@ -41,14 +46,14 @@ class Predicate(ABC, Generic[T]):
 
     @staticmethod
     def of(
-        predicate: Callable[[T], bool],
+        predicate: TPredicate[T],
     ) -> "Predicate[T]":
         """
         If the value passed is a predicate, it is returned without any changes.
         If a function is passed, it will be wrapped into a Predicate object.
 
         Args:
-            predicate (Callable[[T], bool]): The predicate
+            predicate (TPredicate[T]): The predicate
 
         Returns:
             Predicate[T]: The produced predicate
@@ -83,14 +88,14 @@ class PredicateWith(ABC, Generic[T, K]):
 
     @staticmethod
     def of(
-        predicate: Callable[[T, K], bool],
+        predicate: TParamPredicate[T, K],
     ) -> "PredicateWith[T, K]":
         """
         If the value passed is a predicate, it is returned without any changes.
         If a function is passed, it will be wrapped into a Predicate object.
 
         Args:
-            predicate (Callable[[T, K], bool]): The predicate
+            predicate (TParamPredicate[T, K]): The predicate
 
         Returns:
             PredicateWith[T, K]: The produced predicate
@@ -103,7 +108,7 @@ class PredicateWith(ABC, Generic[T, K]):
 class _WrapPredicate(Predicate[T]):
     __slots__ = ("__predicate_fn",)
 
-    def __init__(self, fn: Callable[[T], bool]) -> None:
+    def __init__(self, fn: TPredicate[T]) -> None:
         self.__predicate_fn = fn
 
     def apply(self, value: T) -> bool:
@@ -113,20 +118,20 @@ class _WrapPredicate(Predicate[T]):
 class _WrapPredicateWith(PredicateWith[T, K]):
     __slots__ = ("__predicate_fn",)
 
-    def __init__(self, fn: Callable[[T, K], bool]) -> None:
+    def __init__(self, fn: TParamPredicate[T, K]) -> None:
         self.__predicate_fn = fn
 
     def apply(self, value: T, with_value: K) -> bool:
         return self.__predicate_fn(value, with_value)
 
 
-def predicate_of(predicate: Callable[[T], bool]) -> Predicate[T]:
+def predicate_of(predicate: TPredicate[T]) -> Predicate[T]:
     """
     If the value passed is a predicate, it is returned without any changes.
     If a function is passed, it will be wrapped into a Predicate object.
 
     Args:
-        predicate (Callable[[T], bool]): The predicate
+        predicate (TPredicate[T]): The predicate
 
     Returns:
         Predicate[T]: The produced predicate
@@ -135,14 +140,14 @@ def predicate_of(predicate: Callable[[T], bool]) -> Predicate[T]:
 
 
 def predicate_with_of(
-    predicate: Callable[[T, K], bool],
+    predicate: TParamPredicate[T, K],
 ) -> PredicateWith[T, K]:
     """
     If the value passed is a predicate, it is returned without any changes.
     If a function is passed, it will be wrapped into a Predicate object.
 
     Args:
-        predicate (Callable[[T, K], bool]): The predicate
+        predicate (TParamPredicate[T, K]): The predicate
 
     Returns:
         PredicateWith[T, K]: The produced predicate
@@ -298,7 +303,7 @@ def is_not_blank(obj: Any) -> bool:
     return not_(is_blank)(obj)
 
 
-def default(default_val: T) -> Callable[[Optional[T]], T]:
+def default(default_val: T) -> TParamSupplier[Optional[T], T]:
     """
     Default value provider. Returns the default value if the input is None.
     Usage: default(defaultValue)(myValue)
@@ -308,7 +313,7 @@ def default(default_val: T) -> Callable[[Optional[T]], T]:
         default_val (T): The default value.
 
     Returns:
-        Callable[[Optional[T]], T]: A function that returns the input or the default.
+        TParamSupplier[Optional[T], T]: A function that returns the input or the default.
     """
 
     def wrap(val: Optional[T]) -> T:
@@ -723,7 +728,7 @@ def is_less_than_or_eq(value: float) -> Predicate[Optional[float]]:
 
 
 def not_(
-    predicate: Union[Predicate[Optional[T]], Callable[[Optional[T]], bool]],
+    predicate: TPredicate[Optional[T]],
 ) -> Predicate[Optional[T]]:
     """
     Negates the result of the given predicate. Handles Optional input.
@@ -745,7 +750,7 @@ def not_(
 
 
 def not_strict(
-    predicate: Callable[[T], bool],
+    predicate: TPredicate[T],
 ) -> Predicate[T]:
     """
     Negates the result of the given predicate. Requires non-Optional input.

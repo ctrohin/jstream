@@ -46,6 +46,13 @@ from jstreams.try_opt import (
     raises,
 )
 
+from jstreams.types import (
+    CompletedHandler,
+    ErrorHandler,
+    DisposeHandler,
+    NextHandler,
+)
+
 from jstreams.rx import (
     ObservableSubscription,
     Observable,
@@ -54,10 +61,6 @@ from jstreams.rx import (
     BehaviorSubject,
     PublishSubject,
     ReplaySubject,
-    CompletedHandler,
-    ErrorHandler,
-    DisposeHandler,
-    NextHandler,
     Pipe,
     Reduce,
     Filter,

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Generic, Iterable, TypeVar
-
+from typing import Any, Generic, Iterable, TypeVar
+from jstreams.types import TMapper, TParamMapper
 from jstreams.utils import each
 
 T = TypeVar("T")
@@ -25,13 +25,13 @@ class Mapper(ABC, Generic[T, V]):
         return self.map(value)
 
     @staticmethod
-    def of(mapper: Callable[[T], V]) -> "Mapper[T, V]":
+    def of(mapper: TMapper[T, V]) -> "Mapper[T, V]":
         """
         If the value passed is a mapper, it is returned without changes.
         If a function is passed, it will be wrapped into a Mapper object.
 
         Args:
-            mapper (Callable[[T], V]): The mapper
+            mapper (TMapper[T, V]): The mapper
 
         Returns:
             Mapper[T, V]: The produced mapper
@@ -73,7 +73,7 @@ class MapperWith(ABC, Generic[T, K, V]):
 
     @staticmethod
     def of(
-        mapper: Callable[[T, K], V],
+        mapper: TParamMapper[T, K, V],
     ) -> "MapperWith[T, K, V]":
         """
         If the value passed is a mapper, it is returned without changes.
@@ -81,7 +81,7 @@ class MapperWith(ABC, Generic[T, K, V]):
 
 
         Args:
-            mapper (Callable[[T, K], V]): The mapper
+            mapper (TParamMapper[T, K, V]): The mapper
 
         Returns:
             MapperWith[T, K, V]: The produced mapper
@@ -94,7 +94,7 @@ class MapperWith(ABC, Generic[T, K, V]):
 class _WrapMapper(Mapper[T, V]):
     __slots__ = ("__mapper",)
 
-    def __init__(self, mapper: Callable[[T], V]) -> None:
+    def __init__(self, mapper: TMapper[T, V]) -> None:
         self.__mapper = mapper
 
     def map(self, value: T) -> V:
@@ -109,7 +109,7 @@ class _WrapMapper(Mapper[T, V]):
 class _WrapMapperWith(MapperWith[T, K, V]):
     __slots__ = ("__mapper",)
 
-    def __init__(self, mapper: Callable[[T, K], V]) -> None:
+    def __init__(self, mapper: TParamMapper[T, K, V]) -> None:
         self.__mapper = mapper
 
     def map(self, value: T, with_value: K) -> V:
@@ -121,13 +121,13 @@ class _WrapMapperWith(MapperWith[T, K, V]):
         return self.__mapper == value.__mapper
 
 
-def mapper_of(mapper: Callable[[T], V]) -> Mapper[T, V]:
+def mapper_of(mapper: TMapper[T, V]) -> Mapper[T, V]:
     """
     If the value passed is a mapper, it is returned without changes.
     If a function is passed, it will be wrapped into a Mapper object.
 
     Args:
-        mapper (Callable[[T], V]): The mapper
+        mapper (TMapper[T, V]): The mapper
 
     Returns:
         Mapper[T, V]: The produced mapper
@@ -136,7 +136,7 @@ def mapper_of(mapper: Callable[[T], V]) -> Mapper[T, V]:
 
 
 def mapper_with_of(
-    mapper: Callable[[T, K], V],
+    mapper: TParamMapper[T, K, V],
 ) -> MapperWith[T, K, V]:
     """
     If the value passed is a mapper, it is returned without changes.
@@ -144,7 +144,7 @@ def mapper_with_of(
 
 
     Args:
-        mapper (Callable[[T, K], V]): The mapper
+        mapper (TParamMapper[T, K, V]): The mapper
 
     Returns:
         MapperWith[T, K, V]: The produced mapper
@@ -152,13 +152,13 @@ def mapper_with_of(
     return MapperWith.of(mapper)
 
 
-def map_it(target: Iterable[T], mapper: Callable[[T], V]) -> list[V]:
+def map_it(target: Iterable[T], mapper: TMapper[T, V]) -> list[V]:
     """
     Maps each element of an iterable to a new object produced by the given mapper
 
     Args:
         target (Iterable[T]): The target iterable
-        mapper (Callable[[T], V]): The mapper
+        mapper (TMapper[T, V]): The mapper
 
     Returns:
         list[V]: The mapped elements
@@ -171,7 +171,7 @@ def map_it(target: Iterable[T], mapper: Callable[[T], V]) -> list[V]:
 
 def flat_map(
     target: Iterable[T],
-    mapper: Callable[[T], Iterable[V]],
+    mapper: TMapper[T, Iterable[V]],
 ) -> list[V]:
     """
     Returns a flattened map. The mapper function is called for each element of the target
@@ -180,7 +180,7 @@ def flat_map(
 
     Args:
         target (Iterable[T]): The target iterable
-        mapper (Callable[[T], Iterable[V]]): The mapper
+        mapper (TMapper[T, Iterable[V]]): The mapper
 
     Returns:
         list[V]: The resulting flattened map

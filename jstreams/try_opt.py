@@ -17,12 +17,24 @@ from jstreams.noop import noop
 from jstreams.predicate import is_identity
 from jstreams.stream import Opt
 from jstreams.utils import require_non_null
+from jstreams.types import (
+    TAction,
+    TExceptionHandler,
+    TParamAction,
+    TParamSupplier,
+    TPredicate,
+    TSupplier,
+)
 
 T = TypeVar("T")
 K = TypeVar("K")
 V = TypeVar("V")
 EX_TYPE = TypeVar("EX_TYPE")
 
+OptionalRecoverySupplier = Callable[[Optional[Exception]], Optional[T]]
+ExceptionRecoverySupplier = Callable[[V], T]
+BaseExceptionRecoverySupplier = Callable[[BaseException], T]
+RecoverySupplier = Callable[[Any], T]
 UNCAUGHT_EXCEPTION_LOGGER_NAME: Final[str] = "uncaught_exception_logger"
 
 # Cache the default logger at the module level
@@ -56,7 +68,7 @@ def _log_exception(
 
 
 def catch(
-    fn: Callable[[], T],
+    fn: TSupplier[T],
     logger: Optional[ErrorLogger] = None,
 ) -> Optional[T]:
     """
@@ -78,9 +90,7 @@ def catch(
 
 
 def catch_with(
-    with_val: K,
-    fn: Callable[[K], V],
-    logger: Optional[ErrorLogger] = None,
+    with_val: K, fn: TParamSupplier[K, V], logger: Optional[ErrorLogger] = None
 ) -> Optional[V]:
     """
     Executes fn(with_val), catches any Exception, logs it using _log_exception,
@@ -104,7 +114,7 @@ def catch_with(
 __FAILURE_OBJECT__: Final[object] = object()
 
 
-def raises(fn: Callable[[], Any], exception_type: type[Exception]) -> bool:
+def raises(fn: TAction, exception_type: type[Exception]) -> bool:
     return (
         Try(fn)
         .recover_from(exception_type, lambda _: __FAILURE_OBJECT__)
@@ -139,7 +149,7 @@ class Try(Generic[T]):
         "__recovery_suppliers",
     )
 
-    def __init__(self, fn: Callable[[], T], is_resource: bool = False) -> None:
+    def __init__(self, fn: TSupplier[T], is_resource: bool = False) -> None:
         """
         Initializes a Try operation.
 
@@ -148,20 +158,18 @@ class Try(Generic[T]):
         """
         self.__fn = fn
         self.__is_resource = is_resource
-        self.__then_chain: list[Callable[[T], Any]] = []
-        self.__on_success_chain: list[Callable[[Optional[T]], Any]] = []
-        self.__finally_chain: list[Callable[[Optional[T]], Any]] = []
-        self.__on_failure_chain: list[Callable[[Exception], Any]] = []
+        self.__then_chain: list[TParamAction[T]] = []
+        self.__on_success_chain: list[TParamAction[Optional[T]]] = []
+        self.__finally_chain: list[TParamAction[Optional[T]]] = []
+        self.__on_failure_chain: list[TExceptionHandler] = []
         self.__error_log: Optional[ErrorLogger] = None
         self.__error_message: Optional[str] = None
         self.__has_failed: bool = False
-        self.__failure_exception_supplier: Optional[Callable[[], Exception]] = None
-        self.__recovery_supplier: Optional[
-            Callable[[Optional[Exception]], Optional[T]]
-        ] = None
-        self.__recovery_suppliers: dict[type, Callable[[Any], T]] = {}
+        self.__failure_exception_supplier: Optional[TSupplier[Exception]] = None
+        self.__recovery_supplier: Optional[OptionalRecoverySupplier[T]] = None
+        self.__recovery_suppliers: dict[type, RecoverySupplier[T]] = {}
         self.__retries: int = 0
-        self.__retry_predicate: Optional[Callable[[Exception], bool]] = None
+        self.__retry_predicate: Optional[TPredicate[Exception]] = None
         self.__retries_delay: float = 0.0
 
     def mute(self) -> "Try[T]":
@@ -184,7 +192,7 @@ class Try(Generic[T]):
 
     def retry_if(
         self,
-        predicate: Callable[[Exception], bool],
+        predicate: TPredicate[Exception],
         retries: int,
         delay_between: float = 0.0,
     ) -> "Try[T]":
@@ -216,7 +224,7 @@ class Try(Generic[T]):
         """
         return self.retry_if(lambda _: True, retries, delay_between)
 
-    def and_then(self, fn: Callable[[T], Any]) -> "Try[T]":
+    def and_then(self, fn: TParamAction[T]) -> "Try[T]":
         """
         Adds a function to be executed sequentially if the primary operation succeeds.
         The function receives the result of the preceding successful operation.
@@ -225,7 +233,7 @@ class Try(Generic[T]):
         self.__then_chain.append(fn)
         return self
 
-    def on_success(self, fn: Callable[[Optional[T]], Any]) -> "Try[T]":
+    def on_success(self, fn: TParamAction[Optional[T]]) -> "Try[T]":
         """
         Adds a function to be executed if the primary operation (including `and_then` chain)
         succeeds. The function receives the successful result.
@@ -235,7 +243,7 @@ class Try(Generic[T]):
         self.__on_success_chain.append(fn)
         return self
 
-    def on_failure(self, fn: Callable[[Exception], Any]) -> "Try[T]":
+    def on_failure(self, fn: TExceptionHandler) -> "Try[T]":
         """
         Adds a function to be executed if the operation fails (after all retries).
         The function receives the exception that caused the failure.
@@ -244,7 +252,7 @@ class Try(Generic[T]):
         self.__on_failure_chain.append(fn)
         return self
 
-    def and_finally(self, fn: Callable[[Optional[T]], Any]) -> "Try[T]":
+    def and_finally(self, fn: TParamAction[Optional[T]]) -> "Try[T]":
         """
         Adds a function to be executed after the operation completes, regardless of success or failure.
         The function receives the successful result (if any), otherwise None.
@@ -384,7 +392,7 @@ class Try(Generic[T]):
                 return Opt(None)
         return Opt(None)
 
-    def on_failure_raise(self, exception_supplier: Callable[[], Exception]) -> "Try[T]":
+    def on_failure_raise(self, exception_supplier: TSupplier[Exception]) -> "Try[T]":
         """
         Configures the Try operation to raise a specific exception on failure,
         supplied by the provided function. This overrides default failure handling.
@@ -392,9 +400,7 @@ class Try(Generic[T]):
         self.__failure_exception_supplier = exception_supplier
         return self
 
-    def recover(
-        self, recovery_supplier: Callable[[Optional[Exception]], Optional[T]]
-    ) -> "Try[T]":
+    def recover(self, recovery_supplier: OptionalRecoverySupplier[T]) -> "Try[T]":
         """
         Provides a function to generate a recovery value if the operation fails.
         The function receives the exception that caused the failure.
@@ -404,7 +410,9 @@ class Try(Generic[T]):
         return self
 
     def recover_from(
-        self, exception_type: type[EX_TYPE], recovery_supplier: Callable[[EX_TYPE], T]
+        self,
+        exception_type: type[EX_TYPE],
+        recovery_supplier: ExceptionRecoverySupplier[EX_TYPE, T],
     ) -> "Try[T]":
         self.__recovery_suppliers[exception_type] = recovery_supplier
         return self
@@ -412,13 +420,13 @@ class Try(Generic[T]):
     def recover_from_these(
         self,
         exception_types: list[type],
-        recovery_supplier: Callable[[BaseException], T],
+        recovery_supplier: BaseExceptionRecoverySupplier[T],
     ) -> "Try[T]":
         for ex_type in exception_types:
             self.__recovery_suppliers[ex_type] = recovery_supplier
         return self
 
-    def or_else_try(self, fallback_supplier: Callable[[], "Try[T]"]) -> "Try[T]":
+    def or_else_try(self, fallback_supplier: TSupplier["Try[T]"]) -> "Try[T]":
         """
         If this Try operation fails (after all retries and recovery attempts),
         executes an alternative Try operation provided by the fallback_supplier.
@@ -493,11 +501,11 @@ class Try(Generic[T]):
         return Try(lambda: require_non_null(val))
 
     @staticmethod
-    def with_resource(fn: Callable[[], T]) -> "Try[T]":
+    def with_resource(fn: TSupplier[T]) -> "Try[T]":
         return Try(fn, True)
 
 
-def try_(fn: Callable[[], T]) -> Try[T]:
+def try_(fn: TSupplier[T]) -> Try[T]:
     """
     Factory function to create a Try instance from a callable.
     Syntactic sugar for `Try(fn)`.
@@ -511,7 +519,7 @@ def try_(fn: Callable[[], T]) -> Try[T]:
     return Try(fn)
 
 
-def try_with_resource(fn: Callable[[], T]) -> Try[T]:
+def try_with_resource(fn: TSupplier[T]) -> Try[T]:
     """
     Factory function to create a Try instance from a callable producing a closeable resource.
     Syntactic sugar for `Try(fn, True)`.

@@ -18,6 +18,8 @@ from typing import (
 import inspect
 from uuid import UUID
 
+from jstreams.types import TAnyFunction
+
 # TypeVar to represent the class being decorated.
 _T = TypeVar("_T")
 # Covariant TypeVar for SerializableObject protocol
@@ -233,8 +235,8 @@ def json_standard_serializable(
     ignore_unknown_fields: bool = True,
     aliases: Optional[dict[str, str]] = None,
     omit_none: bool = False,
-    custom_serializers: Optional[dict[str, Callable[[Any], Any]]] = None,
-    custom_deserializers: Optional[dict[str, Callable[[Any], Any]]] = None,
+    custom_serializers: Optional[dict[str, TAnyFunction]] = None,
+    custom_deserializers: Optional[dict[str, TAnyFunction]] = None,
     post_deserialize_hook_name: Optional[str] = "__post_deserialize__",
 ) -> Callable[[type[_T]], type[_T]]:
     """
@@ -245,8 +247,8 @@ def json_standard_serializable(
         ignore_unknown_fields (bool, optional): _description_. Defaults to True.
         aliases (Optional[dict[str, str]], optional): _description_. Defaults to None.
         omit_none (bool, optional): _description_. Defaults to False.
-        custom_serializers (Optional[dict[str, Callable[[Any], Any]]], optional): _description_. Defaults to None.
-        custom_deserializers (Optional[dict[str, Callable[[Any], Any]]], optional): _description_. Defaults to None.
+        custom_serializers (Optional[dict[str, TAnyFunction]], optional): _description_. Defaults to None.
+        custom_deserializers (Optional[dict[str, TAnyFunction]], optional): _description_. Defaults to None.
         post_deserialize_hook_name (Optional[str], optional): _description_. Defaults to "__post_deserialize__".
 
     Returns:
@@ -267,8 +269,8 @@ def json_serializable(
     ignore_unknown_fields: bool = True,
     aliases: Optional[dict[str, str]] = None,
     omit_none: bool = False,
-    custom_serializers: Optional[dict[str, Callable[[Any], Any]]] = None,
-    custom_deserializers: Optional[dict[str, Callable[[Any], Any]]] = None,
+    custom_serializers: Optional[dict[str, TAnyFunction]] = None,
+    custom_deserializers: Optional[dict[str, TAnyFunction]] = None,
     post_deserialize_hook_name: Optional[str] = "__post_deserialize__",
     translate_snake_to_camel: bool = False,
 ) -> Callable[[type[_T]], type[_T]]:
@@ -314,10 +316,10 @@ def json_serializable(
             serialization/deserialization.  Defaults to None.
         omit_none (bool): If True, attributes with None values will be omitted
             from the serialized output. Defaults to False.
-        custom_serializers (Optional[dict[str, Callable[[Any], Any]]]): A dictionary
+        custom_serializers (Optional[dict[str, TAnyFunction]]): A dictionary
             mapping attribute names to custom serializer functions. These functions
             will be called to serialize the corresponding attribute. Defaults to None.
-        custom_deserializers (Optional[dict[str, Callable[[Any], Any]]]): A dictionary
+        custom_deserializers (Optional[dict[str, TAnyFunction]]): A dictionary
             mapping attribute names to custom deserializer functions. These functions
             will be called to deserialize the corresponding attribute. Defaults to None.
         post_deserialize_hook_name (Optional[str]): The name of a method to be called
