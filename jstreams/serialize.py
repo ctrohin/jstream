@@ -1,3 +1,4 @@
+import sys
 from datetime import date, datetime
 from enum import Enum
 import re
@@ -17,13 +18,12 @@ from typing import (
 import inspect
 from uuid import UUID
 
-from jstreams.types import ParamSpec, TAnyFunction
+from jstreams.types import TAnyFunction
 
 # TypeVar to represent the class being decorated.
 _T = TypeVar("_T")
 # Covariant TypeVar for SerializableObject protocol
 _T_co = TypeVar("_T_co", covariant=True)
-Serialized = dict[str, Any]
 
 # Pre-compiled regex for _camel_to_snake for performance
 _CAMEL_TO_SNAKE_PAT1 = re.compile(r"(.)([A-Z][a-z]+)")
@@ -75,9 +75,9 @@ def _camel_to_snake(camel_str: str) -> str:
 # This helps in type checking the duck-typed call to value.to_dict().
 @runtime_checkable
 class SerializableObject(Protocol[_T_co]):
-    def to_dict(self) -> Serialized: ...
+    def to_dict(self) -> dict[str, Any]: ...
     @classmethod
-    def from_dict(cls: type[_T_co], data: Serialized) -> _T_co: ...
+    def from_dict(cls: type[_T_co], data: dict[str, Any]) -> _T_co: ...
 
 
 def _process_value(value: Any) -> Any:
@@ -374,17 +374,17 @@ def json_serializable(
 
         # --- End Caching ---
 
-        def to_dict(self: _T) -> Serialized:
+        def to_dict(self: _T) -> dict[str, Any]:
             return _to_dict_convert_name(self, convert_names=True)
 
-        def _to_dict_convert_name(self: _T, convert_names: bool) -> Serialized:
-            serialized_data: Serialized = {}
+        def _to_dict_convert_name(self: _T, convert_names: bool) -> dict[str, Any]:
+            serialized_data: dict[str, Any] = {}
             aliases_map_local = aliases or {}
             custom_serializers_map_local = custom_serializers or {}
 
             # This map will store all potential attributes to serialize,
             # gathered from __dict__ and __slots__.
-            attributes_map: Serialized = {}
+            attributes_map: dict[str, Any] = {}
 
             # 1. Gather attributes from __dict__ if it exists
             if hasattr(self, "__dict__"):
@@ -458,7 +458,7 @@ def json_serializable(
 
             return serialized_data
 
-        def from_dict(cls_target: type[_T], data: Serialized) -> _T:
+        def from_dict(cls_target: type[_T], data: dict[str, Any]) -> _T:
             """
             Creates an instance of the class from a dictionary.
             Recursively deserializes nested objects based on type hints.
@@ -473,8 +473,8 @@ def json_serializable(
 
             custom_deserializers_map_local = custom_deserializers or {}
 
-            init_kwargs: Serialized = {}
-            extra_data: Serialized = {}  # For data not used in __init__
+            init_kwargs: dict[str, Any] = {}
+            extra_data: dict[str, Any] = {}  # For data not used in __init__
 
             # Prepare arguments for __init__ by deserializing them
             for key_from_data, value_from_data in data.items():
@@ -599,7 +599,7 @@ def json_serializable(
     return decorator
 
 
-def json_deserialize(class_type: type[_T], data: Serialized) -> _T:
+def json_deserialize(class_type: type[_T], data: dict[str, Any]) -> _T:
     """
     Deserialize a dictionary into an instance of the specified class type.
     This function is a convenience wrapper around the from_dict method of the class.
@@ -609,7 +609,7 @@ def json_deserialize(class_type: type[_T], data: Serialized) -> _T:
     return class_type.from_dict(data)  # type: ignore
 
 
-def json_deserialize_list(class_type: type[_T], data: list[Serialized]) -> list[_T]:
+def json_deserialize_list(class_type: type[_T], data: list[dict[str, Any]]) -> list[_T]:
     """
     Deserialize a list of dictionaries into a list of instances of the specified class type.
     """
@@ -622,7 +622,7 @@ def json_deserialize_list(class_type: type[_T], data: list[Serialized]) -> list[
     return [class_type.from_dict(item) for item in data]  # type: ignore
 
 
-def json_serialize(obj: Any) -> Serialized:
+def json_serialize(obj: Any) -> dict[str, Any]:
     """
     Serialize an object into a dictionary.
     This function is a convenience wrapper around the to_dict method of the object.
@@ -632,7 +632,7 @@ def json_serialize(obj: Any) -> Serialized:
     return obj.to_dict()  # type: ignore
 
 
-def json_serialize_list(obj: list[Any]) -> list[Serialized]:
+def json_serialize_list(obj: list[Any]) -> list[dict[str, Any]]:
     """
     Serialize an list of objects into a list of dictionaries.
     This function is a convenience wrapper around the to_dict method of the object.
@@ -645,22 +645,29 @@ def json_serialize_list(obj: list[Any]) -> list[Serialized]:
     return [item.to_dict() for item in obj]
 
 
-P = ParamSpec("P")
+if sys.version_info >= (3, 10):
+    from typing import ParamSpec
+
+    P = ParamSpec("P")
+else:
+    from typing_extensions import ParamSpec
+
+    P = ParamSpec("P")
 # TypeVar for the original return type of a callable
 R = TypeVar("R")
 
 
 def json_serialize_return() -> Callable[  # Type of the decorator factory
     [Callable[P, R]],  # It accepts a callable func(P) -> R
-    Callable[P, Serialized],  # It returns a new callable func(P) -> dict
+    Callable[P, dict[str, Any]],  # It returns a new callable func(P) -> dict
 ]:
     """
     Decorator factory to serialize the return value of a function using json_serialize.
     The decorated function will have its return value processed by json_serialize.
     """
 
-    def decorator(func: Callable[P, R]) -> Callable[P, Serialized]:
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> Serialized:
+    def decorator(func: Callable[P, R]) -> Callable[P, dict[str, Any]]:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> dict[str, Any]:
             result = func(*args, **kwargs)
             return json_serialize(result)
 
@@ -671,15 +678,17 @@ def json_serialize_return() -> Callable[  # Type of the decorator factory
 
 def json_serialize_return_list() -> Callable[  # Type of the decorator factory
     [Callable[P, list[R]]],  # It accepts a callable func(P) -> list[R]
-    Callable[P, list[Serialized]],  # It returns a new callable func(P) -> list[dict]
+    Callable[
+        P, list[dict[str, Any]]
+    ],  # It returns a new callable func(P) -> list[dict]
 ]:
     """
     Decorator factory to serialize the return value of a function using json_serialize.
     The decorated function will have its return value processed by json_serialize.
     """
 
-    def decorator(func: Callable[P, list[R]]) -> Callable[P, list[Serialized]]:
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> list[Serialized]:
+    def decorator(func: Callable[P, list[R]]) -> Callable[P, list[dict[str, Any]]]:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> list[dict[str, Any]]:
             result = func(*args, **kwargs)
             return [json_serialize(item) for item in result]
 
