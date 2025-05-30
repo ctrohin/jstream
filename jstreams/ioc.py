@@ -399,7 +399,7 @@ class _Injector:
         )
 
         if is_mth_or_fn(found_component):
-            comp = found_component()
+            comp = found_component()  # type: ignore[misc]
             # Remove the old dependency, and replace it with the lazy initialized one
             container_dep.qualified_dependencies[full_qualifier] = self.__init_meta(
                 comp
