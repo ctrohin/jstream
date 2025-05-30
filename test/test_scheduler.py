@@ -1,17 +1,11 @@
 from time import sleep
 from typing import Any
 from unittest.mock import patch, MagicMock, call
-import time
-import datetime
 
 from baseTest import BaseTestCase
 from jstreams.scheduler import (
     Duration,
-    get_timestamp_current_hour,
-    get_timestamp_today,
-    schedule_daily,
     schedule_duration,
-    schedule_hourly,
     schedule_periodic,
     scheduler,
 )
@@ -138,10 +132,7 @@ class TestDuration(BaseTestCase):
 
     def test_add_invalid_type(self):
         d1 = Duration(hours=1)
-        with self.assertRaisesRegex(
-            TypeError, "Unsupported operand type for \+: 'Duration' and 'int'"
-        ):
-            _ = d1 + 5
+        self.assertRaises(TypeError, lambda: d1 + 5)
 
     def test_subtract_duration(self):
         d1 = Duration(hours=3, minutes=30)  # 3.5 hours

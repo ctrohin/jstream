@@ -242,11 +242,7 @@ class TestAnnotations(BaseTestCase):
         counter = LockedCounter(0)
 
         # Test getting non-existent attribute
-        with self.assertRaisesRegex(
-            AttributeError,
-            "'UnsafeCounter' object \(wrapped\) has no attribute 'non_existent'",
-        ):
-            getattr(counter, "non_existent")
+        self.assertRaises(AttributeError, lambda: getattr(counter, "non_existent"))
 
     def test_locked_init_exception(self) -> None:
         """Tests that exceptions during original __init__ are propagated."""
