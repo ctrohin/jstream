@@ -1902,7 +1902,11 @@ class Scan(BaseMappingOperator[T, A]):
 class Distinct(Generic[T, K], BaseFilteringOperator[T]):
     __slots__ = ("__key_selector", "__seen_keys")
 
-    def __init__(self, key_selector: Optional[Callable[[T], K]] = None) -> None:
+    def __init__(
+        self,
+        typ: type[T],  # pylint: disable=unused-argument
+        key_selector: Optional[Callable[[T], K]] = None,
+    ) -> None:
         super().__init__(self._is_new)
         self.__key_selector = key_selector
         self.__seen_keys: set[K] = set()
@@ -1924,7 +1928,11 @@ _SENTINEL = object()
 class DistinctUntilChanged(BaseFilteringOperator[T]):
     __slots__ = ("__key_selector", "__prev_key")
 
-    def __init__(self, key_selector: Optional[Callable[[T], K]] = None) -> None:
+    def __init__(
+        self,
+        typ: type[T],  # pylint: disable=unused-argument
+        key_selector: Optional[Callable[[T], K]] = None,
+    ) -> None:
         self.__key_selector = key_selector
         self.__prev_key: Any = _SENTINEL  # Stores the key of the previous item
         super().__init__(self.__is_distinct)
@@ -1991,7 +1999,7 @@ class Ignore(BaseFilteringOperator[T]):
 class Throttle(BaseFilteringOperator[T]):
     __slots__ = ("__timespan", "__last_emitted")
 
-    def __init__(self, timespan: float) -> None:
+    def __init__(self, typ: type[T], timespan: float) -> None:  # pylint: disable=unused-argument
         """
         Emits a value from the source Observable, then ignores subsequent source emissions for a particular timespan.
 
@@ -2018,7 +2026,7 @@ class Throttle(BaseFilteringOperator[T]):
 class Debounce(DelayedBaseFilteringOperator[T]):
     __slots__ = ("__timespan", "__last_value", "__interval")
 
-    def __init__(self, timespan: float) -> None:
+    def __init__(self, typ: type[T], timespan: float) -> None:  # pylint: disable=unused-argument
         """
         Emits a value from the source Observable, after a particular timespan passes without new emissions.
 
@@ -2052,7 +2060,7 @@ class Debounce(DelayedBaseFilteringOperator[T]):
 class Buffer(BaseMappingOperator[T, list[T]]):
     __slots__ = ("__timespan", "__buffer", "__last_checked")
 
-    def __init__(self, timespan: float) -> None:
+    def __init__(self, typ: type[T], timespan: float) -> None:  # pylint: disable=unused-argument
         """
         Buffers the source Observable for a specific timespan then emits the buffered values as a list.
 
@@ -2094,7 +2102,7 @@ class Buffer(BaseMappingOperator[T, list[T]]):
 class BufferCount(BaseMappingOperator[T, list[T]]):
     __slots__ = ("__count", "__buffer")
 
-    def __init__(self, count: int) -> None:
+    def __init__(self, typ: type[T], count: int) -> None:  # pylint: disable=unused-argument
         """
         Buffers a specified number of values from the source Observable and emits them as a list.
 
@@ -2132,7 +2140,7 @@ class Timestamped(Generic[T]):
 
 
 class TimestampOperator(BaseMappingOperator[T, Timestamped[T]]):
-    def __init__(self) -> None:
+    def __init__(self, typ: type[T]) -> None:  # pylint: disable=unused-argument
         super().__init__(self._add_timestamp)
 
     def _add_timestamp(self, val: T) -> Timestamped[T]:
@@ -2142,7 +2150,7 @@ class TimestampOperator(BaseMappingOperator[T, Timestamped[T]]):
 class ElementAt(BaseFilteringOperator[T]):  # Also implicitly maps T to T
     __slots__ = ("__index", "__current_index", "__found")
 
-    def __init__(self, index: int) -> None:
+    def __init__(self, typ: type[T], index: int) -> None:  # pylint: disable=unused-argument
         if index < 0:
             raise ValueError("Index must be a non-negative integer.")
         self.__index = index
@@ -2189,13 +2197,14 @@ class RX:
 
     @staticmethod
     def distinct_until_changed(
+        typ: type[T],
         key_selector: Optional[Callable[[T], Any]] = None,
     ) -> RxOperator[T, T]:
         """
         Emits only items from an Observable that are distinct from their immediate
         predecessor, based on the item itself or a key selected by key_selector.
         """
-        return DistinctUntilChanged(key_selector)
+        return DistinctUntilChanged(typ, key_selector)
 
     @staticmethod
     def filter(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
@@ -2341,44 +2350,48 @@ class RX:
         return Ignore(predicate)
 
     @staticmethod
-    def throttle(timespan: float) -> RxOperator[T, T]:
+    def throttle(typ: type[T], timespan: float) -> RxOperator[T, T]:  # pylint: disable=unused-argument
         """
         Emits a value from the source Observable, then ignores subsequent source emissions for a particular timespan.
 
         Args:
+            typ (type[T]): The type of the values that will pass throgh
             timespan (float): The timespan in seconds to wait before allowing another emission.
         """
-        return Throttle(timespan)
+        return Throttle(typ, timespan)
 
     @staticmethod
-    def debounce(timespan: float) -> RxOperator[T, T]:
+    def debounce(typ: type[T], timespan: float) -> RxOperator[T, T]:
         """
         Emits a value from the source Observable, after a particular timespan passes without new emissions.
 
         Args:
+            typ (type[T]): The type of the values that will pass throgh
             timespan (float): The timespan in seconds to wait before emitting the value.
         """
-        return Debounce(timespan)
+        return Debounce(typ, timespan)
 
     @staticmethod
-    def buffer(timespan: float) -> RxOperator[T, list[T]]:
+    def buffer(typ: type[T], timespan: float) -> RxOperator[T, list[T]]:
         """
         Buffers the source Observable for a specific timespan then emits the buffered values as a list.
 
         Args:
+            typ (type[T]): The type of the values that will pass throgh
             timespan (float): The timespan in seconds for which to buffer values.
         """
-        return Buffer(timespan)
+        return Buffer(typ, timespan)
 
     @staticmethod
-    def buffer_count(count: int) -> RxOperator[T, list[T]]:
+    def buffer_count(typ: type[T], count: int) -> RxOperator[T, list[T]]:
         """
         Buffers a specified number of values from the source Observable and emits them as a list.
 
         Args:
+            typ (type[T]): The type of the values that will pass throgh
             count (int): The number of values to buffer before emitting.
         """
-        return BufferCount(count)
+        return BufferCount(typ, count)
 
     @staticmethod
     def empty() -> Subscribable[Any]:
@@ -2443,7 +2456,9 @@ class RX:
         return Scan(accumulator_fn, seed)
 
     @staticmethod
-    def distinct(key_selector: Optional[Callable[[T], K]] = None) -> RxOperator[T, T]:
+    def distinct(
+        typ: type[T], key_selector: Optional[Callable[[T], K]] = None
+    ) -> RxOperator[T, T]:
         """
         Returns an Observable that emits all items emitted by the source Observable that are distinct.
 
@@ -2451,23 +2466,23 @@ class RX:
         through. If `key_selector` is not passed, it will store ALL objects. This can cause out of memory errors
         if used for long lived observables. USE WITH CARE!
         """
-        return Distinct(key_selector)
+        return Distinct(typ, key_selector)
 
     @staticmethod
-    def timestamp() -> RxOperator[T, Timestamped[T]]:
+    def timestamp(typ: type[T]) -> RxOperator[T, Timestamped[T]]:
         """
         Attaches a timestamp to each item emitted by the source Observable.
         """
-        return TimestampOperator()
+        return TimestampOperator(typ)
 
     @staticmethod
-    def element_at(index: int) -> RxOperator[T, T]:
+    def element_at(typ: type[T], index: int) -> RxOperator[T, T]:
         """
         Emits only the item emitted by the source Observable at the specified index.
         Errors if the source completes before emitting the item at that index,
         unless a default value is provided (not supported in this simplified version).
         """
-        return ElementAt(index)
+        return ElementAt(typ, index)
 
     @staticmethod
     def merge(*sources: Subscribable[T]) -> Subscribable[T]:
@@ -2646,13 +2661,14 @@ def rx_drop_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
 
 
 def rx_distinct_until_changed(
+    typ: type[T],
     key_selector: Optional[Callable[[T], Any]] = None,
 ) -> RxOperator[T, T]:
     """
     Emits only items from an Observable that are distinct from their immediate
     predecessor, based on the item itself or a key selected by key_selector.
     """
-    return RX.distinct_until_changed(key_selector)
+    return RX.distinct_until_changed(typ, key_selector)
 
 
 def rx_tap(action: Callable[[T], Any]) -> RxOperator[T, T]:
@@ -2669,7 +2685,7 @@ def rx_of_type(typ: type[T]) -> RxOperator[T, T]:
     Allows only values of the given type to flow through
 
     Args:
-        typ (type[T]): The type of the values that will pass throgh
+        typ (type[T]): The type of the values that will pass through
 
     Returns:
         RxOperator[T, T]: A OfType operator
@@ -2688,34 +2704,37 @@ def rx_ignore_all() -> RxOperator[T, T]:
     return RX.ignore_all()
 
 
-def rx_throttle(timespan: float) -> RxOperator[T, T]:
+def rx_throttle(typ: type[T], timespan: float) -> RxOperator[T, T]:
     """
     Emits a value from the source Observable, then ignores subsequent source emissions for a particular timespan.
 
     Args:
+        typ (type[T]): The type of the values that will pass throgh
         timespan (float): The timespan in seconds to wait before allowing another emission.
     """
-    return RX.throttle(timespan)
+    return RX.throttle(typ, timespan)
 
 
-def rx_buffer(timespan: float) -> RxOperator[T, list[T]]:
+def rx_buffer(typ: type[T], timespan: float) -> RxOperator[T, list[T]]:
     """
     Buffers the source Observable for a specific timespan then emits the buffered values as a list.
 
     Args:
+        typ (type[T]): The type of the values that will pass throgh
         timespan (float): The timespan in seconds for which to buffer values.
     """
-    return RX.buffer(timespan)
+    return RX.buffer(typ, timespan)
 
 
-def rx_buffer_count(count: int) -> RxOperator[T, list[T]]:
+def rx_buffer_count(typ: type[T], count: int) -> RxOperator[T, list[T]]:
     """
     Buffers a specified number of values from the source Observable and emits them as a list.
 
     Args:
+        typ (type[T]): The type of the values that will pass throgh
         count (int): The number of values to buffer before emitting.
     """
-    return RX.buffer_count(count)
+    return RX.buffer_count(typ, count)
 
 
 def rx_empty() -> Subscribable[Any]:
@@ -2769,7 +2788,9 @@ def rx_scan(accumulator_fn: Callable[[A, T], A], seed: A) -> RxOperator[T, A]:
     return RX.scan(accumulator_fn, seed)
 
 
-def rx_distinct(key_selector: Optional[Callable[[T], K]] = None) -> RxOperator[T, T]:
+def rx_distinct(
+    typ: type[T], key_selector: Optional[Callable[[T], K]] = None
+) -> RxOperator[T, T]:
     """
     Returns an Observable that emits all items emitted by the source Observable that are distinct.
 
@@ -2777,31 +2798,32 @@ def rx_distinct(key_selector: Optional[Callable[[T], K]] = None) -> RxOperator[T
     through. If `key_selector` is not passed, it will store ALL objects. This can cause out of memory errors
     if used for long lived observables. USE WITH CARE!
     """
-    return RX.distinct(key_selector)
+    return RX.distinct(typ, key_selector)
 
 
-def rx_timestamp() -> RxOperator[T, Timestamped[T]]:
+def rx_timestamp(typ: type[T]) -> RxOperator[T, Timestamped[T]]:
     """
     Attaches a timestamp to each item emitted by the source Observable.
     """
-    return RX.timestamp()
+    return RX.timestamp(typ)
 
 
-def rx_element_at(index: int) -> RxOperator[T, T]:
+def rx_element_at(typ: type[T], index: int) -> RxOperator[T, T]:
     """
     Emits only the item emitted by the source Observable at the specified index.
     """
-    return RX.element_at(index)
+    return RX.element_at(typ, index)
 
 
-def rx_debounce(timespan: float) -> RxOperator[T, T]:
+def rx_debounce(typ: type[T], timespan: float) -> RxOperator[T, T]:
     """
     Emits a value from the source Observable, after a particular timespan passes without new emissions.
 
     Args:
+        typ (type[T]): The type of the values that will pass throgh
         timespan (float): The timespan in seconds to wait before emitting the value.
     """
-    return RX.debounce(timespan)
+    return RX.debounce(typ, timespan)
 
 
 def rx_merge(*sources: Subscribable[T]) -> Subscribable[T]:

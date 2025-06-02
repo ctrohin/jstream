@@ -1,6 +1,5 @@
 from threading import Thread
 from time import sleep
-from collections import deque  # Add if not already there for other tests
 from typing import Any  # For DisposableObservable
 
 from baseTest import BaseTestCase
@@ -360,7 +359,7 @@ class TestRx(BaseTestCase):
 
     def test_distinct_until_changed(self) -> None:
         elements = []
-        event(str).pipe(RX.distinct_until_changed()).subscribe(elements.append)
+        event(str).pipe(RX.distinct_until_changed(str)).subscribe(elements.append)
         event(str).publish("test")
         event(str).publish("test")
         event(str).publish("test2")
@@ -369,7 +368,7 @@ class TestRx(BaseTestCase):
 
     def test_distinct_until_changed_with_key(self) -> None:
         elements = []
-        event(str).pipe(RX.distinct_until_changed(lambda s: s[0])).subscribe(
+        event(str).pipe(RX.distinct_until_changed(str, lambda s: s[0])).subscribe(
             elements.append
         )
         event(str).publish("test")
@@ -546,20 +545,20 @@ class TestRx(BaseTestCase):
 
     def test_rx_distinct(self) -> None:
         results = []
-        Flowable([1, 2, 2, 3, 1, 4, 4]).pipe(RX.distinct()).subscribe(results.append)
+        Flowable([1, 2, 2, 3, 1, 4, 4]).pipe(RX.distinct(int)).subscribe(results.append)
         self.assertListEqual(results, [1, 2, 3, 4])
 
         results = []
         data = [{"id": 1, "val": "a"}, {"id": 2, "val": "b"}, {"id": 1, "val": "c"}]
-        Flowable(data).pipe(RX.distinct(key_selector=lambda x: x["id"])).subscribe(
-            results.append
-        )
+        Flowable(data).pipe(
+            RX.distinct(dict[str, str], key_selector=lambda x: x["id"])
+        ).subscribe(results.append)
         self.assertListEqual(results, [{"id": 1, "val": "a"}, {"id": 2, "val": "b"}])
 
     def test_rx_timestamp(self) -> None:
         results = []
         start_time = Value(None)
-        Flowable(["a", "b"]).pipe(RX.timestamp()).subscribe(
+        Flowable(["a", "b"]).pipe(RX.timestamp(str)).subscribe(
             lambda ts_val: (
                 start_time.set(ts_val.timestamp) if start_time.get() is None else None,
                 results.append(ts_val),
@@ -575,26 +574,26 @@ class TestRx(BaseTestCase):
 
     def test_rx_element_at(self) -> None:
         results = []
-        Flowable(["a", "b", "c"]).pipe(RX.element_at(1)).subscribe(results.append)
+        Flowable(["a", "b", "c"]).pipe(RX.element_at(str, 1)).subscribe(results.append)
         self.assertListEqual(results, ["b"])
 
         results = []
-        Flowable(["a", "b", "c"]).pipe(RX.element_at(0)).subscribe(results.append)
+        Flowable(["a", "b", "c"]).pipe(RX.element_at(str, 0)).subscribe(results.append)
         self.assertListEqual(results, ["a"])
 
         results = []
-        Flowable(["a", "b", "c"]).pipe(RX.element_at(2)).subscribe(results.append)
+        Flowable(["a", "b", "c"]).pipe(RX.element_at(str, 2)).subscribe(results.append)
         self.assertListEqual(results, ["c"])
 
         results = []  # out of bounds
-        Flowable(["a", "b", "c"]).pipe(RX.element_at(3)).subscribe(results.append)
+        Flowable(["a", "b", "c"]).pipe(RX.element_at(str, 3)).subscribe(results.append)
         self.assertListEqual(results, [])
 
         with self.assertRaises(ValueError):
-            RX.element_at(-1)
+            RX.element_at(str, -1)
 
     def test_buffer_emits_none_then_list(self) -> None:
-        pipe = RX.buffer(0.02)
+        pipe = RX.buffer(int, 0.02)
         pipe.init()  # Important for stateful operators like buffer
         self.assertIsNone(pipe.transform(1))  # type: ignore
         self.assertIsNone(pipe.transform(2))  # type: ignore
@@ -603,7 +602,7 @@ class TestRx(BaseTestCase):
         self.assertIsNone(pipe.transform(4))  # type: ignore
 
     def test_buffer_count_emits_none_then_list(self) -> None:
-        pipe = RX.buffer_count(3)
+        pipe = RX.buffer_count(int, 3)
         pipe.init()
         self.assertIsNone(pipe.transform(1))  # type: ignore
         self.assertIsNone(pipe.transform(2))  # type: ignore
@@ -613,7 +612,7 @@ class TestRx(BaseTestCase):
     def test_buffer_count_emits_none_then_list_subject(self) -> None:
         subject = SingleValueSubject(1)
         value_list = Value([])
-        subject.pipe(RX.buffer_count(3)).subscribe(value_list.set)
+        subject.pipe(RX.buffer_count(int, 3)).subscribe(value_list.set)
         subject.on_next(2)
         subject.on_next(3)
         subject.on_next(4)
@@ -1258,7 +1257,7 @@ class TestRxZip(BaseTestCase):
     def test_throttle(self) -> None:
         subject = SingleValueSubject(1)
         vals = []
-        subject.pipe(RX.throttle(0.5)).subscribe(vals.append)
+        subject.pipe(RX.throttle(int, 0.5)).subscribe(vals.append)
         subject.on_next(0)
         subject.on_next(1)
         subject.on_next(2)
@@ -1270,7 +1269,7 @@ class TestRxZip(BaseTestCase):
     def test_throttle_tap(self) -> None:
         subject = SingleValueSubject(1)
         vals = []
-        subject.pipe(RX.debounce(0.5), RX.tap(vals.append)).subscribe()
+        subject.pipe(RX.debounce(int, 0.5), RX.tap(vals.append)).subscribe()
         subject.on_next(0)
         subject.on_next(1)
         subject.on_next(2)
