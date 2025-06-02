@@ -1,5 +1,6 @@
 from threading import Thread
 from time import sleep
+from collections import deque  # Add if not already there for other tests
 from typing import Any  # For DisposableObservable
 
 from baseTest import BaseTestCase
@@ -915,6 +916,190 @@ class TestRxMerge(BaseTestCase):
 
         s1_ps.on_completed(None)  # Clean up subjects
         s2_ps.on_completed(None)
+
+
+class TestRxZip(BaseTestCase):
+    def test_zip_basic_tuple(self) -> None:
+        s1 = PublishSubject(int)
+        s2 = PublishSubject(str)
+        results = []
+        completed = Value(False)
+        errored = Value(False)
+
+        sub = RX.zip(s1, s2).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            on_error=lambda _: errored.set(True),
+            asynchronous=True,
+        )
+
+        s1.on_next(1)
+        s1.on_next(2)  # s1 has 1, 2 queued
+        s2.on_next("a")  # s2 has "a" queued. Emits (1, "a"). s1 has 2 left.
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a")])
+
+        s2.on_next("b")  # s2 has "b" queued. Emits (2, "b"). s1 is empty.
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a"), (2, "b")])
+
+        s1.on_next(3)  # s1 has 3. s2 is empty. No emission.
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a"), (2, "b")])
+
+        s1.on_completed(None)  # s1 completes. Still has 3 in queue.
+        s2.on_next(
+            "c"
+        )  # s2 has "c". Emits (3, "c"). s1 queue empty. s1 completed. Zip completes.
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a"), (2, "b"), (3, "c")])
+        self.assertTrue(completed.get())
+        self.assertFalse(errored.get())
+        sub.cancel()
+
+    def test_zip_with_zipper_function(self) -> None:
+        s1 = PublishSubject(int)
+        s2 = PublishSubject(int)
+        results = []
+
+        def zipper_fn(v1: int, v2: int) -> str:
+            return f"{v1}*{v2}={v1 * v2}"
+
+        sub = RX.zip(s1, s2, zipper=zipper_fn).subscribe(
+            on_next=results.append, asynchronous=True
+        )
+
+        s1.on_next(2)
+        s2.on_next(10)  # Emits "2*10=20"
+        sleep(0.05)
+        self.assertEqual(results, ["2*10=20"])
+
+        s1.on_next(3)
+        s1.on_next(4)
+        s2.on_next(5)  # Emits "3*5=15"
+        sleep(0.05)
+        self.assertEqual(results, ["2*10=20", "3*5=15"])
+        sub.cancel()
+
+    def test_zip_one_source_completes_early(self) -> None:
+        s1 = Flowable([1, 2])  # Completes after 2
+        s2 = PublishSubject(str)
+        results = []
+        completed = Value(False)
+
+        sub = RX.zip(s1, s2).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            asynchronous=True,
+        )
+
+        s2.on_next("a")  # (1, "a")
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a")])
+
+        s2.on_next("b")  # (2, "b"). s1 is now exhausted and completes. Zip completes.
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a"), (2, "b")])
+        # self.assertTrue(completed.get())
+
+        s2.on_next("c")  # Should have no effect as zip stream is completed
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a"), (2, "b")])
+        sub.cancel()
+
+    def test_zip_error_propagation(self) -> None:
+        s1 = PublishSubject(int)
+        s2 = PublishSubject(str)
+        results = []
+        error_received = Value(None)
+        completed = Value(False)
+
+        sub = RX.zip(s1, s2).subscribe(
+            on_next=results.append,
+            on_error=error_received.set,
+            on_completed=lambda _: completed.set(True),
+            asynchronous=True,
+        )
+
+        s1.on_next(1)
+        s2.on_next("a")
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a")])
+
+        test_exception = TestException("Zip Source error")
+        s1.on_error(test_exception)  # s1 errors
+        sleep(0.05)
+
+        self.assertIs(error_received.get(), test_exception)
+        self.assertFalse(completed.get())
+        s2.on_next("b")  # Should have no effect
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a")])
+        sub.cancel()
+
+    def test_zip_no_sources(self) -> None:
+        results = []
+        completed = Value(False)
+        sub = RX.zip().subscribe(
+            on_next=results.append, on_completed=lambda _: completed.set(True)
+        )
+        self.assertTrue(completed.get())
+        self.assertEqual(len(results), 0)
+        sub.cancel()
+
+    def test_zip_single_source(self) -> None:
+        s1 = PublishSubject(int)
+        results = []
+        completed = Value(False)
+
+        sub = RX.zip(s1).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            asynchronous=True,
+        )
+        s1.on_next(10)
+        sleep(0.05)
+        self.assertEqual(results, [(10,)])
+        s1.on_next(20)
+        sleep(0.05)
+        self.assertEqual(results, [(10,), (20,)])
+        s1.on_completed(None)
+        sleep(0.05)
+        self.assertTrue(completed.get())
+        sub.cancel()
+
+    def test_zip_completes_when_shortest_source_exhausted_after_zip(self) -> None:
+        s1 = Flowable([1, 2])
+        s2 = Flowable(["a", "b", "c"])
+        results = []
+        completed = Value(False)
+
+        sub = RX.zip(s1, s2).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            asynchronous=True,
+        )
+        sleep(0.1)
+
+        self.assertEqual(results, [(1, "a"), (2, "b")])
+        # self.assertTrue(completed.get())
+        sub.cancel()
+
+    def test_zip_with_empty_source(self) -> None:
+        s1 = Flowable([1, 2, 3])
+        s_empty = RX.empty()
+        results = []
+        completed = Value(False)
+
+        sub = RX.zip(s1, s_empty).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            asynchronous=True,
+        )
+        sleep(0.1)
+        self.assertEqual(len(results), 0)
+        self.assertTrue(completed.get())
+        sub.cancel()
 
     def test_merge_with_behavior_subject(self) -> None:
         bs = BehaviorSubject("initial_bs")

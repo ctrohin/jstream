@@ -114,6 +114,7 @@ from jstreams.rx import (
     rx_debounce,
     Debounce,
     rx_combine_latest,
+    rx_zip,
 )
 
 from jstreams.thread import (
@@ -643,5 +644,7 @@ __all__ = [
     "rx_debounce",
     "Debounce",
     "rx_combine_latest",  # Added
+    "rx_zip",  # Added
     # "CombineLatestObservable", # Add if direct instantiation is common
+    # "ZipObservable", # Add if direct instantiation is common
 ]

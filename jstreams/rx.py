@@ -8,6 +8,7 @@ from typing import (
     Iterable,
     Optional,
     TypeVar,
+    Deque,
     Any,
     cast,
     Union,
@@ -15,6 +16,7 @@ from typing import (
 )
 import uuid
 from copy import deepcopy
+from collections import deque
 from dataclasses import dataclass
 
 from jstreams.predicate import not_strict
@@ -895,6 +897,136 @@ class _CombineLatestSubscriptionManager(Generic[T, V]):
         self._inner_subscriptions.clear()
 
 
+class _ZipSubscriptionManager(Generic[T, V]):
+    __slots__ = (
+        "_sources",
+        "_zipper_fn",
+        "_merged_subscription",
+        "_inner_subscriptions",
+        "_queues",
+        "_completed_flags",  # To track which sources have completed
+        "_errored",
+        "_lock",
+        "_asynchronous_sources",
+        "_backpressure_sources",
+    )
+
+    def __init__(
+        self,
+        sources: tuple[Subscribable[Any], ...],
+        zipper_fn: Callable[..., V],  # Zipper function
+        merged_subscription: ObservableSubscription[V],
+        asynchronous_sources: bool,
+        backpressure_sources: Optional[BackpressureStrategy],
+    ):
+        self._sources = sources
+        self._zipper_fn = zipper_fn
+        self._merged_subscription = merged_subscription
+        self._inner_subscriptions: list[ObservableSubscription[Any]] = []
+        self._queues: list[Deque[Any]] = [deque() for _ in sources]
+        self._completed_flags: list[bool] = [False] * len(sources)
+        self._errored = False
+        self._lock = Lock()
+        self._asynchronous_sources = asynchronous_sources
+        self._backpressure_sources = backpressure_sources
+
+    def _create_on_next_handler(self, index: int) -> Callable[[Any], None]:
+        def _on_next_for_source(value: Any) -> None:
+            if self._errored or self._merged_subscription.is_paused():
+                return
+
+            with self._lock:
+                if self._completed_flags[
+                    index
+                ]:  # Should not happen if source respects completion
+                    return
+                self._queues[index].append(value)
+                self._check_and_emit_zip()
+
+        return _on_next_for_source
+
+    def _check_and_emit_zip(self) -> None:
+        # This method must be called under self._lock
+        while all(q for q in self._queues):  # While all queues have at least one item
+            if self._errored or self._merged_subscription.is_paused():
+                break
+
+            items_to_zip = [q.popleft() for q in self._queues]
+            try:
+                zipped_value = self._zipper_fn(*items_to_zip)
+                self._merged_subscription.on_next(zipped_value)
+            except Exception as e:
+                self._on_error_forward(e)  # Error in zipper function
+                break  # Stop processing on error
+
+            for i, queue in enumerate(self._queues):
+                if self._completed_flags[i] and not queue:
+                    if not self._errored:
+                        self._merged_subscription.on_completed(None)
+                        self.dispose_all_inner()
+                    return
+
+    def _create_on_completed_handler(
+        self, index: int
+    ) -> Callable[[Optional[Any]], None]:
+        def _on_completed_for_source(_: Optional[Any] = None) -> None:
+            with self._lock:
+                if self._errored or self._completed_flags[index]:
+                    return
+
+                self._completed_flags[index] = True
+                if not self._queues[index]:  # If this source's queue is now empty
+                    if not self._errored:
+                        self._merged_subscription.on_completed(None)
+                        self.dispose_all_inner()
+                    return
+
+                # If all sources completed AND all queues are empty, then complete.
+                # This handles the case where completion happens after the last item is dequeued.
+                if all(self._completed_flags) and not any(self._queues):
+                    if not self._errored:
+                        self._merged_subscription.on_completed(None)
+                        self.dispose_all_inner()
+
+        return _on_completed_for_source
+
+    def _on_error_forward(self, ex: Exception) -> None:
+        should_forward_error = False
+        with self._lock:
+            if not self._errored:
+                self._errored = True
+                should_forward_error = True
+
+        if should_forward_error:
+            self._merged_subscription.on_error(ex)
+            self.dispose_all_inner()
+
+    def subscribe_to_sources(self) -> None:
+        if not self._sources:
+            if not self._errored:
+                self._merged_subscription.on_completed(None)
+            return
+
+        for i, source in enumerate(self._sources):
+            on_next_handler = self._create_on_next_handler(i)
+            on_completed_handler = self._create_on_completed_handler(i)
+            inner_sub = source.subscribe(
+                on_next=on_next_handler,
+                on_error=self._on_error_forward,
+                on_completed=on_completed_handler,
+                asynchronous=self._asynchronous_sources,
+                backpressure=self._backpressure_sources,
+            )
+            self._inner_subscriptions.append(inner_sub)
+
+    def dispose_all_inner(self) -> None:
+        for sub in self._inner_subscriptions:
+            sub.cancel()
+        self._inner_subscriptions.clear()
+        for q in self._queues:
+            q.clear()
+
+
 class MergeObservable(Subscribable[T]):
     __slots__ = ("_sources",)
 
@@ -992,7 +1124,56 @@ class CombineLatestObservable(Subscribable[V]):
             cast(Callable[..., V], self._combiner_fn),
             merged_subscription,
             False,
-            None,  # TODO: Pass async/backpressure for sources
+            backpressure,
+        )
+        original_on_dispose_for_merged_sub = merged_subscription.on_dispose
+
+        def custom_dispose_logic() -> None:
+            manager.dispose_all_inner()
+            if original_on_dispose_for_merged_sub:
+                original_on_dispose_for_merged_sub()
+
+        merged_subscription.on_dispose = custom_dispose_logic
+        manager.subscribe_to_sources()
+        return merged_subscription
+
+
+class ZipObservable(Subscribable[V]):
+    __slots__ = ("_sources", "_zipper_fn")
+
+    def __init__(
+        self, sources: tuple[Subscribable[Any], ...], zipper: Optional[Callable[..., V]]
+    ):
+        self._sources = sources
+        if zipper is None:
+            self._zipper_fn = lambda *args: tuple(args)  # Default zipper
+        else:
+            self._zipper_fn = zipper  # type: ignore[assignment]
+
+    def subscribe(
+        self,
+        on_next: Optional[NextHandler[V]] = None,
+        on_error: ErrorHandler = None,
+        on_completed: CompletedHandler[V] = None,
+        on_dispose: DisposeHandler = None,
+        asynchronous: bool = False,
+        backpressure: Optional[BackpressureStrategy] = None,
+    ) -> ObservableSubscription[V]:
+        merged_subscription = ObservableSubscription(
+            self,
+            on_next if on_next else _empty_sub,
+            on_error,
+            on_completed,
+            on_dispose,
+            asynchronous,
+            backpressure,
+        )
+        manager = _ZipSubscriptionManager[Any, V](
+            self._sources,
+            cast(Callable[..., V], self._zipper_fn),
+            merged_subscription,
+            False,
+            None,
         )
         original_on_dispose_for_merged_sub = merged_subscription.on_dispose
 
@@ -2320,6 +2501,24 @@ class RX:
             return RX.empty()
         return CombineLatestObservable(sources, combiner)
 
+    @staticmethod
+    def zip(
+        *sources: Subscribable[Any], zipper: Optional[Callable[..., V]] = None
+    ) -> Subscribable[V]:
+        """
+        Combines multiple Observables to create an Observable whose values are
+        calculated from the Nth emission of each of its input Observables.
+        Args:
+            *sources: The Observables to combine.
+            zipper: An optional function that takes one value from each source
+                    and returns a combined value. If None, a tuple of values is emitted.
+        Returns:
+            A Subscribable that emits zipped values.
+        """
+        if not sources:
+            return RX.empty()
+        return ZipObservable(sources, zipper)
+
 
 def rx_reduce(reducer: Callable[[T, T], T]) -> RxOperator[T, T]:
     """
@@ -2621,3 +2820,13 @@ def rx_combine_latest(
     calculated from the latest values of each of its input Observables.
     """
     return RX.combine_latest(*sources, combiner=combiner)
+
+
+def rx_zip(
+    *sources: Subscribable[Any], zipper: Optional[Callable[..., V]] = None
+) -> Subscribable[V]:
+    """
+    Combines multiple Observables to create an Observable whose values are
+    calculated from the Nth emission of each of its input Observables.
+    """
+    return RX.zip(*sources, zipper=zipper)
