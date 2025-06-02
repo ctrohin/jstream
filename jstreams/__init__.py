@@ -113,6 +113,7 @@ from jstreams.rx import (
     TimestampOperator,
     rx_debounce,
     Debounce,
+    rx_combine_latest,
 )
 
 from jstreams.thread import (
@@ -641,4 +642,6 @@ __all__ = [
     "TimestampOperator",
     "rx_debounce",
     "Debounce",
+    "rx_combine_latest",  # Added
+    # "CombineLatestObservable", # Add if direct instantiation is common
 ]

@@ -779,6 +779,122 @@ class _MergeSubscriptionManager(Generic[T]):
         self._inner_subscriptions.clear()
 
 
+class _CombineLatestSubscriptionManager(Generic[T, V]):
+    __slots__ = (
+        "_sources",
+        "_combiner_fn",
+        "_merged_subscription",
+        "_inner_subscriptions",
+        "_latest_values",
+        "_has_emitted_flags",
+        "_emitted_once_count",
+        "_completed_sources_count",
+        "_errored",
+        "_lock",
+        "_asynchronous_sources",
+        "_backpressure_sources",
+    )
+
+    def __init__(
+        self,
+        sources: tuple[Subscribable[Any], ...],
+        combiner_fn: Callable[..., V],
+        merged_subscription: ObservableSubscription[V],
+        asynchronous_sources: bool,
+        backpressure_sources: Optional[BackpressureStrategy],
+    ):
+        self._sources = sources
+        self._combiner_fn = combiner_fn
+        self._merged_subscription = merged_subscription
+        self._inner_subscriptions: list[ObservableSubscription[Any]] = []
+        self._latest_values: list[Any] = [None] * len(
+            sources
+        )  # Placeholder, actual values stored
+        self._has_emitted_flags: list[bool] = [False] * len(sources)
+        self._emitted_once_count = 0
+        self._completed_sources_count = 0
+        self._errored = False
+        self._lock = Lock()
+        self._asynchronous_sources = asynchronous_sources
+        self._backpressure_sources = backpressure_sources
+
+    def _create_on_next_handler(self, index: int) -> Callable[[Any], None]:
+        def _on_next_for_source(value: Any) -> None:
+            if self._errored or self._merged_subscription.is_paused():
+                return
+
+            with self._lock:
+                self._latest_values[index] = value
+                if not self._has_emitted_flags[index]:
+                    self._has_emitted_flags[index] = True
+                    self._emitted_once_count += 1
+
+                if self._emitted_once_count == len(self._sources):
+                    # All sources have emitted at least once, ready to combine
+                    try:
+                        # Pass a copy of latest_values to combiner
+                        combined_value = self._combiner_fn(*list(self._latest_values))
+                        self._merged_subscription.on_next(combined_value)
+                    except Exception as e:
+                        self._on_error_forward(e)  # Error in combiner function
+
+        return _on_next_for_source
+
+    def _create_on_completed_handler(
+        self, index: int
+    ) -> Callable[[Optional[Any]], None]:
+        def _on_completed_for_source(_: Optional[Any] = None) -> None:
+            with self._lock:
+                if self._errored:
+                    return
+                # If a source completes before emitting, the whole stream completes.
+                if not self._has_emitted_flags[index]:
+                    self._errored = True  # Prevent other completions/errors
+                    self._merged_subscription.on_completed(None)
+                    self.dispose_all_inner()
+                    return
+
+                self._completed_sources_count += 1
+                if self._completed_sources_count == len(self._sources):
+                    self._merged_subscription.on_completed(None)
+
+        return _on_completed_for_source
+
+    def _on_error_forward(self, ex: Exception) -> None:
+        should_forward_error = False
+        with self._lock:
+            if not self._errored:
+                self._errored = True
+                should_forward_error = True
+
+        if should_forward_error:
+            self._merged_subscription.on_error(ex)
+            self.dispose_all_inner()
+
+    def subscribe_to_sources(self) -> None:
+        if not self._sources:  # Should be guarded by CombineLatestObservable
+            if not self._errored:
+                self._merged_subscription.on_completed(None)
+            return
+
+        for i, source in enumerate(self._sources):
+            on_next_handler = self._create_on_next_handler(i)
+            on_completed_handler = self._create_on_completed_handler(i)
+            inner_sub = source.subscribe(
+                on_next=on_next_handler,
+                on_error=self._on_error_forward,  # Common error handler
+                on_completed=on_completed_handler,
+                asynchronous=self._asynchronous_sources,
+                backpressure=self._backpressure_sources,
+            )
+            self._inner_subscriptions.append(inner_sub)
+
+    def dispose_all_inner(self) -> None:
+        for sub in self._inner_subscriptions:
+            sub.cancel()
+        self._inner_subscriptions.clear()
+
+
 class MergeObservable(Subscribable[T]):
     __slots__ = ("_sources",)
 
@@ -826,6 +942,67 @@ class MergeObservable(Subscribable[T]):
 
         manager.subscribe_to_sources()
 
+        return merged_subscription
+
+
+class CombineLatestObservable(Subscribable[V]):
+    __slots__ = ("_sources", "_combiner_fn")
+
+    def __init__(
+        self,
+        sources: tuple[Subscribable[Any], ...],
+        combiner: Optional[Callable[[tuple[Any, ...]], V]],
+    ):
+        if not sources:
+            # This case should ideally be handled by RX.combine_latest factory returning RX.empty()
+            # However, if constructed directly, make it behave like empty.
+            # For simplicity in the manager, we ensure sources is not empty here or rely on factory.
+            # Let's assume factory handles empty sources.
+            pass
+
+        self._sources = sources
+        if combiner is None:
+            self._combiner_fn = lambda *args: tuple(args)  # Default combiner
+        else:
+            self._combiner_fn = combiner  # type: ignore[assignment]
+
+    def subscribe(
+        self,
+        on_next: Optional[NextHandler[V]] = None,
+        on_error: ErrorHandler = None,
+        on_completed: CompletedHandler[V] = None,
+        on_dispose: DisposeHandler = None,
+        asynchronous: bool = False,  # Asynchronicity of the combined emission
+        backpressure: Optional[BackpressureStrategy] = None,
+    ) -> ObservableSubscription[V]:
+        # The 'asynchronous' and 'backpressure' here apply to how the *combined* value is delivered.
+        # The manager will also need to know if source subscriptions should be async.
+        # For now, let's assume source subscriptions are synchronous within the manager's handlers.
+        merged_subscription = ObservableSubscription(
+            self,
+            on_next if on_next else _empty_sub,
+            on_error,
+            on_completed,
+            on_dispose,  # User's on_dispose for the combined stream
+            asynchronous,
+            backpressure,
+        )
+        manager = _CombineLatestSubscriptionManager[Any, V](
+            self._sources,
+            cast(Callable[..., V], self._combiner_fn),
+            merged_subscription,
+            False,
+            None,  # TODO: Pass async/backpressure for sources
+        )
+        original_on_dispose_for_merged_sub = merged_subscription.on_dispose
+
+        def custom_dispose_logic() -> None:
+            manager.dispose_all_inner()
+            if original_on_dispose_for_merged_sub:
+                original_on_dispose_for_merged_sub()
+
+        merged_subscription.on_dispose = custom_dispose_logic
+        manager.subscribe_to_sources()
         return merged_subscription
 
 
@@ -2125,6 +2302,24 @@ class RX:
             return sources[0]  # No need to wrap a single source
         return MergeObservable(*sources)
 
+    @staticmethod
+    def combine_latest(
+        *sources: Subscribable[Any], combiner: Optional[Callable[..., V]] = None
+    ) -> Subscribable[V]:
+        """
+        Combines multiple Observables to create an Observable whose values are
+        calculated from the latest values of each of its input Observables.
+        Args:
+            *sources: The Observables to combine.
+            combiner: An optional function that takes the latest values from each source
+                      and returns a combined value. If None, a tuple of latest values is emitted.
+        Returns:
+            A Subscribable that emits combined values.
+        """
+        if not sources:
+            return RX.empty()
+        return CombineLatestObservable(sources, combiner)
+
 
 def rx_reduce(reducer: Callable[[T, T], T]) -> RxOperator[T, T]:
     """
@@ -2416,3 +2611,13 @@ def rx_merge(*sources: Subscribable[T]) -> Subscribable[T]:
     Completes when all sources complete; errors if any source errors.
     """
     return RX.merge(*sources)
+
+
+def rx_combine_latest(
+    *sources: Subscribable[Any], combiner: Optional[Callable[..., V]] = None
+) -> Subscribable[V]:
+    """
+    Combines multiple Observables to create an Observable whose values are
+    calculated from the latest values of each of its input Observables.
+    """
+    return RX.combine_latest(*sources, combiner=combiner)

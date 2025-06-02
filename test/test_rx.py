@@ -1093,3 +1093,218 @@ class TestRxMerge(BaseTestCase):
         subject.on_next(5)
         sleep(1)
         self.assertEqual(vals, [5])
+
+
+class TestRxCombineLatest(BaseTestCase):
+    def test_combine_latest_basic_tuple(self) -> None:
+        s1 = PublishSubject(int)
+        s2 = PublishSubject(str)
+        results = []
+        completed = Value(False)
+
+        sub = RX.combine_latest(s1, s2).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            asynchronous=True,
+        )
+
+        s1.on_next(1)
+        self.assertEqual(
+            len(results), 0, "Should not emit until all sources emitted once"
+        )
+
+        s2.on_next("a")  # First emission from s2, now both have emitted
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a")])
+
+        s1.on_next(2)  # s2's latest is still "a"
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a"), (2, "a")])
+
+        s2.on_next("b")  # s1's latest is 2
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a"), (2, "a"), (2, "b")])
+
+        s1.on_completed(None)
+        s2.on_next(
+            "c"
+        )  # s1 completed, but s2 can still trigger using s1's last value (2)
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a"), (2, "a"), (2, "b"), (2, "c")])
+
+        s2.on_completed(None)  # All sources completed
+        sleep(0.05)
+        self.assertTrue(completed.get())
+        sub.cancel()
+
+    def test_combine_latest_with_combiner_function(self) -> None:
+        s1 = PublishSubject(int)
+        s2 = PublishSubject(int)
+        results = []
+
+        def combiner(v1: int, v2: int) -> str:
+            return f"{v1}+{v2}={v1 + v2}"
+
+        sub = RX.combine_latest(s1, s2, combiner=combiner).subscribe(
+            on_next=results.append, asynchronous=True
+        )
+
+        s1.on_next(1)
+        s2.on_next(10)  # Emits "1+10=11"
+        sleep(0.05)
+        self.assertEqual(results, ["1+10=11"])
+
+        s1.on_next(2)  # Emits "2+10=12"
+        sleep(0.05)
+        self.assertEqual(results, ["1+10=11", "2+10=12"])
+        sub.cancel()
+
+    def test_combine_latest_one_source_completes_before_emitting(self) -> None:
+        s1 = PublishSubject(int)
+        s2 = PublishSubject(str)
+        results = []
+        completed = Value(False)
+        errored = Value(False)
+
+        sub = RX.combine_latest(s1, s2).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            on_error=lambda _: errored.set(True),
+            asynchronous=True,
+        )
+
+        s1.on_next(1)
+        s2.on_completed(None)  # s2 completes before emitting anything
+        sleep(0.05)
+
+        self.assertTrue(
+            completed.get(), "Should complete if one source completes before emitting"
+        )
+        self.assertFalse(errored.get())
+        self.assertEqual(len(results), 0, "Should not emit any values")
+        sub.cancel()
+
+    def test_combine_latest_error_propagation(self) -> None:
+        s1 = PublishSubject(int)
+        s2 = PublishSubject(str)
+        results = []
+        error_received = Value(None)
+        completed = Value(False)
+
+        sub = RX.combine_latest(s1, s2).subscribe(
+            on_next=results.append,
+            on_error=error_received.set,
+            on_completed=lambda _: completed.set(True),
+            asynchronous=True,
+        )
+
+        s1.on_next(1)
+        s2.on_next("a")
+        sleep(0.05)
+        self.assertEqual(results, [(1, "a")])
+
+        test_exception = TestException("Source error")
+        s1.on_error(test_exception)
+        sleep(0.05)
+
+        self.assertIs(error_received.get(), test_exception)
+        self.assertFalse(completed.get())
+        sub.cancel()
+
+    def test_combine_latest_no_sources(self) -> None:
+        results = []
+        completed = Value(False)
+        sub = RX.combine_latest().subscribe(
+            on_next=results.append, on_completed=lambda _: completed.set(True)
+        )
+        self.assertTrue(completed.get())
+        self.assertEqual(len(results), 0)
+        sub.cancel()  # Should be a no-op on an already completed empty sub
+
+    def test_combine_latest_single_source(self) -> None:
+        s1 = PublishSubject(int)
+        results = []
+        completed = Value(False)
+
+        sub = RX.combine_latest(s1).subscribe(
+            on_next=results.append,
+            on_completed=lambda _: completed.set(True),
+            asynchronous=True,
+        )
+        s1.on_next(10)
+        sleep(0.05)
+        self.assertEqual(results, [(10,)])
+        s1.on_next(20)
+        sleep(0.05)
+        self.assertEqual(results, [(10,), (20,)])
+        s1.on_completed(None)
+        sleep(0.05)
+        self.assertTrue(completed.get())
+        sub.cancel()
+
+    def test_combine_latest_single_source_with_combiner(self) -> None:
+        s1 = PublishSubject(int)
+        results = []
+        sub = RX.combine_latest(s1, combiner=lambda x: f"val:{x}").subscribe(
+            on_next=results.append, asynchronous=True
+        )
+        s1.on_next(5)
+        sleep(0.05)
+        self.assertEqual(results, ["val:5"])
+        sub.cancel()
+
+    def test_combine_latest_cancellation_disposes_inner(self) -> None:
+        s1_ps = PublishSubject(int)
+        s2_ps = PublishSubject(str)
+        s1_dispose_called = Value(False)
+        s2_dispose_called = Value(False)
+
+        # Wrap subjects to track disposal
+        class DisposableSrc(Observable[Any]):
+            def __init__(self, actual_src: Subscribable[Any], flag: Value[bool]):
+                super().__init__()
+                self._actual_src = actual_src
+                self._flag = flag
+
+            def subscribe(
+                self,
+                on_next=None,
+                on_error=None,
+                on_completed=None,
+                on_dispose=None,
+                asynchronous=False,
+                backpressure=None,
+            ):
+                def _dispose_hook():
+                    self._flag.set(True)
+                    if on_dispose:
+                        on_dispose()
+
+                return self._actual_src.subscribe(
+                    on_next,
+                    on_error,
+                    on_completed,
+                    _dispose_hook,
+                    asynchronous,
+                    backpressure,
+                )
+
+        disposable_s1 = DisposableSrc(s1_ps, s1_dispose_called)
+        disposable_s2 = DisposableSrc(s2_ps, s2_dispose_called)
+
+        combined_sub = RX.combine_latest(disposable_s1, disposable_s2).subscribe(
+            asynchronous=True
+        )
+
+        s1_ps.on_next(1)  # Ensure subscriptions are active
+        s2_ps.on_next("a")
+        sleep(0.05)
+
+        combined_sub.cancel()
+        sleep(0.05)
+
+        self.assertTrue(s1_dispose_called.get(), "s1 should have been disposed")
+        self.assertTrue(s2_dispose_called.get(), "s2 should have been disposed")
+
+        s1_ps.on_completed(None)  # Clean up subjects
+        s2_ps.on_completed(None)
