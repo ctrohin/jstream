@@ -2500,12 +2500,15 @@ class RX:
 
     @staticmethod
     def combine_latest(
-        *sources: Subscribable[Any], combiner: Optional[Callable[..., V]] = None
-    ) -> Subscribable[V]:
+        return_type: type[T],  # pylint: disable=unused-argument
+        *sources: Subscribable[Any],
+        combiner: Optional[Callable[..., T]] = None,
+    ) -> Subscribable[T]:
         """
         Combines multiple Observables to create an Observable whose values are
         calculated from the latest values of each of its input Observables.
         Args:
+            return_type: the return type of the combined observable.
             *sources: The Observables to combine.
             combiner: An optional function that takes the latest values from each source
                       and returns a combined value. If None, a tuple of latest values is emitted.
@@ -2518,12 +2521,15 @@ class RX:
 
     @staticmethod
     def zip(
-        *sources: Subscribable[Any], zipper: Optional[Callable[..., V]] = None
-    ) -> Subscribable[V]:
+        return_type: type[T],  # pylint: disable=unused-argument
+        *sources: Subscribable[Any],
+        zipper: Optional[Callable[..., T]] = None,
+    ) -> Subscribable[T]:
         """
         Combines multiple Observables to create an Observable whose values are
         calculated from the Nth emission of each of its input Observables.
         Args:
+            return_type: the return type of the zipped observable.
             *sources: The Observables to combine.
             zipper: An optional function that takes one value from each source
                     and returns a combined value. If None, a tuple of values is emitted.
@@ -2835,20 +2841,24 @@ def rx_merge(*sources: Subscribable[T]) -> Subscribable[T]:
 
 
 def rx_combine_latest(
-    *sources: Subscribable[Any], combiner: Optional[Callable[..., V]] = None
-) -> Subscribable[V]:
+    return_type: type[T],
+    *sources: Subscribable[Any],
+    combiner: Optional[Callable[..., T]] = None,
+) -> Subscribable[T]:
     """
     Combines multiple Observables to create an Observable whose values are
     calculated from the latest values of each of its input Observables.
     """
-    return RX.combine_latest(*sources, combiner=combiner)
+    return RX.combine_latest(return_type, *sources, combiner=combiner)
 
 
 def rx_zip(
-    *sources: Subscribable[Any], zipper: Optional[Callable[..., V]] = None
-) -> Subscribable[V]:
+    return_type: type[T],
+    *sources: Subscribable[Any],
+    zipper: Optional[Callable[..., T]] = None,
+) -> Subscribable[T]:
     """
     Combines multiple Observables to create an Observable whose values are
     calculated from the Nth emission of each of its input Observables.
     """
-    return RX.zip(*sources, zipper=zipper)
+    return RX.zip(return_type, *sources, zipper=zipper)

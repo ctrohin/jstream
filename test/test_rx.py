@@ -925,7 +925,7 @@ class TestRxZip(BaseTestCase):
         completed = Value(False)
         errored = Value(False)
 
-        sub = RX.zip(s1, s2).subscribe(
+        sub = RX.zip(tuple[int, str], s1, s2).subscribe(
             on_next=results.append,
             on_completed=lambda _: completed.set(True),
             on_error=lambda _: errored.set(True),
@@ -964,7 +964,7 @@ class TestRxZip(BaseTestCase):
         def zipper_fn(v1: int, v2: int) -> str:
             return f"{v1}*{v2}={v1 * v2}"
 
-        sub = RX.zip(s1, s2, zipper=zipper_fn).subscribe(
+        sub = RX.zip(str, s1, s2, zipper=zipper_fn).subscribe(
             on_next=results.append, asynchronous=True
         )
 
@@ -986,7 +986,7 @@ class TestRxZip(BaseTestCase):
         results = []
         completed = Value(False)
 
-        sub = RX.zip(s1, s2).subscribe(
+        sub = RX.zip(tuple[int, str], s1, s2).subscribe(
             on_next=results.append,
             on_completed=lambda _: completed.set(True),
             asynchronous=True,
@@ -1013,7 +1013,7 @@ class TestRxZip(BaseTestCase):
         error_received = Value(None)
         completed = Value(False)
 
-        sub = RX.zip(s1, s2).subscribe(
+        sub = RX.zip(tuple[int, str], s1, s2).subscribe(
             on_next=results.append,
             on_error=error_received.set,
             on_completed=lambda _: completed.set(True),
@@ -1039,7 +1039,7 @@ class TestRxZip(BaseTestCase):
     def test_zip_no_sources(self) -> None:
         results = []
         completed = Value(False)
-        sub = RX.zip().subscribe(
+        sub = RX.zip(Any).subscribe(
             on_next=results.append, on_completed=lambda _: completed.set(True)
         )
         self.assertTrue(completed.get())
@@ -1051,7 +1051,7 @@ class TestRxZip(BaseTestCase):
         results = []
         completed = Value(False)
 
-        sub = RX.zip(s1).subscribe(
+        sub = RX.zip(tuple[int], s1).subscribe(
             on_next=results.append,
             on_completed=lambda _: completed.set(True),
             asynchronous=True,
@@ -1073,7 +1073,7 @@ class TestRxZip(BaseTestCase):
         results = []
         completed = Value(False)
 
-        sub = RX.zip(s1, s2).subscribe(
+        sub = RX.zip(tuple[int, str], s1, s2).subscribe(
             on_next=results.append,
             on_completed=lambda _: completed.set(True),
             asynchronous=True,
@@ -1090,7 +1090,7 @@ class TestRxZip(BaseTestCase):
         results = []
         completed = Value(False)
 
-        sub = RX.zip(s1, s_empty).subscribe(
+        sub = RX.zip(tuple[int, Any], s1, s_empty).subscribe(
             on_next=results.append,
             on_completed=lambda _: completed.set(True),
             asynchronous=True,
@@ -1286,7 +1286,11 @@ class TestRxCombineLatest(BaseTestCase):
         results = []
         completed = Value(False)
 
-        sub = RX.combine_latest(s1, s2).subscribe(
+        sub = RX.combine_latest(
+            tuple[int, str],
+            s1,
+            s2,
+        ).subscribe(
             on_next=results.append,
             on_completed=lambda _: completed.set(True),
             asynchronous=True,
@@ -1329,7 +1333,7 @@ class TestRxCombineLatest(BaseTestCase):
         def combiner(v1: int, v2: int) -> str:
             return f"{v1}+{v2}={v1 + v2}"
 
-        sub = RX.combine_latest(s1, s2, combiner=combiner).subscribe(
+        sub = RX.combine_latest(str, s1, s2, combiner=combiner).subscribe(
             on_next=results.append, asynchronous=True
         )
 
@@ -1350,7 +1354,7 @@ class TestRxCombineLatest(BaseTestCase):
         completed = Value(False)
         errored = Value(False)
 
-        sub = RX.combine_latest(s1, s2).subscribe(
+        sub = RX.combine_latest(tuple[int, str], s1, s2).subscribe(
             on_next=results.append,
             on_completed=lambda _: completed.set(True),
             on_error=lambda _: errored.set(True),
@@ -1375,7 +1379,7 @@ class TestRxCombineLatest(BaseTestCase):
         error_received = Value(None)
         completed = Value(False)
 
-        sub = RX.combine_latest(s1, s2).subscribe(
+        sub = RX.combine_latest(tuple[int, str], s1, s2).subscribe(
             on_next=results.append,
             on_error=error_received.set,
             on_completed=lambda _: completed.set(True),
@@ -1398,7 +1402,7 @@ class TestRxCombineLatest(BaseTestCase):
     def test_combine_latest_no_sources(self) -> None:
         results = []
         completed = Value(False)
-        sub = RX.combine_latest().subscribe(
+        sub = RX.combine_latest(Any).subscribe(
             on_next=results.append, on_completed=lambda _: completed.set(True)
         )
         self.assertTrue(completed.get())
@@ -1410,7 +1414,7 @@ class TestRxCombineLatest(BaseTestCase):
         results = []
         completed = Value(False)
 
-        sub = RX.combine_latest(s1).subscribe(
+        sub = RX.combine_latest(tuple[int], s1).subscribe(
             on_next=results.append,
             on_completed=lambda _: completed.set(True),
             asynchronous=True,
@@ -1429,7 +1433,7 @@ class TestRxCombineLatest(BaseTestCase):
     def test_combine_latest_single_source_with_combiner(self) -> None:
         s1 = PublishSubject(int)
         results = []
-        sub = RX.combine_latest(s1, combiner=lambda x: f"val:{x}").subscribe(
+        sub = RX.combine_latest(str, s1, combiner=lambda x: f"val:{x}").subscribe(
             on_next=results.append, asynchronous=True
         )
         s1.on_next(5)
@@ -1476,9 +1480,9 @@ class TestRxCombineLatest(BaseTestCase):
         disposable_s1 = DisposableSrc(s1_ps, s1_dispose_called)
         disposable_s2 = DisposableSrc(s2_ps, s2_dispose_called)
 
-        combined_sub = RX.combine_latest(disposable_s1, disposable_s2).subscribe(
-            asynchronous=True
-        )
+        combined_sub = RX.combine_latest(
+            tuple[Any, Any], disposable_s1, disposable_s2
+        ).subscribe(asynchronous=True)
 
         s1_ps.on_next(1)  # Ensure subscriptions are active
         s2_ps.on_next("a")
