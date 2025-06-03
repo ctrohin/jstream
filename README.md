@@ -28,6 +28,21 @@ You can check out the full documentation with examples [here](https://github.com
 
 
 ## Changelog
+### v2025.6.1
+- ReactiveX
+    - Added `throttle`, `buffer`. `buffer_count`, `debounce`, `defer`, `distinct`, `element_at`, `empty`, `ignore_all`, `map_to`, `never`, `of_type`, `range`, `scan`, `tap`, `throw` and `timestamp` ReactiveX operators
+    - Added `BackpressureStrategy` to observable subscriptions
+    - Allow empty subscriptions on observables, since now they can be tapped
+    - Added `combine_latest`, `zip` and `merge` for observables.
+    - Pipes can now use async operators such as `debounce`
+- Stream
+    - Added `to_sorted_list` collector
+    - Added `just` factory method for a stream of a single value
+    - Added `map_indexed`, `filter_indexed`, `group_adjacent`, `windowed`, `pad` and `flatten_opt` operations 
+    - Improved performance of `flat_map` to perform lazy mapping
+- Python version compatibility
+    - Added python 3.12 and 3.13 to the build pipelines
+
 ### v2025.5.3
 - Added serialization module
 - Performance improvements for dependency injection
