@@ -576,6 +576,9 @@ class _Observable(_ObservableBase[T], _ObservableParent[T]):
     def __init__(self) -> None:  # pylint: disable=useless-parent-delegation
         super().__init__()
 
+    def chain(self) -> "ChainBuilder[T]":
+        return ChainBuilder(self)
+
 
 def _empty_sub(_: Any) -> None:
     pass
@@ -2043,7 +2046,6 @@ class Debounce(DelayedBaseFilteringOperator[T]):
 
     def __create_timer(self, callback: Callable[[Any], Any]) -> Timer:
         def do() -> None:
-            print("Ran")
             callback(self.__last_value)
 
         return Timer(self.__timespan, 0.01, do)
@@ -2862,3 +2864,110 @@ def rx_zip(
     calculated from the Nth emission of each of its input Observables.
     """
     return RX.zip(return_type, *sources, zipper=zipper)
+
+
+class ChainBuilder(Generic[T]):
+    __slots__ = ("__observable", "__ops")
+
+    def __init__(self, obs: _Observable[T]) -> None:
+        self.__observable = obs
+        self.__ops: list[RxOperator[Any, Any]] = []
+
+    def debounce(self, timespan: float) -> "ChainBuilder[T]":
+        self.__ops.append(rx_debounce(T, timespan))  # type: ignore[misc]
+        return self
+
+    def element_at(self, index: int) -> "ChainBuilder[T]":
+        self.__ops.append(rx_element_at(T, index))  # type: ignore[misc]
+        return self
+
+    def take(self, count: int) -> "ChainBuilder[T]":
+        self.__ops.append(rx_take(T, count))  # type: ignore[misc]
+        return self
+
+    def distinct(
+        self, key_selector: Optional[Callable[[T], Any]] = None
+    ) -> "ChainBuilder[T]":
+        self.__ops.append(rx_distinct(T, key_selector))  # type: ignore[misc]
+        return self
+
+    def timestamp(self) -> "ChainBuilder[Timestamped[T]]":
+        self.__ops.append(rx_timestamp(T))  # type: ignore[misc]
+        return self  # type: ignore[return-value]
+
+    def scan(self, seed: A) -> "ChainBuilder[A]":
+        self.__ops.append(rx_scan(A, seed))  # type: ignore[misc]
+        return self  # type: ignore[return-value]
+
+    def map_to(self, value: V) -> "ChainBuilder[V]":
+        self.__ops.append(rx_map_to(value))
+        return self  # type: ignore[return-value]
+
+    def buffer_count(self, count: int) -> "ChainBuilder[list[T]]":
+        self.__ops.append(rx_buffer_count(T, count))  # type: ignore[misc]
+        return self  # type: ignore[return-value]
+
+    def buffer(self, timespan: float) -> "ChainBuilder[list[T]]":
+        self.__ops.append(rx_buffer(T, timespan))  # type: ignore[misc]
+        return self  # type: ignore[return-value]
+
+    def throttle(self, timespan: float) -> "ChainBuilder[T]":
+        self.__ops.append(rx_throttle(T, timespan))  # type: ignore[misc]
+        return self
+
+    def ignore_all(self) -> "ChainBuilder[T]":
+        self.__ops.append(rx_ignore_all())
+        return self
+
+    def of_type(self, typ: type[V]) -> "ChainBuilder[V]":
+        self.__ops.append(rx_of_type(typ))
+        return self  # type: ignore[return-value]
+
+    def tap(self, action: Callable[[T], Any]) -> "ChainBuilder[T]":
+        self.__ops.append(rx_tap(action))
+        return self
+
+    def distinct_until_changed(
+        self, key_selector: Optional[Callable[[T], Any]] = None
+    ) -> "ChainBuilder[T]":
+        self.__ops.append(rx_distinct_until_changed(T, key_selector))  # type: ignore[misc]
+        return self
+
+    def drop_until(self, predicate: Callable[[T], bool]) -> "ChainBuilder[T]":
+        self.__ops.append(rx_drop_until(predicate))
+        return self
+
+    def drop_while(self, predicate: Callable[[T], bool]) -> "ChainBuilder[T]":
+        self.__ops.append(rx_drop_while(predicate))
+        return self
+
+    def drop(self, count: int) -> "ChainBuilder[T]":
+        self.__ops.append(rx_drop(T, count))  # type: ignore[misc]
+        return self
+
+    def take_until(self, predicate: Callable[[T], bool]) -> "ChainBuilder[T]":
+        self.__ops.append(rx_take_until(predicate))
+        return self
+
+    def take_while(self, predicate: Callable[[T], bool]) -> "ChainBuilder[T]":
+        self.__ops.append(rx_take_while(predicate))
+        return self
+
+    def map(self, mapper: Callable[[T], V]) -> "ChainBuilder[V]":
+        self.__ops.append(rx_map(mapper))
+        return self  # type: ignore[return-value]
+
+    def filter(self, predicate: Callable[[T], bool]) -> "ChainBuilder[T]":
+        self.__ops.append(rx_filter(predicate))
+        return self
+
+    def reduce(self, reducer: Callable[[T, T], T]) -> "ChainBuilder[T]":
+        self.__ops.append(rx_reduce(reducer))
+        return self
+
+    def custom(self, op: RxOperator[T, V]) -> "ChainBuilder[V]":
+        self.__ops.append(op)
+        return self  # type: ignore[return-value]
+
+    def build(self) -> Subscribable[T]:
+        return PipeObservable(self.__observable, Pipe(T, Any, self.__ops))  # type: ignore[arg-type,misc]

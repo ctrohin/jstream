@@ -115,6 +115,8 @@ from jstreams.rx import (
     Debounce,
     rx_combine_latest,
     rx_zip,
+    ChainBuilder,
+    DelayedBaseFilteringOperator,
 )
 
 from jstreams.thread import (
@@ -645,4 +647,6 @@ __all__ = [
     "Debounce",
     "rx_combine_latest",
     "rx_zip",
+    "ChainBuilder",
+    "DelayedBaseFilteringOperator",
 ]

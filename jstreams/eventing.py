@@ -8,6 +8,7 @@ from jstreams.rx import (
     DisposeHandler,
     ObservableSubscription,
     Pipe,
+    ChainBuilder,
     PipeObservable,
     RxOperator,
     SingleValueSubject,
@@ -349,6 +350,9 @@ class _Event(Generic[T]):
             .to_list()
         )
         return PipeObservable(self.__subject, Pipe(T, Any, op_list))  # type: ignore
+
+    def chain(self) -> ChainBuilder[T]:
+        return ChainBuilder(self.__subject)
 
     def _destroy(self) -> None:
         self.__subject.dispose()
