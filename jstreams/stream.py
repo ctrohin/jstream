@@ -1017,7 +1017,7 @@ class _DropWhileIterable(_GenericIterable[T]):
         raise StopIteration()
 
 
-class _ConcatIterable(_GenericIterable[T]):
+class ConcatIterable(_GenericIterable[T]):
     __slots__ = ("__iterable2", "__iterator2", "__done")
 
     def __init__(self, it1: Iterable[T], it2: Iterable[T]) -> None:
@@ -2092,7 +2092,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The resulting stream
         """
-        return Stream(_ConcatIterable(self.__arg, new_stream.__arg))
+        return Stream(ConcatIterable(self.__arg, new_stream.__arg))
 
     def peek(
         self,

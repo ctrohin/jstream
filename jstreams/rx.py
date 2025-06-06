@@ -20,7 +20,7 @@ from collections import deque
 from dataclasses import dataclass
 
 from jstreams.predicate import not_strict
-from jstreams.stream import Stream
+from jstreams.stream import ConcatIterable, Stream
 import abc
 
 from jstreams.timer import Timer
@@ -466,22 +466,21 @@ class Piped(abc.ABC, Generic[T, V]):
 
 
 class _ObservableBase(Subscribable[T]):
-    __slots__ = ("__subscriptions", "_parent", "_last_val")
+    __slots__ = ("__subscriptions", "__async_subscriptions", "_parent", "_last_val")
 
     def __init__(self) -> None:
         self.__subscriptions: list[ObservableSubscription[Any]] = []
+        self.__async_subscriptions: list[ObservableSubscription[Any]] = []
         self._parent: Optional[_ObservableParent[T]] = None
         self._last_val: Optional[T] = None
 
     def _notify_all_subs(self, val: T) -> None:
         self._last_val = val
 
-        if self.__subscriptions is not None:
-            # Notify async subscriptions first, so they can be executed in parallel
-            sub_stream = Stream(self.__subscriptions)
-            sub_stream.filter(lambda s: s.is_async()).each(lambda s: s.on_next(val))
-            # Notify sync subscriptions after async ones
-            sub_stream.filter(lambda s: not s.is_async()).each(lambda s: s.on_next(val))
+        # Notify async subscriptions first, so they can be executed in parallel
+        # Notify sync subscriptions after async ones
+        for s in ConcatIterable(self.__async_subscriptions, self.__subscriptions):
+            s.on_next(val)
 
     def subscribe(
         self,
@@ -523,53 +522,62 @@ class _ObservableBase(Subscribable[T]):
             asynchronous,
             backpressure=backpressure,
         )
-        self.__subscriptions.append(sub)
+
+        if asynchronous:
+            self.__async_subscriptions.append(sub)
+        else:
+            self.__subscriptions.append(sub)
+
         if self._parent is not None:
             self._parent._push_to_sub_on_subscribe(sub)
         return sub
 
     def cancel(self, sub: ObservableSubscription[Any]) -> None:
-        (
-            Stream(self.__subscriptions)
-            .find_first(lambda e: e.get_subscription_id() == sub.get_subscription_id())
-            .if_present(self.__subscriptions.remove)
+        sub_list = (
+            self.__async_subscriptions if sub.is_async() else self.__subscriptions
         )
+        Stream(sub_list).find_first(
+            lambda e: e.get_subscription_id() == sub.get_subscription_id()
+        ).if_present(sub_list.remove)
 
     def dispose(self) -> None:
-        (Stream(self.__subscriptions).each(lambda s: s.dispose()))
+        for s in ConcatIterable(self.__async_subscriptions, self.__subscriptions):
+            s.dispose()
         self.__subscriptions.clear()
+        self.__async_subscriptions.clear()
 
     def pause(self, sub: ObservableSubscription[Any]) -> None:
-        (
-            Stream(self.__subscriptions)
-            .find_first(lambda e: e.get_subscription_id() == sub.get_subscription_id())
-            .if_present(lambda s: s.pause())
-        )
+        Stream(
+            self.__async_subscriptions if sub.is_async() else self.__subscriptions
+        ).find_first(
+            lambda e: e.get_subscription_id() == sub.get_subscription_id()
+        ).if_present(lambda s: s.pause())
 
     def resume(self, sub: ObservableSubscription[Any]) -> None:
-        (
-            Stream(self.__subscriptions)
-            .find_first(lambda e: e.get_subscription_id() == sub.get_subscription_id())
-            .if_present(lambda s: s.resume())
-        )
+        Stream(
+            self.__async_subscriptions if sub.is_async() else self.__subscriptions
+        ).find_first(
+            lambda e: e.get_subscription_id() == sub.get_subscription_id()
+        ).if_present(lambda s: s.resume())
 
     def pause_all(self) -> None:
-        (Stream(self.__subscriptions).each(lambda s: s.pause()))
+        for s in ConcatIterable(self.__async_subscriptions, self.__subscriptions):
+            s.pause()
 
     def resume_paused(self) -> None:
-        (
-            Stream(self.__subscriptions)
-            .filter(lambda s: s.is_paused())
-            .each(lambda s: s.resume())
-        )
+        Stream(ConcatIterable(self.__async_subscriptions, self.__subscriptions)).filter(
+            lambda s: s.is_paused()
+        ).each(lambda s: s.resume())
 
     def on_completed(self, val: Optional[T]) -> None:
-        (Stream(self.__subscriptions).each(lambda s: s.on_completed(val)))
+        for s in ConcatIterable(self.__async_subscriptions, self.__subscriptions):
+            s.on_completed(val)
         # Clear all subscriptions. This subject is out of business
         self.dispose()
 
     def on_error(self, ex: Exception) -> None:
-        (Stream(self.__subscriptions).each(lambda s: s.on_error(ex)))
+        for s in ConcatIterable(self.__async_subscriptions, self.__subscriptions):
+            s.on_error(ex)
 
 
 class _Observable(_ObservableBase[T], _ObservableParent[T]):
@@ -2867,11 +2875,26 @@ def rx_zip(
 
 
 class ChainBuilder(Generic[T]):
-    __slots__ = ("__observable", "__ops")
+    __slots__ = (
+        "__observable",
+        "__ops",
+        "__error_handler",
+        "__complete_handler",
+        "__next_handler",
+        "__dispose_handler",
+        "__async",
+        "__backpressure",
+    )
 
     def __init__(self, obs: _Observable[T]) -> None:
         self.__observable = obs
         self.__ops: list[RxOperator[Any, Any]] = []
+        self.__error_handler: Optional[ErrorHandler] = None
+        self.__complete_handler: Optional[CompletedHandler[T]] = None
+        self.__dispose_handler: Optional[DisposeHandler] = None
+        self.__next_handler: Optional[NextHandler[T]] = None
+        self.__async: bool = False
+        self.__backpressure: Optional[BackpressureStrategy] = None
 
     def debounce(self, timespan: float) -> "ChainBuilder[T]":
         self.__ops.append(rx_debounce(T, timespan))  # type: ignore[misc]
@@ -2968,6 +2991,40 @@ class ChainBuilder(Generic[T]):
     def custom(self, op: RxOperator[T, V]) -> "ChainBuilder[V]":
         self.__ops.append(op)
         return self  # type: ignore[return-value]
+
+    def catch(self, error_handler: ErrorHandler) -> "ChainBuilder[T]":
+        self.__error_handler = error_handler
+        return self
+
+    def completed(self, completed_handler: CompletedHandler[T]) -> "ChainBuilder[T]":
+        self.__complete_handler = completed_handler
+        return self
+
+    def disposed(self, disposed_handler: DisposeHandler) -> "ChainBuilder[T]":
+        self.__dispose_handler = disposed_handler
+        return self
+
+    def backpressure(self, backpressure: BackpressureStrategy) -> "ChainBuilder[T]":
+        self.__backpressure = backpressure
+        return self
+
+    def next(self, next_handler: NextHandler[T]) -> "ChainBuilder[T]":
+        self.__next_handler = next_handler
+        return self
+
+    def asynchronous(self, asynchronous: bool) -> "ChainBuilder[T]":
+        self.__async = asynchronous
+        return self
+
+    def subscribe(self) -> ObservableSubscription[T]:
+        return PipeObservable(self.__observable, Pipe(T, Any, self.__ops)).subscribe(  # type: ignore[misc,return-value]
+            self.__next_handler,  # type: ignore[arg-type]
+            self.__error_handler,
+            self.__complete_handler,  # type: ignore[arg-type]
+            self.__dispose_handler,
+            self.__async,
+            self.__backpressure,
+        )
 
     def build(self) -> Subscribable[T]:
         return PipeObservable(self.__observable, Pipe(T, Any, self.__ops))  # type: ignore[arg-type,misc]
