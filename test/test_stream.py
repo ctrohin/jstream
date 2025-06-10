@@ -933,21 +933,21 @@ class TestStream(BaseTestCase):
             Stream(
                 [Opt.of(1), Opt.empty(), Opt.of(2), Opt.of_nullable(None), Opt.of(3)]
             )
-            .flatten_opt()
+            .flatten_opt(int)
             .to_list(),
             [1, 2, 3],
         )
         self.assertEqual(
-            Stream([Opt.empty(), Opt.of_nullable(None)]).flatten_opt().to_list(), []
+            Stream([Opt.empty(), Opt.of_nullable(None)]).flatten_opt(str).to_list(), []
         )
-        self.assertEqual(Stream([]).flatten_opt().to_list(), [])
+        self.assertEqual(Stream([]).flatten_opt(str).to_list(), [])
         # Test with stream of non-Opt (should ideally not happen with type hints, but good to check)
         # This will likely cause an AttributeError if not handled, or a type error.
         # The current implementation maps to get_actual, then filters None.
         # If an element is not an Opt, opt.get_actual() will fail.
         # For this test, we assume the input stream correctly contains Opt[L] instances.
         s_typed: Stream[Opt[int]] = Stream.of_items(Opt.of(10), Opt.empty(), Opt.of(20))
-        self.assertEqual(s_typed.flatten_opt().to_list(), [10, 20])
+        self.assertEqual(s_typed.flatten_opt(int).to_list(), [10, 20])
 
     def test_deep_copy(self) -> None:
         original_stream = Stream([1, 2, 3, 4, 5])

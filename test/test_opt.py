@@ -70,8 +70,10 @@ class TestOpt(BaseTestCase):
         """
         Test opt flatStream function
         """
-        self.assertEqual(Opt("A").flat_stream().to_list(), ["A"])
-        self.assertEqual(Opt(["A", "B", "C"]).flat_stream().to_list(), ["A", "B", "C"])
+        self.assertEqual(Opt("A").flat_stream(str).to_list(), ["A"])
+        self.assertEqual(
+            Opt(["A", "B", "C"]).flat_stream(str).to_list(), ["A", "B", "C"]
+        )
 
     def test_opt_orElseThrow(self) -> None:
         """

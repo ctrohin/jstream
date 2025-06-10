@@ -389,19 +389,21 @@ class Opt(Generic[T]):
             return Stream([self.__val])
         return Stream([])
 
-    def flat_stream(self) -> "Stream[T]":
+    def flat_stream(self, typ: type[V]) -> "Stream[V]":  # pylint: disable=unused-argument
         """
         Returns a Stream containing the current Opt value if the value
         is not an Iterable, or a Stream containing all the values in
         the Opt if the Opt contains an iterable
 
+        Args:
+            typ: (type[V]): The type of the resulting stream
         Returns:
-            Stream[T]: The resulting Stream
+            Stream[V]: The resulting Stream
         """
         if self.__val is not None:
             if isinstance(self.__val, Iterable):
                 return Stream(self.__val)
-            return Stream([self.__val])
+            return Stream([self.__val])  # type: ignore[list-item]
         return Stream([])
 
     def or_else_raise(self) -> T:
@@ -548,11 +550,12 @@ class Opt(Generic[T]):
             return Opt(mapper(self.__val, with_val))
         return cast(Opt[V], self.__get_none())
 
-    def flatten(self: "Opt[Opt[U]]") -> "Opt[U]":
+    def flatten(self, typ: type[U]) -> "Opt[U]":  # pylint: disable=unused-argument
         """
         Flattens a nested Opt[Opt[U]] into Opt[U].
         If the outer Opt is empty, or the inner Opt is empty, returns an empty Opt.
-
+        Args:
+            typ (type[U]): The type of the returned opt
         Returns:
             Opt[U]: The flattened Opt.
         """
@@ -639,7 +642,7 @@ class Opt(Generic[T]):
     def peek(self, action: Callable[[T], Any]) -> "Opt[T]":
         return self.if_present(action)
 
-    def unzip(self: "Opt[Pair[A, B]]") -> "Pair[Opt[A], Opt[B]]":
+    def unzip(self, left_type: type[A], right_type: type[B]) -> "Pair[Opt[A], Opt[B]]":  # pylint: disable=unused-argument
         """
         Transforms an Opt[Pair[A, B]] into a Pair[Opt[A], Opt[B]].
         If the original Opt is empty, returns a Pair of two empty Opts.
@@ -2262,12 +2265,15 @@ class Stream(Generic[T]):
             return Stream(current_elements)
         return Stream(current_elements + [value] * (size - len(current_elements)))
 
-    def flatten_opt(self: "Stream[Opt[L]]") -> "Stream[L]":
+    def flatten_opt(self, typ: type[L]) -> "Stream[L]":  # pylint: disable=unused-argument
         """
         Flattens a stream of Opts into a stream of their contained values, discarding empty Opts.
 
         This requires the stream to be of type Stream[Opt[L]], but type hinting can't
         fully enforce this at runtime, so incorrect usage may result in errors.
+
+        Args:
+            typ (type[L]): the type of the return stream
 
         Returns:
             Stream[L]: A stream of values contained in the non-empty Opts.
@@ -2275,10 +2281,16 @@ class Stream(Generic[T]):
         # The type hint self: "Stream[Opt[L]]" constrains what streams this can be called on.
         # We map to extract values from Opts, and filter to remove Nones.
         return (
-            self.map(lambda opt: opt.get_actual())
+            self.map(lambda e: self.__type_check(e, Opt))
+            .map(lambda e: e.get_actual())  # type: ignore[attr-defined]
             .filter(is_not_none)
             .map(lambda x: require_non_null(x))
         )
+
+    def __type_check(self, obj: U, typ: type[U]) -> U:
+        if not isinstance(obj, typ):
+            raise ValueError(f"Unexpected object {obj}. Was expecting type {typ}")
+        return obj
 
     def clone(self) -> "Stream[T]":
         # If self.__arg is a list, tuple, or set, a shallow copy is often enough

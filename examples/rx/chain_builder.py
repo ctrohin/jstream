@@ -41,9 +41,13 @@ second_sub_values = []
 # We can also use subscribe directly, while providing the subscription elements in the builder
 (
     subject.chain()
+    # We filter for distinct consecutive values
     .distinct_until_changed()
+    # We drop the first 2 values
     .drop(2)
+    # We want only values higher than 10
     .filter(is_higher_than(10))
+    # We group the values in lists of 5
     .buffer_count(5)
     # We can also add error handling
     .catch(lambda e: print(e))

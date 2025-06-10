@@ -7,7 +7,7 @@ V = TypeVar("V")
 K = TypeVar("K")
 
 
-class Pair(Generic[T, V]):
+class BasePair(Generic[T, V]):
     __slots__ = ("__left", "__right")
 
     def __init__(self, left: T, right: V) -> None:
@@ -44,7 +44,12 @@ class Pair(Generic[T, V]):
         return f"left={self.__left}, right={self.__right}"
 
 
-class Triplet(Generic[T, V, K], Pair[T, K]):
+class Pair(BasePair[T, V]):
+    def unpack(self) -> tuple[T, V]:
+        return (self.left(), self.right())
+
+
+class Triplet(Generic[T, V, K], BasePair[T, K]):
     __slots__ = ("__middle",)
 
     def __init__(self, left: T, middle: V, right: K) -> None:
@@ -78,6 +83,9 @@ class Triplet(Generic[T, V, K], Pair[T, K]):
 
     def __repr__(self) -> str:
         return f"left={self.__left}, middle={self.__middle}, right={self.__right}"
+
+    def unpack(self) -> tuple[T, V, K]:
+        return (self.left(), self.middle(), self.right())
 
 
 def pair(left: T, right: V) -> Pair[T, V]:
@@ -127,7 +135,7 @@ def triplet_of(values: tuple[T, V, K]) -> Triplet[T, V, K]:
 
 def left_matches(
     predicate_arg: Callable[[T], bool],
-) -> Predicate[Pair[Any, Any]]:
+) -> Predicate[BasePair[Any, Any]]:
     """
     Produces a predicate that checks if the left value of a Pair/Triplet matches the given predicate
 
@@ -135,10 +143,10 @@ def left_matches(
         predicate_arg (Callable[[T], bool]): The left matching predicate
 
     Returns:
-        Predicate[Pair[T, V]]: The produced predicate
+        Predicate[BasePair[T, V]]: The produced predicate
     """
 
-    def wrap(pair_arg: Pair[T, V]) -> bool:
+    def wrap(pair_arg: BasePair[T, V]) -> bool:
         return predicate_of(predicate_arg)(pair_arg.left())
 
     return predicate_of(wrap)
@@ -146,7 +154,7 @@ def left_matches(
 
 def right_matches(
     predicate_arg: Callable[[V], bool],
-) -> Predicate[Pair[Any, Any]]:
+) -> Predicate[BasePair[Any, Any]]:
     """
     Produces a predicate that checks if the right value of a Pair/Triplet matches the given predicate
 
@@ -154,10 +162,10 @@ def right_matches(
         predicate_arg (Callable[[V], bool]): The right matching predicate
 
     Returns:
-        Predicate[Pair[T, V]]: The produced predicate
+        Predicate[BasePair[T, V]]: The produced predicate
     """
 
-    def wrap(pair_arg: Pair[T, V]) -> bool:
+    def wrap(pair_arg: BasePair[T, V]) -> bool:
         return predicate_arg(pair_arg.right())
 
     return predicate_of(wrap)
