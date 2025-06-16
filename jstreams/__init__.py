@@ -12,22 +12,47 @@ from jstreams.stream_operations import (
 
 from jstreams.iterable_operations import (
     find_first,
-    take_while,
-    drop_while,
     matching,
     reduce,
-    take_until,
-    drop_until,
     find_last,
 )
 
 from jstreams.mapper import (
-    map_it,
     flat_map,
     mapper_of,
     mapper_with_of,
     Mapper,
     MapperWith,
+)
+
+from jstreams.iterables import (
+    map_it,
+    map_indexed,
+    filter_it,
+    cast_to,
+    chunked,
+    concat,
+    concat_of,
+    cycle,
+    repeat,
+    defer,
+    distinct,
+    drop_until,
+    drop_while,
+    take_until,
+    take_while,
+    limit,
+    skip,
+    group_adjacent,
+    windowed,
+    indexed,
+    scan,
+    pair_it,
+    pairwise,
+    sliding_window,
+    intersperse,
+    unfold,
+    zip_longest,
 )
 
 from jstreams.reducer import reducer_of, Reducer
@@ -298,6 +323,13 @@ from jstreams.collectors import (
     joining,
     grouping_by_mapping,
     Collectors,
+)
+
+from jstreams.func import (
+    get_number_of_arguments,
+    pipe,
+    partial,
+    curry,
 )
 
 from jstreams.state import (
@@ -649,4 +681,30 @@ __all__ = [
     "rx_zip",
     "ChainBuilder",
     "DelayedBaseFilteringOperator",
+    "get_number_of_arguments",
+    "pipe",
+    "partial",
+    "curry",
+    "map_indexed",
+    "cast_to",
+    "chunked",
+    "concat",
+    "concat_of",
+    "cycle",
+    "repeat",
+    "defer",
+    "distinct",
+    "limit",
+    "skip",
+    "filter_it",
+    "group_adjacent",
+    "windowed",
+    "indexed",
+    "scan",
+    "pair_it",
+    "pairwise",
+    "sliding_window",
+    "intersperse",
+    "unfold",
+    "zip_longest",
 ]

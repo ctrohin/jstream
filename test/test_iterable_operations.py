@@ -4,6 +4,8 @@ from jstreams.iterable_operations import (
     find_last,
     matching,
     reduce,
+)
+from jstreams.iterables import (
     drop_until,
     drop_while,
     take_until,

@@ -152,23 +152,6 @@ def mapper_with_of(
     return MapperWith.of(mapper)
 
 
-def map_it(target: Iterable[T], mapper: Callable[[T], V]) -> list[V]:
-    """
-    Maps each element of an iterable to a new object produced by the given mapper
-
-    Args:
-        target (Iterable[T]): The target iterable
-        mapper (Callable[[T], V]): The mapper
-
-    Returns:
-        list[V]: The mapped elements
-    """
-    if target is None:
-        return []
-    mapper_obj = Mapper.of(mapper)
-    return [mapper_obj.map(el) for el in target]
-
-
 def flat_map(
     target: Iterable[T],
     mapper: Callable[[T], Iterable[V]],

@@ -67,118 +67,6 @@ def matching(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
     return [el for el in target if predicate(el)]
 
 
-def take_while(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
-    """
-    Returns the first batch of elements matching the predicate. Once an element
-    that does not match the predicate is found, the function will return
-
-    Args:
-        target (Iterable[T]): The target iterable
-        predicate (Callable[[T], bool]): The predicate
-
-    Returns:
-        list[T]: The result list
-    """
-    ret: list[T] = []
-    if target is None:
-        return ret
-
-    for el in target:
-        if predicate(el):
-            ret.append(el)
-        else:
-            break
-    return ret
-
-
-def drop_while(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
-    """
-    Returns the target iterable elements without the first elements that match the
-    predicate. Once an element that does not match the predicate is found,
-    the function will start adding the remaining elements to the result list
-
-    Args:
-        target (Iterable[T]): The target iterable
-        predicate (Callable[[T], bool]): The predicate
-
-    Returns:
-        list[T]: The result list
-    """
-    ret: list[T] = []
-    if target is None:
-        return ret
-
-    index = 0
-    start_adding = False
-    for el in target:
-        if start_adding:
-            ret.append(el)
-            continue
-        if predicate(el):
-            index += 1
-        else:
-            start_adding = True
-            ret.append(el)
-
-    return ret
-
-
-def take_until(
-    target: Iterable[T],
-    predicate: Callable[[T], bool],
-    include_stop_value: bool = False,
-) -> list[T]:
-    """
-    Returns the first batch of elements until the predicate returns True.
-    The element that satisfies the predicate IS included in the result.
-
-    Args:
-        target (Iterable[T]): The target iterable.
-        predicate (Callable[[T], bool]): The predicate.
-
-    Returns:
-        list[T]: The result list including the element that matched the predicate.
-    """
-    ret: list[T] = []
-    if target is None:
-        return ret
-
-    for el in target:
-        if predicate(el):  # Then check if the condition is met
-            if include_stop_value:
-                ret.append(el)  # Append the if it needs to be included
-            break  # Stop after including the element
-        ret.append(el)
-    return ret
-
-
-def drop_until(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
-    """
-    Returns the target iterable elements starting from the first element that
-    matches the predicate (inclusive). Elements before the first match are dropped.
-
-    Args:
-        target (Iterable[T]): The target iterable.
-        predicate (Callable[[T], bool]): The predicate.
-
-    Returns:
-        list[T]: The result list starting from the first matching element.
-                 Returns an empty list if the predicate never matches.
-    """
-    if target is None:
-        return []
-
-    index = 0
-    target_list = list(target)  # Convert once for slicing and indexing
-
-    for el in target_list:
-        if predicate(el):
-            break  # Stop searching
-        index += 1
-
-    return target_list[index:]
-
-
 def reduce(target: Iterable[T], reducer: Callable[[T, T], T]) -> Optional[T]:
     """
     Reduces an iterable to a single value. The reducer function takes two values and
@@ -203,3 +91,59 @@ def reduce(target: Iterable[T], reducer: Callable[[T, T], T]) -> Optional[T]:
     # functools.reduce will apply the reducer to the rest of the iterator
     # starting with the initial_value.
     return functools.reduce(reducer, iterator, initial_value)
+
+
+def any_match(iterable: Iterable[T], predicate: Callable[[T], bool]) -> bool:
+    """
+    Checks if any iterable object matches the given predicate
+
+    Args:
+        iterable (Iterable[T]): The iterable
+        predicate (Callable[[T], bool]): The predicate
+
+    Returns:
+        bool: True if any object matches, False otherwise
+    """
+    if iterable is None:
+        return False
+    for el in iterable:
+        if predicate(el):
+            return True
+    return False
+
+
+def none_match(iterable: Iterable[T], predicate: Callable[[T], bool]) -> bool:
+    """
+    Checks if none of the iterable objects matches the given predicate. This is the inverse of 'any_match`
+
+    Args:
+        iterable (Iterable[T]): The iterable
+        predicate (Callable[[T], bool]): The predicate
+
+    Returns:
+        bool: True if no object matches, False otherwise
+    """
+    if iterable is None:
+        return False
+
+    return not any_match(iterable, predicate)
+
+
+def all_match(iterable: Iterable[T], predicate: Callable[[T], bool]) -> bool:
+    """
+    Checks if all of the iterable objects matche the given predicate.
+
+    Args:
+        iterable (Iterable[T]): The iterable
+        predicate (Callable[[T], bool]): The predicate
+
+    Returns:
+        bool: True if all objects matche, False otherwise
+    """
+    if iterable is None:
+        return False
+
+    for el in iterable:
+        if not predicate(el):
+            return False
+    return True

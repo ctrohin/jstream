@@ -1,4 +1,3 @@
-from collections import deque
 from typing import (
     Callable,
     Iterable,
@@ -9,11 +8,47 @@ from typing import (
     Generic,
     cast,
 )
-from abc import ABC
 
 from jstreams.class_operations import ClassOps
-import itertools  # Added import
-from jstreams.iterable_operations import find_first, find_last, reduce
+import itertools
+from jstreams.iterable_operations import (
+    all_match,
+    any_match,
+    find_first,
+    find_last,
+    none_match,
+    reduce,
+)
+from jstreams.iterables import (
+    cast_to,
+    chunked,
+    concat,
+    concat_of,
+    cycle,
+    defer,
+    distinct,
+    drop_until,
+    drop_while,
+    filter_it,
+    group_adjacent,
+    indexed,
+    intersperse,
+    limit,
+    map_indexed,
+    map_it,
+    pair_it,
+    pairwise,
+    peek,
+    repeat,
+    scan,
+    skip,
+    sliding_window,
+    take_until,
+    take_while,
+    unfold,
+    windowed,
+    zip_longest,
+)
 from jstreams.mapper import flat_map
 from jstreams.predicate import (
     is_none,
@@ -764,824 +799,6 @@ class Opt(Generic[T]):
         return Stream(opts).find_first(Opt.is_present).flat_map(lambda x: x)
 
 
-class _GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
-    __slots__ = ("_iterable", "_iterator")
-
-    def __init__(self, it: Iterable[T]) -> None:
-        self._iterable = it
-        self._iterator = self._iterable.__iter__()
-
-    def _prepare(self) -> None:
-        pass
-
-    def __iter__(self) -> Iterator[T]:
-        self._iterator = self._iterable.__iter__()
-        self._prepare()
-        return self
-
-
-class _FilterIterable(_GenericIterable[T]):
-    __slots__ = ("__predicate",)
-
-    def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
-        super().__init__(it)
-        self.__predicate = predicate
-
-    def __next__(self) -> T:
-        while True:
-            next_obj = self._iterator.__next__()
-            if self.__predicate(next_obj):
-                return next_obj
-
-
-class _MapIndexedIterable(Generic[T, V], Iterator[V], Iterable[V]):
-    __slots__ = ("_iterable", "_iterator", "__mapper", "__index")
-
-    def __init__(self, it: Iterable[T], mapper: Callable[[int, T], V]) -> None:
-        self._iterable = it
-        self._iterator = self._iterable.__iter__()
-        self.__mapper = mapper
-        self.__index = 0
-
-    def _prepare(self) -> None:
-        self.__index = 0
-
-    def __iter__(self) -> Iterator[V]:
-        self._iterator = self._iterable.__iter__()
-        self._prepare()
-        return self
-
-    def __next__(self) -> V:
-        # Get the next element, increment the index, and then apply the mapper.
-        # This ensures that the mapper function always receives the current
-        # (correctly incremented) index alongside the element.
-        obj = self._iterator.__next__()
-        current_index = self.__index
-        self.__index += 1
-        return self.__mapper(current_index, obj)
-
-
-class _GroupAdjacentIterable(Generic[T, K], Iterator[list[T]], Iterable[list[T]]):
-    __slots__ = (
-        "_iterable",
-        "_iterator",
-        "__key_func",
-        "_current_group",
-        "_current_key",
-    )
-
-    def __init__(self, it: Iterable[T], key_func: Callable[[T], K]) -> None:
-        self._iterable = it
-        self._iterator = iter(self._iterable)
-        self.__key_func = key_func
-        self._current_group: list[T] = []
-        self._current_key: Optional[K] = None
-
-    def __iter__(self) -> Iterator[list[T]]:
-        self._iterator = iter(self._iterable)
-        self._current_group = []
-        self._current_key = None
-        return self
-
-    def __next__(self) -> list[T]:
-        try:
-            if not self._current_group:
-                # Start a new group: get the first element, initialize group and key
-                first_element = next(self._iterator)
-                self._current_key = self.__key_func(first_element)
-                self._current_group.append(first_element)
-
-            while True:  # Keep trying to extend the current group
-                next_element = next(self._iterator)
-                next_key = self.__key_func(next_element)
-
-                if next_key == self._current_key:
-                    # Same key: add to group and continue
-                    self._current_group.append(next_element)
-                else:
-                    # Different key: yield current group, start a new group, and stop iteration for now
-                    group_to_yield = self._current_group
-                    self._current_key = next_key
-                    self._current_group = [next_element]
-                    return group_to_yield
-
-        except StopIteration as exc:
-            if self._current_group:
-                # Yield any remaining group at the end
-                group_to_yield = self._current_group
-                self._current_group = []  # Clear it after yielding
-                return group_to_yield
-            # No current group (probably empty iterator to start)
-            raise StopIteration from exc
-
-
-class _WindowedIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
-    __slots__ = ("_iterable", "_iterator", "_size", "_step", "_partial")
-
-    def __init__(
-        self, it: Iterable[T], size: int, step: int = 1, partial: bool = False
-    ) -> None:
-        if size <= 0 or step <= 0:
-            raise ValueError("Size and step must be positive")
-        self._iterable = it
-        self._iterator = iter(self._iterable)
-        self._size = size
-        self._step = step
-        self._partial = partial
-
-    def __iter__(self) -> Iterator[list[T]]:
-        self._iterator = iter(self._iterable)  # Reset iterator
-        return self
-
-    def __next__(self) -> list[T]:
-        window: list[T] = []
-        try:
-            # Try to populate a new window by skipping elements first if step > 1
-            if len(window) == 0:
-                for _ in range(
-                    self._step - 1
-                ):  # Consume and discard elements (if step > 1)
-                    next(
-                        self._iterator
-                    )  # Will raise StopIteration if not enough elements
-            # Fill as much of window as possible until end of data or window size
-            for _ in range(self._size):
-                window.append(next(self._iterator))
-        except StopIteration as exc:
-            # Check whether to yield a partial window if allowed or stop iteration
-            if not window or (not self._partial and len(window) < self._size):
-                raise StopIteration from exc
-        # If full or partial (if allowed), return the window
-        return window
-
-
-class _CastIterable(Generic[T, V], Iterator[T], Iterable[T]):
-    __slots__ = ("__iterable", "__iterator")
-
-    def __init__(self, it: Iterable[V], typ: type[T]) -> None:  # pylint: disable=unused-argument
-        self.__iterable = it
-        self.__iterator = self.__iterable.__iter__()
-
-    def __iter__(self) -> Iterator[T]:
-        self.__iterator = self.__iterable.__iter__()
-        return self
-
-    def __next__(self) -> T:
-        next_obj = self.__iterator.__next__()
-        return cast(T, next_obj)
-
-
-class _SkipIterable(_GenericIterable[T]):
-    __slots__ = ("__count",)
-
-    def __init__(self, it: Iterable[T], count: int) -> None:
-        super().__init__(it)
-        self.__count = count
-
-    def _prepare(self) -> None:
-        try:
-            count = 0
-            while count < self.__count:
-                self._iterator.__next__()
-                count += 1
-        except StopIteration:
-            pass
-
-    def __next__(self) -> T:
-        return self._iterator.__next__()
-
-
-class _LimitIterable(_GenericIterable[T]):
-    __slots__ = ("__count", "__current_count")
-
-    def __init__(self, it: Iterable[T], count: int) -> None:
-        super().__init__(it)
-        self.__count = count
-        self.__current_count = 0
-
-    def _prepare(self) -> None:
-        self.__current_count = 0
-
-    def __next__(self) -> T:
-        if self.__current_count >= self.__count:
-            raise StopIteration()
-
-        obj = self._iterator.__next__()
-        self.__current_count += 1
-        return obj
-
-
-class _TakeWhileIterable(_GenericIterable[T]):
-    __slots__ = ("__predicate", "__done", "__include_stop_value")
-
-    def __init__(
-        self, it: Iterable[T], predicate: Callable[[T], bool], include_stop_value: bool
-    ) -> None:
-        super().__init__(it)
-        self.__done = False
-        self.__predicate = predicate
-        self.__include_stop_value = include_stop_value
-
-    def _prepare(self) -> None:
-        self.__done = False
-
-    def __next__(self) -> T:
-        if self.__done:
-            raise StopIteration()
-
-        obj = self._iterator.__next__()
-        if not self.__predicate(obj):
-            self.__done = True
-            if not self.__include_stop_value:
-                raise StopIteration()
-
-        return obj
-
-
-class _DropWhileIterable(_GenericIterable[T]):
-    __slots__ = ("__predicate", "__done")
-
-    def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
-        super().__init__(it)
-        self.__done = False
-        self.__predicate = predicate
-
-    def _prepare(self) -> None:
-        self.__done = False
-
-    def __next__(self) -> T:
-        if self.__done:
-            return self._iterator.__next__()
-        while not self.__done:
-            obj = self._iterator.__next__()
-            if not self.__predicate(obj):
-                self.__done = True
-                return obj
-        raise StopIteration()
-
-
-class ConcatIterable(_GenericIterable[T]):
-    __slots__ = ("__iterable2", "__iterator2", "__done")
-
-    def __init__(self, it1: Iterable[T], it2: Iterable[T]) -> None:
-        super().__init__(it1)
-        self.__done = False
-        self.__iterable2 = it2
-        self.__iterator2 = self.__iterable2.__iter__()
-
-    def _prepare(self) -> None:
-        self.__done = False
-        self.__iterator2 = self.__iterable2.__iter__()
-
-    def __next__(self) -> T:
-        if self.__done:
-            return self.__iterator2.__next__()
-        try:
-            return self._iterator.__next__()
-        except StopIteration:
-            self.__done = True
-            return self.__next__()
-
-
-# Modify _DistinctIterable to accept key_func
-class _DistinctIterable(_GenericIterable[T]):
-    __slots__ = ("__seen", "__key_func")  # Use __seen instead of __set for clarity
-
-    def __init__(
-        self, it: Iterable[T], key_func: Optional[Callable[[T], Any]] = None
-    ) -> None:
-        super().__init__(it)
-        self.__seen: set[Any] = (
-            set()
-        )  # Stores keys if key_func is provided, else elements
-        self.__key_func = key_func
-
-    def _prepare(self) -> None:
-        self.__seen = set()
-
-    def __next__(self) -> T:
-        while True:  # Keep trying until a distinct element is found or iterator ends
-            obj = self._iterator.__next__()
-            key_to_check = self.__key_func(obj) if self.__key_func else obj
-            if key_to_check not in self.__seen:
-                self.__seen.add(key_to_check)
-                return obj
-
-
-class _MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
-    __slots__ = ("_iterable", "_iterator", "__mapper")
-
-    def __init__(self, it: Iterable[T], mapper: Callable[[T], V]) -> None:
-        self._iterable = it
-        self._iterator = self._iterable.__iter__()
-        self.__mapper = mapper
-
-    def _prepare(self) -> None:
-        pass
-
-    def __iter__(self) -> Iterator[V]:
-        self._iterator = self._iterable.__iter__()
-        self._prepare()
-        return self
-
-    def __next__(self) -> V:
-        return self.__mapper(self._iterator.__next__())
-
-
-class _PeekIterable(_GenericIterable[T]):
-    __slots__ = ("__action", "__logger")
-
-    def __init__(
-        self,
-        it: Iterable[T],
-        action: Callable[[T], Any],
-        logger: Optional[Callable[[Exception], Any]] = None,
-    ) -> None:
-        super().__init__(it)
-        self.__action = action
-        self.__logger = logger
-
-    def _prepare(self) -> None:
-        pass
-
-    def __next__(self) -> T:
-        obj = self._iterator.__next__()
-        try:
-            self.__action(obj)  # Perform the side-effect
-        except Exception as e:
-            print(  # pylint: disable=expression-not-assigned
-                f"Exception during Stream.peek: {e}"
-            ) if self.__logger is None else self.__logger(e)
-        return obj  # Return the original object
-
-
-class _IndexedIterable(Generic[T], Iterator[Pair[int, T]], Iterable[Pair[int, T]]):
-    __slots__ = ("_iterable", "_iterator", "_index")
-
-    def __init__(self, it: Iterable[T]) -> None:
-        self._iterable = it
-        self._iterator = self._iterable.__iter__()
-        self._index = 0
-
-    def __iter__(self) -> Iterator[Pair[int, T]]:
-        self._iterator = self._iterable.__iter__()
-        self._index = 0  # Reset index for new iteration
-        return self
-
-    def __next__(self) -> Pair[int, T]:
-        obj = self._iterator.__next__()  # Raises StopIteration when done
-        current_index = self._index
-        self._index += 1
-        return Pair(current_index, obj)
-
-
-# In stream.py, add a new Iterable class
-class _ChunkedIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
-    __slots__ = ("_iterator", "_size")
-
-    def __init__(self, it: Iterable[T], size: int) -> None:
-        if size <= 0:
-            raise ValueError("Chunk size must be positive")
-        # Store the original iterator directly
-        self._iterator = iter(it)
-        self._size = size
-
-    def __iter__(self) -> Iterator[list[T]]:
-        # Resetting isn't straightforward without consuming the original iterable again.
-        # This implementation assumes the stream is consumed once.
-        # If re-iteration is needed, the original iterable must support it.
-        # Or, store the original iterable and get a new iterator here.
-        # self._iterator = iter(self._iterable) # If storing _iterable instead
-        return self
-
-    def __next__(self) -> list[T]:
-        chunk = []
-        try:
-            for _ in range(self._size):
-                chunk.append(next(self._iterator))
-        except StopIteration:
-            # Reached the end of the underlying iterator
-            pass  # Allow the loop to finish
-
-        if not chunk:  # If no elements were added (end of iteration)
-            raise StopIteration
-        return chunk
-
-
-class _TakeUntilIterable(_GenericIterable[T]):
-    __slots__ = ("__predicate", "__done", "__include_stop_value")
-
-    def __init__(
-        self, it: Iterable[T], predicate: Callable[[T], bool], include_stop_value: bool
-    ) -> None:
-        super().__init__(it)
-        self.__predicate = predicate
-        self.__done = False
-        self.__include_stop_value = include_stop_value
-
-    def _prepare(self) -> None:
-        self.__done = False
-
-    def __next__(self) -> T:
-        if self.__done:
-            raise StopIteration()
-
-        obj = self._iterator.__next__()
-        if self.__predicate(obj):
-            self.__done = True  # Stop after yielding this one
-            if not self.__include_stop_value:
-                raise StopIteration()
-
-        return obj
-
-
-class _DropUntilIterable(_GenericIterable[T]):
-    __slots__ = ("__predicate", "__dropping")
-
-    def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
-        super().__init__(it)
-        self.__predicate = predicate
-        self.__dropping = True  # Start in dropping mode
-
-    def _prepare(self) -> None:
-        self.__dropping = True
-
-    def __next__(self) -> T:
-        while self.__dropping:
-            obj = self._iterator.__next__()  # Consume elements
-            if self.__predicate(obj):
-                self.__dropping = False  # Stop dropping
-                return obj  # Return the first matching element
-        # Once dropping stops, just yield remaining elements
-        return self._iterator.__next__()
-
-
-class _ScanIterable(Generic[T, V], Iterator[V], Iterable[V]):
-    __slots__ = (
-        "_iterator",
-        "_accumulator",
-        "_current_value",
-        "_first",
-        "_iterable",
-        "_initial_value",
-    )
-
-    def __init__(
-        self, it: Iterable[T], accumulator: Callable[[V, T], V], initial_value: V
-    ) -> None:
-        # Store original iterable to allow re-iteration if needed
-        self._iterable = it
-        self._iterator = iter(self._iterable)
-        self._accumulator = accumulator
-        self._initial_value = initial_value
-        # State for iteration
-        self._current_value = self._initial_value
-        self._first = True  # Flag to yield initial value first
-
-    def __iter__(self) -> Iterator[V]:
-        # Reset state for new iteration
-        self._iterator = iter(self._iterable)
-        self._current_value = self._initial_value
-        self._first = True
-        return self
-
-    def __next__(self) -> V:
-        if self._first:
-            self._first = False
-            return self._current_value  # Yield initial value first
-
-        next_element = next(self._iterator)  # Get next element from source
-        self._current_value = self._accumulator(self._current_value, next_element)
-        return self._current_value
-
-
-class _PairIterable(Generic[T, V], Iterator[Pair[T, V]], Iterable[Pair[T, V]]):
-    __slots__ = ("_it1", "_it2", "_iter1", "_iter2")
-
-    def __init__(self, it1: Iterable[T], it2: Iterable[V]) -> None:
-        self._it1 = it1
-        self._it2 = it2
-        self._iter1 = self._it1.__iter__()
-        self._iter2 = self._it2.__iter__()
-
-    def __iter__(self) -> Iterator[Pair[T, V]]:
-        self._iter1 = self._it1.__iter__()
-        self._iter2 = self._it2.__iter__()
-        return self
-
-    def __next__(self) -> Pair[T, V]:
-        return Pair(self._iter1.__next__(), self._iter2.__next__())
-
-
-class _MultiConcatIterable(Generic[T], Iterator[T], Iterable[T]):
-    __slots__ = ("_iterables", "_current_iterator", "_iterable_index")
-
-    def __init__(self, iterables: tuple[Iterable[T], ...]) -> None:
-        self._iterables = iterables
-        self._iterable_index = 0
-        self._current_iterator: Optional[Iterator[T]] = None
-        self._advance_iterator()  # Initialize the first iterator
-
-    def _advance_iterator(self) -> None:
-        """Moves to the next iterator in the sequence."""
-        if self._iterable_index < len(self._iterables):
-            self._current_iterator = iter(self._iterables[self._iterable_index])
-            self._iterable_index += 1
-        else:
-            self._current_iterator = None  # No more iterables
-
-    def __iter__(self) -> Iterator[T]:
-        # Reset state for new iteration
-        self._iterable_index = 0
-        self._advance_iterator()
-        return self
-
-    def __next__(self) -> T:
-        while self._current_iterator is not None:
-            try:
-                return next(self._current_iterator)
-            except StopIteration:
-                # Current iterator is exhausted, move to the next one
-                self._advance_iterator()
-        # If _current_iterator becomes None, all iterables are exhausted
-        raise StopIteration
-
-
-class _PairwiseIterable(Generic[T], Iterator[Pair[T, T]], Iterable[Pair[T, T]]):
-    __slots__ = ("_iterator", "_previous", "_first_element_consumed", "_iterable")
-
-    def __init__(self, it: Iterable[T]) -> None:
-        self._iterable = it  # Store original iterable if re-iteration needed
-        self._iterator = iter(self._iterable)
-        self._previous: Optional[T] = None
-        self._first_element_consumed = False
-
-    def __iter__(self) -> Iterator[Pair[T, T]]:
-        self._iterator = iter(self._iterable)  # Reset iterator
-        self._previous = None
-        self._first_element_consumed = False
-        return self
-
-    def __next__(self) -> Pair[T, T]:
-        if not self._first_element_consumed:
-            # Consume the very first element to establish the initial 'previous'
-            self._previous = next(self._iterator)
-            self._first_element_consumed = True
-
-        # Get the next element to form a pair with the previous one
-        current = next(self._iterator)  # Raises StopIteration when done
-        pair_to_yield = Pair(
-            require_non_null(self._previous), current
-        )  # require_non_null is safe here
-        self._previous = current  # Update previous for the next iteration
-        return pair_to_yield
-
-
-class _SlidingWindowIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
-    __slots__ = ("_iterator", "_size", "_step", "_window", "_buffer")
-
-    def __init__(self, it: Iterable[T], size: int, step: int) -> None:
-        if size <= 0 or step <= 0:
-            raise ValueError("Size and step must be positive")
-        self._iterator = iter(it)
-        self._size = size
-        if step <= 0:
-            raise ValueError("Step must be positive")
-        self._step = step
-        # Use deque for efficient additions/removals from both ends
-        self._window: deque[T] = deque(maxlen=size)
-
-    def __iter__(self) -> Iterator[list[T]]:
-        # Resetting requires re-iterating the source
-        # self._iterator = iter(self._iterable) # If storing original iterable
-        self._window.clear()
-        return self
-
-    def __next__(self) -> list[T]:
-        while len(self._window) < self._size:
-            try:
-                element = next(self._iterator)
-                self._window.append(element)
-
-            except StopIteration as exc:
-                # Not enough elements to form a full window initially or remaining
-                if len(self._window) > 0 and len(self._window) < self._size:
-                    # Option: yield partial window at the end? Or require full windows?
-                    # Current StopIteration implies only full windows.
-                    pass  # Let StopIteration be raised below if window is empty
-                raise StopIteration from exc
-
-        # Yield the current full window
-        result = list(self._window)  # Create list copy
-
-        # Prepare for the next window by sliding
-        for _ in range(self._step):
-            if not self._window:
-                break  # Should not happen if size > 0
-            self._window.popleft()  # Remove element(s) from the left
-
-        return result  # Return the window captured before sliding
-
-
-class _RepeatIterable(Generic[T], Iterator[T], Iterable[T]):
-    __slots__ = ("_buffered_elements", "_n", "_current_n", "_iterator")
-
-    def __init__(self, it: Iterable[T], n: Optional[int]) -> None:
-        # Buffer the original iterable ONCE
-        self._buffered_elements = list(it)
-        self._n = n  # None means infinite
-        self._current_n = 0
-        self._iterator = iter(self._buffered_elements)
-
-    def __iter__(self) -> Iterator[T]:
-        # Reset for new iteration
-        self._current_n = 0
-        self._iterator = iter(self._buffered_elements)
-        return self
-
-    def __next__(self) -> T:
-        try:
-            return next(self._iterator)
-        except StopIteration as exc:
-            # End of current cycle reached
-            if self._n is not None:  # Finite repetitions
-                self._current_n += 1
-                if self._current_n >= self._n:
-                    raise StopIteration from exc  # Max repetitions reached
-            # Start next cycle
-            if not self._buffered_elements:  # Handle empty source
-                raise StopIteration from exc
-            self._iterator = iter(self._buffered_elements)
-            return next(self._iterator)  # Get first element of next cycle
-
-
-class _IntersperseIterable(Generic[T], Iterator[T], Iterable[T]):
-    __slots__ = ("_iterator", "_separator", "_needs_separator", "_iterable")
-
-    def __init__(self, it: Iterable[T], separator: T) -> None:
-        self._iterable = it  # Store original if re-iteration needed
-        self._iterator = iter(self._iterable)
-        self._separator = separator
-        self._needs_separator = False  # Don't insert before the first element
-
-    def __iter__(self) -> Iterator[T]:
-        self._iterator = iter(self._iterable)  # Reset
-        self._needs_separator = False
-        return self
-
-    def __next__(self) -> T:
-        if self._needs_separator:
-            self._needs_separator = False  # Reset flag after yielding separator
-            return self._separator
-        # Get the next actual element from the source
-        next_element = next(self._iterator)  # Raises StopIteration when source is done
-        # Set flag to insert separator *before* the *next* element
-        self._needs_separator = True
-        return next_element
-
-
-class _UnfoldIterable(Generic[T, S], Iterator[T], Iterable[T]):
-    __slots__ = ("_initial_seed", "_generator", "_current_seed", "_next_pair")
-
-    def __init__(self, seed: S, generator: Callable[[S], Optional[Pair[T, S]]]) -> None:
-        self._initial_seed = seed
-        self._generator = generator
-        # State for iteration
-        self._current_seed = self._initial_seed
-        self._next_pair: Optional[Pair[T, S]] = self._generator(
-            self._current_seed
-        )  # Compute first pair
-
-    def __iter__(self) -> Iterator[T]:
-        # Reset state for new iteration
-        self._current_seed = self._initial_seed
-        self._next_pair = self._generator(self._current_seed)
-        return self
-
-    def __next__(self) -> T:
-        if self._next_pair is None:
-            raise StopIteration  # Generator signaled end
-
-        # Get current element and next seed from the pair
-        current_element = self._next_pair.left()
-        next_seed = self._next_pair.right()
-
-        # Update state for the *next* call to __next__
-        self._current_seed = next_seed
-        self._next_pair = self._generator(self._current_seed)
-
-        return current_element  # Return the element generated in the previous step
-
-
-class _ZipLongestIterable(
-    Generic[T, V],
-    Iterator[Pair[Optional[T], Optional[V]]],
-    Iterable[Pair[Optional[T], Optional[V]]],
-):
-    __slots__ = ("_it1", "_it2", "_iter1", "_iter2", "_fillvalue", "_done1", "_done2")
-
-    def __init__(
-        self, it1: Iterable[T], it2: Iterable[V], fillvalue: Any = None
-    ) -> None:
-        self._it1 = it1
-        self._it2 = it2
-        self._fillvalue = fillvalue
-        self._iter1 = iter(self._it1)
-        self._iter2 = iter(self._it2)
-        self._done1 = False
-        self._done2 = False
-
-    def __iter__(self) -> Iterator[Pair[Optional[T], Optional[V]]]:
-        self._iter1 = iter(self._it1)
-        self._iter2 = iter(self._it2)
-        self._done1 = False
-        self._done2 = False
-        return self
-
-    def __next__(self) -> Pair[Optional[T], Optional[V]]:
-        val1: Optional[T] = self._fillvalue
-        val2: Optional[V] = self._fillvalue
-
-        if not self._done1:
-            try:
-                val1 = next(self._iter1)
-            except StopIteration:
-                self._done1 = True
-
-        if not self._done2:
-            try:
-                val2 = next(self._iter2)
-            except StopIteration:
-                self._done2 = True
-
-        if self._done1 and self._done2:
-            raise StopIteration
-
-        return Pair(val1, val2)
-
-
-class _CycleIterable(Generic[T], Iterator[T], Iterable[T]):
-    __slots__ = ("_elements", "_n", "_current_n", "_iterator")
-
-    def __init__(self, it: Iterable[T], n: Optional[int]) -> None:
-        self._n: Optional[int] = n
-        self._elements = list(it)  # Buffer elements
-        if not self._elements and n is not None and n > 0:
-            # Cannot cycle an empty iterable a fixed number of times > 0
-            # If n is None (infinite) or n is 0, an empty iterable source is fine (results in empty stream).
-            self._elements = []  # Ensure it's empty and will stop immediately
-            self._n = 0  # Force stop
-        else:
-            self._n = n
-        self._current_n = 0
-        self._iterator = iter(self._elements)
-
-    def __iter__(self) -> Iterator[T]:
-        self._current_n = 0
-        if not self._elements:  # Handle empty iterable source
-            self._iterator = iter([])  # Empty iterator
-        else:
-            self._iterator = iter(self._elements)
-        return self
-
-    def __next__(self) -> T:
-        if not self._elements:  # If original iterable was empty
-            raise StopIteration
-
-        try:
-            return next(self._iterator)
-        except StopIteration as exc:
-            if self._n is not None:
-                self._current_n += 1
-                if self._current_n >= self._n:
-                    raise StopIteration from exc
-            # Reset for next cycle (will raise StopIteration if _elements is empty,
-            # but we've guarded against that if n > 0)
-            self._iterator = iter(self._elements)
-            return next(self._iterator)
-
-
-class _DeferIterable(Generic[T], Iterator[T], Iterable[T]):
-    __slots__ = ("_supplier", "_current_iterator")
-
-    def __init__(self, supplier: Callable[[], Iterable[T]]) -> None:
-        self._supplier = supplier
-        self._current_iterator: Optional[Iterator[T]] = None  # Initialized in __iter__
-
-    def __iter__(self) -> Iterator[T]:
-        self._current_iterator = iter(
-            self._supplier()
-        )  # Call supplier and get iterator
-        return self
-
-    def __next__(self) -> T:
-        if self._current_iterator is None:
-            raise RuntimeError(
-                "Iterator not initialized. __iter__ must be called first."
-            )
-        return next(self._current_iterator)
-
-
 class Stream(Generic[T]):
     __slots__ = ("__arg",)
 
@@ -1597,7 +814,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: The result stream
         """
-        return Stream(_MapIterable(self.__arg, mapper))
+        return Stream(map_it(self.__arg, mapper))
 
     def zip_longest(
         self, other: Iterable[V], fillvalue: Any = None
@@ -1618,7 +835,7 @@ class Stream(Generic[T]):
         """
         # Note: The Pair type hints need to reflect the Optional nature
         # Pair[Optional[T], Optional[V]] is correct.
-        return Stream(_ZipLongestIterable(self.__arg, other, fillvalue))
+        return Stream(zip_longest(self.__arg, other, fillvalue))
 
     def flat_map(self, mapper: Callable[[T], Iterable[V]]) -> "Stream[V]":
         """
@@ -1676,20 +893,20 @@ class Stream(Generic[T]):
             Stream[T]: The stream of filtered objects
         """
 
-        return Stream(_FilterIterable(self.__arg, predicate))
+        return Stream(filter_it(self.__arg, predicate))
 
-    def cast(self, cast_to: type[V]) -> "Stream[V]":
+    def cast(self, cast_to_type: type[V]) -> "Stream[V]":
         """
         Returns a stream of objects casted to the given type. Useful when receiving untyped data lists
         and they need to be used in a typed context.
 
         Args:
-            castTo (type[V]): The type all objects will be casted to
+            cast_to_type (type[V]): The type all objects will be casted to
 
         Returns:
             Stream[V]: The stream of casted objects
         """
-        return Stream(_CastIterable(self.__arg, cast_to))
+        return Stream(cast_to(self.__arg, cast_to_type))
 
     def any_match(self, predicate: Callable[[T], bool]) -> bool:
         """
@@ -1701,12 +918,7 @@ class Stream(Generic[T]):
         Returns:
             bool: True if any object matches, False otherwise
         """
-        if self.__arg is None:
-            return False
-        for el in self.__arg:
-            if predicate(el):
-                return True
-        return False
+        return any_match(self.__arg, predicate)
 
     def none_match(self, predicate: Callable[[T], bool]) -> bool:
         """
@@ -1718,10 +930,7 @@ class Stream(Generic[T]):
         Returns:
             bool: True if no object matches, False otherwise
         """
-        if self.__arg is None:
-            return False
-
-        return not self.any_match(predicate)
+        return none_match(self.__arg, predicate)
 
     def all_match(self, predicate: Callable[[T], bool]) -> bool:
         """
@@ -1733,13 +942,7 @@ class Stream(Generic[T]):
         Returns:
             bool: True if all objects matche, False otherwise
         """
-        if self.__arg is None:
-            return False
-
-        for el in self.__arg:
-            if not predicate(el):
-                return False
-        return True
+        return all_match(self.__arg, predicate)
 
     def is_empty(self) -> bool:
         """
@@ -1776,7 +979,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: A stream of the intermediate accumulated values.
         """
-        return Stream(_ScanIterable(self.__arg, accumulator, initial_value))
+        return Stream(scan(self.__arg, accumulator, initial_value))
 
     def zip(self, other: Iterable[V]) -> "Stream[Pair[T, V]]":
         """
@@ -1946,7 +1149,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The result stream
         """
-        return Stream(_SkipIterable(self.__arg, count))
+        return Stream(skip(self.__arg, count))
 
     def limit(self, count: int) -> "Stream[T]":
         """
@@ -1958,7 +1161,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The result stream
         """
-        return Stream(_LimitIterable(self.__arg, count))
+        return Stream(limit(self.__arg, count))
 
     def take_while(
         self,
@@ -1974,7 +1177,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The result stream
         """
-        return Stream(_TakeWhileIterable(self.__arg, predicate, include_stop_value))
+        return Stream(take_while(self.__arg, predicate, include_stop_value))
 
     def drop_while(self, predicate: Callable[[T], bool]) -> "Stream[T]":
         """
@@ -1986,7 +1189,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The result stream
         """
-        return Stream(_DropWhileIterable(self.__arg, predicate))
+        return Stream(drop_while(self.__arg, predicate))
 
     def take_until(
         self,
@@ -2004,7 +1207,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The resulting stream.
         """
-        return Stream(_TakeUntilIterable(self.__arg, predicate, include_stop_value))
+        return Stream(take_until(self.__arg, predicate, include_stop_value))
 
     def drop_until(self, predicate: Callable[[T], bool]) -> "Stream[T]":
         """
@@ -2018,7 +1221,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The resulting stream.
         """
-        return Stream(_DropUntilIterable(self.__arg, predicate))
+        return Stream(drop_until(self.__arg, predicate))
 
     def reduce(self, reducer: Callable[[T, T], T]) -> Opt[T]:
         """
@@ -2082,7 +1285,7 @@ class Stream(Generic[T]):
         Args:
             key (Optional[Callable[[T], Ay]]): A function to extract the key for uniqueness comparison. If None, the element itself is used. Defaults to None.
         """
-        return Stream(_DistinctIterable(self.__arg, key))
+        return Stream(distinct(self.__arg, key))
 
     def concat(self, new_stream: "Stream[T]") -> "Stream[T]":
         """
@@ -2095,7 +1298,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The resulting stream
         """
-        return Stream(ConcatIterable(self.__arg, new_stream.__arg))
+        return Stream(concat(self.__arg, new_stream.__arg))
 
     def peek(
         self,
@@ -2112,7 +1315,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The same stream, allowing further chaining.
         """
-        return Stream(_PeekIterable(self.__arg, action, logger))
+        return Stream(peek(self.__arg, action, logger))
 
     def count(self) -> int:
         """
@@ -2138,7 +1341,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[Pair[int, T]]: A stream of index-element pairs.
         """
-        return Stream(_IndexedIterable(self.__arg))
+        return Stream(indexed(self.__arg))
 
     # Alias for familiarity
     def enumerate(self) -> "Stream[Pair[int, T]]":
@@ -2159,7 +1362,7 @@ class Stream(Generic[T]):
         Raises:
             ValueError: If size is not positive.
         """
-        return Stream(_ChunkedIterable(self.__arg, size))
+        return Stream(chunked(self.__arg, size))
 
     def find_last(self, predicate: Callable[[T], bool]) -> Opt[T]:
         """
@@ -2184,7 +1387,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[V]: A stream of transformed values.
         """
-        return Stream(_MapIndexedIterable(self.__arg, mapper))
+        return Stream(map_indexed(self.__arg, mapper))
 
     def filter_indexed(self, predicate: Callable[[int, T], bool]) -> "Stream[T]":
         """
@@ -2212,7 +1415,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[list[T]]: A stream of lists, where each list is a group of adjacent elements with the same key.
         """
-        return Stream(_GroupAdjacentIterable(self.__arg, key_func))
+        return Stream(group_adjacent(self.__arg, key_func))
 
     def windowed(
         self, size: int, step: int = 1, partial: bool = False
@@ -2236,7 +1439,7 @@ class Stream(Generic[T]):
         Raises:
             ValueError: If size or step is not positive.
         """
-        return Stream(_WindowedIterable(self.__arg, size, step, partial))
+        return Stream(windowed(self.__arg, size, step, partial))
 
     def pad(self, size: int, value: T) -> "Stream[T]":
         """
@@ -2316,7 +1519,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[Pair[T, T]]: A stream of adjacent pairs.
         """
-        return Stream(_PairwiseIterable(self.__arg))
+        return Stream(pairwise(self.__arg))
 
     def sliding_window(self, size: int, step: int = 1) -> "Stream[list[T]]":
         """
@@ -2345,7 +1548,7 @@ class Stream(Generic[T]):
         # NOTE: The _SlidingWindowIterable implementation above is complex and might need refinement
         # for full correctness and laziness, especially around edge cases and step > size.
         # Consider starting with a simpler implementation if needed.
-        return Stream(_SlidingWindowIterable(self.__arg, size, step))
+        return Stream(sliding_window(self.__arg, size, step))
 
     def any_none(self) -> bool:
         """
@@ -2391,7 +1594,7 @@ class Stream(Generic[T]):
         if n is not None and n <= 0:
             raise ValueError("Number of repetitions 'n' must be positive if specified.")
         # The _RepeatIterable buffers the original self.__arg
-        return Stream(_RepeatIterable(self.__arg, n))
+        return Stream(repeat(self.__arg, n))
 
     def intersperse(self, separator: T) -> "Stream[T]":
         """
@@ -2417,7 +1620,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The resulting stream with separators.
         """
-        return Stream(_IntersperseIterable(self.__arg, separator))
+        return Stream(intersperse(self.__arg, separator))
 
     # ==========================================
     #          FACTORY METHODS
@@ -2524,7 +1727,7 @@ class Stream(Generic[T]):
             raise ValueError("Number of repetitions 'n' must be non-negative.")
         if n == 0:
             return Stream.empty()
-        return Stream(_CycleIterable(iterable, n))
+        return Stream(cycle(iterable, n))
 
     @staticmethod
     def of_dict_keys(dictionary: dict[K, Any]) -> "Stream[K]":
@@ -2553,7 +1756,7 @@ class Stream(Generic[T]):
         Creates a stream whose underlying iterable is obtained by calling the
         supplier function only when the stream is iterated.
         """
-        return Stream(_DeferIterable(supplier))
+        return Stream(defer(supplier))
 
     @staticmethod
     def range(start: int, stop: Optional[int] = None, step: int = 1) -> "Stream[int]":
@@ -2642,7 +1845,7 @@ class Stream(Generic[T]):
         # If only one iterable, just return a stream of it
         if len(iterables) == 1:
             return Stream(iterables[0])
-        return Stream(_MultiConcatIterable(iterables))
+        return Stream(concat_of(*iterables))
 
     @staticmethod
     def unfold(seed: S, generator: Callable[[S], Optional[Pair[T, S]]]) -> "Stream[T]":
@@ -2679,7 +1882,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The generated stream.
         """
-        return Stream(_UnfoldIterable(seed, generator))
+        return Stream(unfold(seed, generator))
 
 
 def stream(it: Iterable[T]) -> Stream[T]:
@@ -2733,7 +1936,7 @@ def pair_stream(left: Iterable[T], right: Iterable[V]) -> Stream[Pair[T, V]]:
     Returns:
         Stream[Pair[T, V]]: The resulting pair stream
     """
-    return Stream(_PairIterable(left, right))
+    return Stream(pair_it(left, right))
 
 
 def _generate_generator(supplier: Callable[[], T]) -> Iterator[T]:

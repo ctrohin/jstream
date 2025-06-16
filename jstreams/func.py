@@ -1,4 +1,7 @@
 from typing import Any, Callable, Optional, TypeVar, overload
+import inspect
+from threading import RLock
+
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -22,17 +25,17 @@ S = TypeVar("S")
 
 
 @overload
-def fpipe(f1: Callable[[A], B], f2: Callable[[B], C]) -> Callable[[A], C]: ...
+def pipe(f1: Callable[[A], B], f2: Callable[[B], C]) -> Callable[[A], C]: ...
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B], f2: Callable[[B], C], f3: Callable[[C], D]
 ) -> Callable[[A], D]: ...
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -41,7 +44,7 @@ def fpipe(
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -51,7 +54,7 @@ def fpipe(
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -62,7 +65,7 @@ def fpipe(
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -74,7 +77,7 @@ def fpipe(
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -87,7 +90,7 @@ def fpipe(
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -101,7 +104,7 @@ def fpipe(
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -116,7 +119,7 @@ def fpipe(
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -132,7 +135,7 @@ def fpipe(
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -149,7 +152,7 @@ def fpipe(
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -167,7 +170,7 @@ def fpipe(
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -186,7 +189,7 @@ def fpipe(
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -206,7 +209,7 @@ def fpipe(
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -227,7 +230,7 @@ def fpipe(
 
 
 @overload
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Callable[[B], C],
     f3: Callable[[C], D],
@@ -248,7 +251,7 @@ def fpipe(
 ) -> Callable[[A], R]: ...
 
 
-def fpipe(
+def pipe(
     f1: Callable[[A], B],
     f2: Optional[Callable[[B], C]] = None,
     f3: Optional[Callable[[C], D]] = None,
@@ -278,13 +281,13 @@ def fpipe(
     This function is useful for multi function composition.
 
     Example:
-        >>> from jstreams import fpipe
+        >>> from jstreams import pipe
         >>>
         >>> add_one = lambda x: x + 1
         >>> add_two = lambda x: x + 2
         >>> add_three = lambda x: x + 3
         >>> add_four = lambda x: x + 4
-        >>> chained = fpipe(add_one, add_two, add_three, add_four)
+        >>> chained = pipe(add_one, add_two, add_three, add_four)
         >>> chained(1)
         11
 
@@ -309,11 +312,147 @@ def fpipe(
         f17,
         f18,
     ]
+    return _pipe_list(fns)
 
-    def wrap(param: A) -> S:
+
+def _pipe_list(fns: list[Optional[Callable[[Any], Any]]]) -> Callable[[Any], Any]:
+    def wrap(param: Any) -> Any:
         for f in fns:
             if f is not None:
                 param = f(param)
-        return param  # type: ignore[return-value]
+        return param
 
     return wrap
+
+
+def partial(func: Callable[..., R], *initial_args: Any) -> Callable[..., R]:
+    """
+    Creates a partial version of a function.
+
+    The returned function will have some of the initial arguments of the original
+    function pre-filled. When the partial function is called, it will be invoked
+    with the pre-filled arguments followed by any new arguments provided.
+
+    Example:
+        >>> from jstreams import partial
+        >>>
+        >>> def add(a, b, c):
+        ...     return a + b + c
+        >>>
+        >>> partial_add_5 = partial(add, 5)
+        >>> result1 = partial_add_5(10, 15)  # Equivalent to add(5, 10, 15)
+        >>> print(result1)
+        30
+        >>>
+        >>> partial_add_5_10 = partial(add, 5, 10)
+        >>> result2 = partial_add_5_10(15)   # Equivalent to add(5, 10, 15)
+        >>> print(result2)
+        30
+
+    Args:
+        func (Callable[..., R]): The initial function.
+        *initial_args (Any): The initial arguments to pre-fill.
+
+    Returns:
+        Callable[..., R]: A new function that, when called, will execute the
+                          original function with the pre-filled arguments
+                          followed by the arguments passed to the new function.
+    """
+
+    def wrapper(*new_args: Any, **new_kwargs: Any) -> R:
+        return func(*initial_args, *new_args, **new_kwargs)
+
+    return wrapper
+
+
+# Cache for storing the number of arguments for functions
+_ARG_COUNT_CACHE: dict[Any, int] = {}
+_ARG_COUNT_CACHE_LOCK = RLock()
+
+
+def get_number_of_arguments(func: Callable[..., Any]) -> int:
+    """
+    Finds the number of arguments a given function accepts, using a cache
+    for efficiency on repeated calls with the same function.
+
+    This counts all named parameters in the function's signature,
+    including positional, keyword-only, variable positional (*args),
+    and variable keyword (**kwargs) parameters. Each of these counts as one.
+    Results are cached to avoid repeated expensive introspection.
+
+    Args:
+        func: The function to inspect.
+
+    Returns:
+        The total number of parameters in the function's signature.
+
+    Raises:
+        ValueError: If the signature cannot be determined (e.g., for some built-in functions
+                    implemented in C that don't expose their signature).
+        TypeError: If the provided 'func' is not a callable object.
+    """
+    # Optimistic check without lock
+    if func in _ARG_COUNT_CACHE:
+        return _ARG_COUNT_CACHE[func]
+
+    with _ARG_COUNT_CACHE_LOCK:
+        # Double-check if another thread populated the cache while waiting for the lock
+        if func in _ARG_COUNT_CACHE:
+            return _ARG_COUNT_CACHE[func]
+
+        # If still not in cache, compute, store, and return
+        try:
+            signature = inspect.signature(func)
+            count = len(signature.parameters)
+            _ARG_COUNT_CACHE[func] = count
+            return count
+        except ValueError as e:  # Do not cache errors
+            raise ValueError(f"Could not determine signature for {func}: {e}") from e
+        except TypeError as e:  # Do not cache errors
+            raise TypeError(f"Object {func} is not a callable: {e}") from e
+
+
+def curry(func: Callable[..., Any], n: int = -1) -> Callable[..., Any]:
+    """
+    Transforms a function that takes multiple arguments into a sequence of
+    functions, each taking a single argument. This process is known as currying.
+
+    The curried function is built by successively applying arguments one at a time.
+    Each call with an argument returns a new function that expects the next
+    argument, until all `n` arguments have been supplied, at which point the
+    original function `func` is executed with all collected arguments.
+
+    Args:
+        func: The function to be curried.
+        n: The number of arguments to curry.
+           If -1 (default), the arity is automatically determined by inspecting
+           the signature of `func` (counting all its defined parameters).
+           If `func` takes 1 or 0 arguments (or `n` is <= 1), `func` is
+           returned directly.
+
+    Returns:
+        A curried version of `func`. If `n` > 1, this is a function that
+        takes one argument and returns another curried function. If `n` <= 1,
+        `func` itself (or a partially applied version if called recursively)
+        is returned.
+
+    Example:
+        >>> def add_three_numbers(x, y, z):
+        ...     return x + y + z
+        >>> curried_add = curry(add_three_numbers)
+        >>> result = curried_add(1)(2)(3)
+        >>> print(result)
+        6
+
+        >>> curried_add_two_args = curry(add_three_numbers, 2)
+        >>> add_1_and_2 = curried_add_two_args(1)(2) # Returns a function lambda z: 1 + 2 + z
+        >>> result_partial = add_1_and_2(10)
+        >>> print(result_partial)
+        13
+    """
+    if n == -1:
+        n = get_number_of_arguments(func)
+
+    if n <= 1:
+        return func
+    return lambda arg: curry(partial(func, arg), n - 1)

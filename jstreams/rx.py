@@ -19,8 +19,9 @@ from copy import deepcopy
 from collections import deque
 from dataclasses import dataclass
 
+from jstreams.iterables import ConcatIterable
 from jstreams.predicate import not_strict
-from jstreams.stream import ConcatIterable, Stream
+from jstreams.stream import Stream
 import abc
 
 from jstreams.timer import Timer
