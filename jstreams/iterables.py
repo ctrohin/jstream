@@ -564,7 +564,7 @@ class ChunkedIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
         # If re-iteration is needed, the original iterable must support it.
         # Or, store the original iterable and get a new iterator here.
         if sys.version_info >= (3, 12):
-            return map(list, batched(self._iterator, self._size))  # type: ignore[arg-type]
+            return map(list, batched(self._iterator, self._size))
         self._iterator = iter(self._iterable)  # If storing _iterable instead
         return self
 
