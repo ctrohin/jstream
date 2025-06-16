@@ -1166,7 +1166,6 @@ class Stream(Generic[T]):
     def take_while(
         self,
         predicate: Callable[[T], bool],
-        include_stop_value: bool = False,
     ) -> "Stream[T]":
         """
         Returns a stream of elements until the first element that DOES NOT match the given predicate
@@ -1177,7 +1176,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The result stream
         """
-        return Stream(take_while(self.__arg, predicate, include_stop_value))
+        return Stream(take_while(self.__arg, predicate))
 
     def drop_while(self, predicate: Callable[[T], bool]) -> "Stream[T]":
         """
@@ -1194,7 +1193,6 @@ class Stream(Generic[T]):
     def take_until(
         self,
         predicate: Callable[[T], bool],
-        include_stop_value: bool = False,
     ) -> "Stream[T]":
         """
         Returns a stream consisting of elements taken from this stream until
@@ -1207,7 +1205,7 @@ class Stream(Generic[T]):
         Returns:
             Stream[T]: The resulting stream.
         """
-        return Stream(take_until(self.__arg, predicate, include_stop_value))
+        return Stream(take_until(self.__arg, predicate))
 
     def drop_until(self, predicate: Callable[[T], bool]) -> "Stream[T]":
         """

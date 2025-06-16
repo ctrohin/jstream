@@ -1,7 +1,11 @@
 from abc import ABC
 from collections import deque
+from itertools import dropwhile, islice, takewhile
+import itertools
+import sys
 from typing import Any, Callable, Generic, Iterable, Iterator, Optional, TypeVar, cast
 
+from jstreams.predicate import not_strict
 from jstreams.tuples import Pair
 from jstreams.utils import require_non_null
 
@@ -9,6 +13,9 @@ T = TypeVar("T")
 V = TypeVar("V")
 K = TypeVar("K")
 S = TypeVar("S")
+
+if sys.version_info >= (3, 12):
+    from itertools import batched
 
 
 class GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
@@ -26,6 +33,9 @@ class GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
         self._prepare()
         return self
 
+    def __next__(self) -> T:
+        raise StopIteration()
+
 
 class FilterIterable(GenericIterable[T]):
     __slots__ = ("__predicate",)
@@ -34,11 +44,8 @@ class FilterIterable(GenericIterable[T]):
         super().__init__(it)
         self.__predicate = predicate
 
-    def __next__(self) -> T:
-        while True:
-            next_obj = self._iterator.__next__()
-            if self.__predicate(next_obj):
-                return next_obj
+    def __iter__(self) -> Iterator[V]:
+        return filter(self.__predicate, self._iterable)  # type: ignore[arg-type]
 
 
 def filter_it(iterable: Iterable[T], predicate: Callable[[T], bool]) -> Iterable[T]:
@@ -233,20 +240,14 @@ def windowed(
     return WindowedIterable(iterable, size, step, partial)
 
 
-class CastIterable(Generic[T, V], Iterator[T], Iterable[T]):
-    __slots__ = ("__iterable", "__iterator")
+class CastIterable(Generic[T, V], Iterable[T]):
+    __slots__ = "__iterable"
 
     def __init__(self, it: Iterable[V], typ: type[T]) -> None:  # pylint: disable=unused-argument
         self.__iterable = it
-        self.__iterator = self.__iterable.__iter__()
 
     def __iter__(self) -> Iterator[T]:
-        self.__iterator = self.__iterable.__iter__()
-        return self
-
-    def __next__(self) -> T:
-        next_obj = self.__iterator.__next__()
-        return cast(T, next_obj)
+        return map(lambda x: cast(T, x), self.__iterable)
 
 
 def cast_to(iterable: Iterable[T], cast_to_type: type[V]) -> Iterable[V]:
@@ -280,8 +281,8 @@ class SkipIterable(GenericIterable[T]):
         except StopIteration:
             pass
 
-    def __next__(self) -> T:
-        return self._iterator.__next__()
+    def __iter__(self) -> Iterator[T]:
+        return islice(self._iterable, self.__count, None, 1)
 
 
 def skip(iterable: Iterable[T], count: int) -> Iterable[T]:
@@ -299,23 +300,14 @@ def skip(iterable: Iterable[T], count: int) -> Iterable[T]:
 
 
 class LimitIterable(GenericIterable[T]):
-    __slots__ = ("__count", "__current_count")
+    __slots__ = "__count"
 
     def __init__(self, it: Iterable[T], count: int) -> None:
         super().__init__(it)
         self.__count = count
-        self.__current_count = 0
 
-    def _prepare(self) -> None:
-        self.__current_count = 0
-
-    def __next__(self) -> T:
-        if self.__current_count >= self.__count:
-            raise StopIteration()
-
-        obj = self._iterator.__next__()
-        self.__current_count += 1
-        return obj
+    def __iter__(self) -> Iterator[T]:
+        return islice(self._iterable, 0, self.__count, 1)
 
 
 def limit(iterable: Iterable[T], count: int) -> Iterable[T]:
@@ -333,36 +325,23 @@ def limit(iterable: Iterable[T], count: int) -> Iterable[T]:
 
 
 class TakeWhileIterable(GenericIterable[T]):
-    __slots__ = ("__predicate", "__done", "__include_stop_value")
+    __slots__ = ("__predicate",)
 
     def __init__(
-        self, it: Iterable[T], predicate: Callable[[T], bool], include_stop_value: bool
+        self,
+        it: Iterable[T],
+        predicate: Callable[[T], bool],
     ) -> None:
         super().__init__(it)
-        self.__done = False
         self.__predicate = predicate
-        self.__include_stop_value = include_stop_value
 
-    def _prepare(self) -> None:
-        self.__done = False
-
-    def __next__(self) -> T:
-        if self.__done:
-            raise StopIteration()
-
-        obj = self._iterator.__next__()
-        if not self.__predicate(obj):
-            self.__done = True
-            if not self.__include_stop_value:
-                raise StopIteration()
-
-        return obj
+    def __iter__(self) -> Iterator[T]:
+        return takewhile(self.__predicate, self._iterable)
 
 
 def take_while(
     iterable: Iterable[T],
     predicate: Callable[[T], bool],
-    include_stop_value: bool = False,
 ) -> Iterable[T]:
     """
     Returns an iterable of elements until the first element that DOES NOT match the given predicate
@@ -370,33 +349,25 @@ def take_while(
     Args:
         iterable (Iterable[T]): The iterable
         predicate (Callable[[T], bool]): The predicate
-        include_stop_value (bool): Include the stop value in the resulting iterable. Defaults to False
     Returns:
         Iterable[T]: The result iterable
     """
-    return TakeWhileIterable(iterable, predicate, include_stop_value)
+    return TakeWhileIterable(iterable, predicate)
 
 
 class DropWhileIterable(GenericIterable[T]):
-    __slots__ = ("__predicate", "__done")
+    __slots__ = ("__predicate",)
 
-    def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
+    def __init__(
+        self,
+        it: Iterable[T],
+        predicate: Callable[[T], bool],
+    ) -> None:
         super().__init__(it)
-        self.__done = False
         self.__predicate = predicate
 
-    def _prepare(self) -> None:
-        self.__done = False
-
-    def __next__(self) -> T:
-        if self.__done:
-            return self._iterator.__next__()
-        while not self.__done:
-            obj = self._iterator.__next__()
-            if not self.__predicate(obj):
-                self.__done = True
-                return obj
-        raise StopIteration()
+    def __iter__(self) -> Iterator[T]:
+        return dropwhile(self.__predicate, self._iterable)
 
 
 def drop_while(iterable: Iterable[T], predicate: Callable[[T], bool]) -> Iterable[T]:
@@ -410,30 +381,18 @@ def drop_while(iterable: Iterable[T], predicate: Callable[[T], bool]) -> Iterabl
     Returns:
         Iterable[T]: The result iterable
     """
-    return DropWhileIterable(iterable, predicate)
+    return dropwhile(predicate, iterable)
 
 
 class ConcatIterable(GenericIterable[T]):
-    __slots__ = ("__iterable2", "__iterator2", "__done")
+    __slots__ = ("__iterable2", "__iterator2")
 
     def __init__(self, it1: Iterable[T], it2: Iterable[T]) -> None:
         super().__init__(it1)
-        self.__done = False
         self.__iterable2 = it2
-        self.__iterator2 = self.__iterable2.__iter__()
 
-    def _prepare(self) -> None:
-        self.__done = False
-        self.__iterator2 = self.__iterable2.__iter__()
-
-    def __next__(self) -> T:
-        if self.__done:
-            return self.__iterator2.__next__()
-        try:
-            return self._iterator.__next__()
-        except StopIteration:
-            self.__done = True
-            return self.__next__()
+    def __iter__(self) -> Iterator[T]:
+        return itertools.chain(self._iterable, self.__iterable2)
 
 
 def concat(iterable1: Iterable[T], iterable2: Iterable[T]) -> Iterable[T]:
@@ -492,7 +451,7 @@ def distinct(
     return DistinctIterable(iterable, key)
 
 
-class MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
+class MapIterable(Generic[T, V], Iterable[V]):
     __slots__ = ("_iterable", "_iterator", "__mapper")
 
     def __init__(self, it: Iterable[T], mapper: Callable[[T], V]) -> None:
@@ -500,16 +459,8 @@ class MapIterable(Generic[T, V], Iterator[V], Iterable[V]):
         self._iterator = self._iterable.__iter__()
         self.__mapper = mapper
 
-    def _prepare(self) -> None:
-        pass
-
     def __iter__(self) -> Iterator[V]:
-        self._iterator = self._iterable.__iter__()
-        self._prepare()
-        return self
-
-    def __next__(self) -> V:
-        return self.__mapper(self._iterator.__next__())
+        return map(self.__mapper, self._iterable)
 
 
 def map_it(iterable: Iterable[T], mapper: Callable[[T], V]) -> Iterable[V]:
@@ -547,7 +498,7 @@ class PeekIterable(GenericIterable[T]):
             self.__action(obj)  # Perform the side-effect
         except Exception as e:
             print(  # pylint: disable=expression-not-assigned
-                f"Exception during Stream.peek: {e}"
+                f"Exception during peek: {e}"
             ) if self.__logger is None else self.__logger(e)
         return obj  # Return the original object
 
@@ -560,7 +511,19 @@ def peek(
     return PeekIterable(it, action, logger)
 
 
-class IndexedIterable(Generic[T], Iterator[Pair[int, T]], Iterable[Pair[int, T]]):
+class _InlineIndex:
+    __slots__ = ("_index",)
+
+    def __init__(self) -> None:
+        self._index = 0
+
+    def next(self) -> int:
+        result = self._index
+        self._index += 1
+        return result
+
+
+class IndexedIterable(Generic[T], Iterable[Pair[int, T]]):
     __slots__ = ("_iterable", "_iterator", "_index")
 
     def __init__(self, it: Iterable[T]) -> None:
@@ -569,15 +532,8 @@ class IndexedIterable(Generic[T], Iterator[Pair[int, T]], Iterable[Pair[int, T]]
         self._index = 0
 
     def __iter__(self) -> Iterator[Pair[int, T]]:
-        self._iterator = self._iterable.__iter__()
-        self._index = 0  # Reset index for new iteration
-        return self
-
-    def __next__(self) -> Pair[int, T]:
-        obj = self._iterator.__next__()  # Raises StopIteration when done
-        current_index = self._index
-        self._index += 1
-        return Pair(current_index, obj)
+        index = _InlineIndex()
+        return map(lambda x: Pair(index.next(), x), self._iterable)
 
 
 def indexed(iterable: Iterable[T]) -> Iterable[Pair[int, T]]:
@@ -592,12 +548,13 @@ def indexed(iterable: Iterable[T]) -> Iterable[Pair[int, T]]:
 
 
 class ChunkedIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
-    __slots__ = ("_iterator", "_size")
+    __slots__ = ("_iterator", "_size", "_iterable")
 
     def __init__(self, it: Iterable[T], size: int) -> None:
         if size <= 0:
             raise ValueError("Chunk size must be positive")
         # Store the original iterator directly
+        self._iterable = it
         self._iterator = iter(it)
         self._size = size
 
@@ -606,7 +563,9 @@ class ChunkedIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
         # This implementation assumes the stream is consumed once.
         # If re-iteration is needed, the original iterable must support it.
         # Or, store the original iterable and get a new iterator here.
-        # self._iterator = iter(self._iterable) # If storing _iterable instead
+        if sys.version_info >= (3, 12):
+            return batched(self._iterator, self._size)
+        self._iterator = iter(self._iterable)  # If storing _iterable instead
         return self
 
     def __next__(self) -> list[T]:
@@ -641,37 +600,63 @@ def chunked(iterable: Iterable[T], size: int) -> Iterable[list[T]]:
     return ChunkedIterable(iterable, size)
 
 
-class TakeUntilIterable(GenericIterable[T]):
-    __slots__ = ("__predicate", "__done", "__include_stop_value")
+class _StoppingPredicate(Generic[T]):
+    __slots__ = ("__predicate", "__stopped", "__include_stop_value")
 
     def __init__(
-        self, it: Iterable[T], predicate: Callable[[T], bool], include_stop_value: bool
+        self, predicate: Callable[[T], bool], include_stop_value: bool
     ) -> None:
-        super().__init__(it)
         self.__predicate = predicate
-        self.__done = False
+        self.__stopped: bool = False
         self.__include_stop_value = include_stop_value
 
-    def _prepare(self) -> None:
-        self.__done = False
-
-    def __next__(self) -> T:
-        if self.__done:
-            raise StopIteration()
-
-        obj = self._iterator.__next__()
+    def __call__(self, obj: T) -> bool:
+        if self.__stopped:
+            return False
         if self.__predicate(obj):
-            self.__done = True  # Stop after yielding this one
-            if not self.__include_stop_value:
-                raise StopIteration()
+            self.__stopped = True
+        if self.__include_stop_value and self.__stopped:
+            return True
+        return not self.__stopped
 
-        return obj
+
+class _AllowingPredicate(Generic[T]):
+    __slots__ = ("__predicate", "__stopped", "__include_stop_value")
+
+    def __init__(
+        self, predicate: Callable[[T], bool], include_stop_value: bool
+    ) -> None:
+        self.__predicate = predicate
+        self.__stopped: bool = False
+        self.__include_stop_value = include_stop_value
+
+    def __call__(self, obj: T) -> bool:
+        if self.__stopped:
+            return False
+        if not self.__predicate(obj):
+            self.__stopped = True
+        if self.__include_stop_value and self.__stopped:
+            return True
+        return not self.__stopped
+
+
+class TakeUntilIterable(GenericIterable[T]):
+    __slots__ = ("__predicate",)
+
+    def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
+        super().__init__(it)
+        self.__predicate = predicate
+
+    def __iter__(self) -> Iterator[T]:
+        return takewhile(
+            not_strict(self.__predicate),
+            self._iterable,
+        )
 
 
 def take_until(
     iterable: Iterable[T],
     predicate: Callable[[T], bool],
-    include_stop_value: bool = False,
 ) -> Iterable[T]:
     """
     Returns an iterable consisting of elements taken from the initial iterable until
@@ -680,33 +665,22 @@ def take_until(
     Args:
         iterable: The intial iterable
         predicate: The predicate to test elements against.
-        include_stop_value: Flag marking if the value that causes the iteration stop should be included
 
     Returns:
         Iterable[T]: The resulting iterable.
     """
-    return TakeUntilIterable(iterable, predicate, include_stop_value)
+    return TakeUntilIterable(iterable, predicate)
 
 
 class DropUntilIterable(GenericIterable[T]):
-    __slots__ = ("__predicate", "__dropping")
+    __slots__ = ("__predicate",)
 
     def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
         super().__init__(it)
         self.__predicate = predicate
-        self.__dropping = True  # Start in dropping mode
 
-    def _prepare(self) -> None:
-        self.__dropping = True
-
-    def __next__(self) -> T:
-        while self.__dropping:
-            obj = self._iterator.__next__()  # Consume elements
-            if self.__predicate(obj):
-                self.__dropping = False  # Stop dropping
-                return obj  # Return the first matching element
-        # Once dropping stops, just yield remaining elements
-        return self._iterator.__next__()
+    def __iter__(self) -> Iterator[T]:
+        return dropwhile(not_strict(self.__predicate), self._iterable)
 
 
 def drop_until(iterable: Iterable[T], predicate: Callable[[T], bool]) -> Iterable[T]:
@@ -820,38 +794,14 @@ def pair_it(left: Iterable[T], right: Iterable[V]) -> Iterable[Pair[T, V]]:
     return PairIterable(left, right)
 
 
-class MultiConcatIterable(Generic[T], Iterator[T], Iterable[T]):
-    __slots__ = ("_iterables", "_current_iterator", "_iterable_index")
+class MultiConcatIterable(Generic[T], Iterable[T]):
+    __slots__ = ("_iterables",)
 
-    def __init__(self, iterables: tuple[Iterable[T], ...]) -> None:
+    def __init__(self, *iterables: Iterable[T]) -> None:
         self._iterables = iterables
-        self._iterable_index = 0
-        self._current_iterator: Optional[Iterator[T]] = None
-        self._advance_iterator()  # Initialize the first iterator
-
-    def _advance_iterator(self) -> None:
-        """Moves to the next iterator in the sequence."""
-        if self._iterable_index < len(self._iterables):
-            self._current_iterator = iter(self._iterables[self._iterable_index])
-            self._iterable_index += 1
-        else:
-            self._current_iterator = None  # No more iterables
 
     def __iter__(self) -> Iterator[T]:
-        # Reset state for new iteration
-        self._iterable_index = 0
-        self._advance_iterator()
-        return self
-
-    def __next__(self) -> T:
-        while self._current_iterator is not None:
-            try:
-                return next(self._current_iterator)
-            except StopIteration:
-                # Current iterator is exhausted, move to the next one
-                self._advance_iterator()
-        # If _current_iterator becomes None, all iterables are exhausted
-        raise StopIteration
+        return itertools.chain(*self._iterables)
 
 
 def concat_of(*iterables: Iterable[T]) -> Iterable[T]:
@@ -871,7 +821,7 @@ def concat_of(*iterables: Iterable[T]) -> Iterable[T]:
     # If only one iterable, just return a stream of it
     if len(iterables) == 1:
         return iterables[0]
-    return MultiConcatIterable(iterables)
+    return MultiConcatIterable(*iterables)
 
 
 class PairwiseIterable(Generic[T], Iterator[Pair[T, T]], Iterable[Pair[T, T]]):

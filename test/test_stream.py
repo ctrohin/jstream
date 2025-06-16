@@ -592,17 +592,15 @@ class TestStream(BaseTestCase):
         s = Stream([1, 2, 3, 4, 5, 2])
         self.assertEqual(s.take_until(lambda x: x > 3).to_list(), [1, 2, 3])
         self.assertEqual(
-            s.take_until(lambda x: x > 3, include_stop_value=True).to_list(),
-            [1, 2, 3, 4],
+            s.take_until(lambda x: x > 3).to_list(),
+            [1, 2, 3],
         )
         self.assertEqual(
             Stream([1, 2, 3]).take_until(lambda x: x > 10).to_list(), [1, 2, 3]
         )
         self.assertEqual(
-            Stream([1, 2, 3])
-            .take_until(lambda x: x == 1, include_stop_value=True)
-            .to_list(),
-            [1],
+            Stream([1, 2, 3]).take_until(lambda x: x == 1).to_list(),
+            [],
         )
         self.assertEqual(Stream([1, 2, 3]).take_until(lambda x: x == 1).to_list(), [])
         self.assertEqual(Stream([]).take_until(lambda x: x > 0).to_list(), [])
@@ -956,3 +954,9 @@ class TestStream(BaseTestCase):
         self.assertNotEqual(original_stream, clone)
         original_stream._Stream__arg = [1, 2]
         self.assertNotEqual(original_stream.to_list(), clone.to_list())
+
+    def test_concat_of(self) -> None:
+        self.assertEqual(
+            Stream.concat_of([1, 2, 3], [4, 5, 6], [7, 8, 9]).to_list(),
+            [1, 2, 3, 4, 5, 6, 7, 8, 9],
+        )
