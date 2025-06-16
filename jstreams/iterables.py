@@ -381,7 +381,7 @@ def drop_while(iterable: Iterable[T], predicate: Callable[[T], bool]) -> Iterabl
     Returns:
         Iterable[T]: The result iterable
     """
-    return dropwhile(predicate, iterable)
+    return DropWhileIterable(iterable, predicate)
 
 
 class ConcatIterable(GenericIterable[T]):
@@ -564,7 +564,7 @@ class ChunkedIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
         # If re-iteration is needed, the original iterable must support it.
         # Or, store the original iterable and get a new iterator here.
         if sys.version_info >= (3, 12):
-            return batched(self._iterator, self._size)
+            return map(list, batched(self._iterator, self._size))  # type: ignore[arg-type]
         self._iterator = iter(self._iterable)  # If storing _iterable instead
         return self
 
