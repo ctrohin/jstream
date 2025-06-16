@@ -190,7 +190,7 @@ def is_none(val: Any) -> bool:
     return val is None
 
 
-def is_in(it: Iterable[Any]) -> Predicate[Any]:
+def is_in(it: Iterable[Any]) -> Callable[[Any], bool]:
     """
     Predicate to check if a value is contained in an iterable.
     Usage: is_in(check_in_this_list)(find_this_item)
@@ -200,17 +200,17 @@ def is_in(it: Iterable[Any]) -> Predicate[Any]:
         it (Iterable[Any]): The iterable to check within.
 
     Returns:
-        Predicate[Any]: The predicate.
+        Callable[[Any], bool]: The predicate.
     """
 
     # Efficiency depends on the type of 'it' (set/dict is O(1), list/tuple is O(n))
     def wrap(elem: Any) -> bool:
         return elem in it
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def is_not_in(it: Iterable[Any]) -> Predicate[Any]:
+def is_not_in(it: Iterable[Any]) -> Callable[[Any], bool]:
     """
     Predicate to check if a value is not contained in an iterable.
     Usage: is_not_in(check_in_this_list)(find_this_item)
@@ -220,13 +220,13 @@ def is_not_in(it: Iterable[Any]) -> Predicate[Any]:
         it (Iterable[Any]): The iterable to check within.
 
     Returns:
-        Predicate[Any]: The predicate.
+        Callable[[Any], bool]: The predicate.
     """
     # Reuses is_in and not_ for conciseness and correctness
     return not_(is_in(it))
 
 
-def equals(obj: T) -> Predicate[T]:
+def equals(obj: T) -> Callable[[T], bool]:
     """
     Predicate to check if a value equals another value. Handles None correctly.
     Usage: equals(object_to_compare_to)(my_object)
@@ -236,17 +236,17 @@ def equals(obj: T) -> Predicate[T]:
         obj (T): The object to compare to.
 
     Returns:
-        Predicate[T]: The predicate.
+        Callable[[T], bool]: The predicate.
     """
 
     def wrap(other: T) -> bool:
         # Handles None comparison explicitly
         return (obj is None and other is None) or (obj == other)
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def not_equals(obj: Any) -> Predicate[Any]:
+def not_equals(obj: Any) -> Callable[[Any], bool]:
     """
     Predicate to check if a value does not equal another value.
     Usage: not_equals(objectToCompareTo)(myObject)
@@ -256,7 +256,7 @@ def not_equals(obj: Any) -> Predicate[Any]:
         obj (Any): The object to compare to.
 
     Returns:
-        Predicate[Any]: The predicate.
+        Callable[[Any], bool]: The predicate.
     """
     # Reuses equals and not_
     return not_(equals(obj))
@@ -318,7 +318,7 @@ def default(default_val: T) -> Callable[[Optional[T]], T]:
     return wrap
 
 
-def contains(value: Any) -> Predicate[Optional[Union[str, Iterable[Any]]]]:
+def contains(value: Any) -> Callable[[Optional[Union[str, Iterable[Any]]]], bool]:
     """
     Checks if the given value is contained in the call parameter (string or iterable).
     Usage:
@@ -332,17 +332,17 @@ def contains(value: Any) -> Predicate[Optional[Union[str, Iterable[Any]]]]:
         value (Any): The value to check for containment.
 
     Returns:
-        Predicate[Optional[Union[str, Iterable[Any]]]]: A predicate.
+        Callable[[Optional[Union[str, Iterable[Any]]]], bool]: A predicate.
     """
 
     def wrap(val: Optional[Union[str, Iterable[Any]]]) -> bool:
         # Check for None before using 'in'
         return val is not None and value in val
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def str_contains(value: str) -> Predicate[Optional[str]]:
+def str_contains(value: str) -> Callable[[Optional[str]], bool]:
     """
     Checks if the given string value is contained in the call parameter string.
     Usage: str_contains("test")("This is the test string") # Returns True
@@ -352,13 +352,13 @@ def str_contains(value: str) -> Predicate[Optional[str]]:
         value (str): The substring to check for.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
     # Correctly uses casting for type specificity
-    return cast(Predicate[Optional[str]], contains(value))
+    return cast(Callable[[Optional[str]], bool], contains(value))
 
 
-def str_contains_ignore_case(value: str) -> Predicate[Optional[str]]:
+def str_contains_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
     """
     Case-insensitive version of str_contains.
 
@@ -366,17 +366,17 @@ def str_contains_ignore_case(value: str) -> Predicate[Optional[str]]:
         value (str): The substring to check for.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
 
     # .lower() is the standard way, creates temporary strings.
     def wrap(val: Optional[str]) -> bool:
         return val is not None and value.lower() in val.lower()
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def str_starts_with(value: str) -> Predicate[Optional[str]]:
+def str_starts_with(value: str) -> Callable[[Optional[str]], bool]:
     """
     Checks if the call parameter string starts with the given value.
     Usage: str_starts_with("test")("test string") # Returns True
@@ -385,17 +385,17 @@ def str_starts_with(value: str) -> Predicate[Optional[str]]:
         value (str): The prefix string.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
 
     # Uses efficient built-in str.startswith
     def wrap(val: Optional[str]) -> bool:
         return val is not None and val.startswith(value)
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def str_starts_with_ignore_case(value: str) -> Predicate[Optional[str]]:
+def str_starts_with_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
     """
     Case-insensitive version of str_starts_with.
 
@@ -403,17 +403,17 @@ def str_starts_with_ignore_case(value: str) -> Predicate[Optional[str]]:
         value (str): The prefix string.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
 
     # .lower() is standard.
     def wrap(val: Optional[str]) -> bool:
         return val is not None and val.lower().startswith(value.lower())
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def str_ends_with(value: str) -> Predicate[Optional[str]]:
+def str_ends_with(value: str) -> Callable[[Optional[str]], bool]:
     """
     Checks if the call parameter string ends with the given value.
     Usage: str_ends_with("string")("test string") # Returns True
@@ -422,17 +422,17 @@ def str_ends_with(value: str) -> Predicate[Optional[str]]:
         value (str): The suffix string.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
 
     # Uses efficient built-in str.endswith
     def wrap(val: Optional[str]) -> bool:
         return val is not None and val.endswith(value)
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def str_ends_with_ignore_case(value: str) -> Predicate[Optional[str]]:
+def str_ends_with_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
     """
     Case-insensitive version of str_ends_with.
 
@@ -440,17 +440,17 @@ def str_ends_with_ignore_case(value: str) -> Predicate[Optional[str]]:
         value (str): The suffix string.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
 
     # .lower() is standard.
     def wrap(val: Optional[str]) -> bool:
         return val is not None and val.lower().endswith(value.lower())
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def str_matches(pattern: str) -> Predicate[Optional[str]]:
+def str_matches(pattern: str) -> Callable[[Optional[str]], bool]:
     """
     Checks if the call parameter string matches the given regex pattern *at the beginning*.
     Uses `re.match`.
@@ -461,7 +461,7 @@ def str_matches(pattern: str) -> Predicate[Optional[str]]:
         pattern (str): The regular expression pattern.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
 
     # Compile regex for potential minor optimization if used repeatedly,
@@ -474,10 +474,10 @@ def str_matches(pattern: str) -> Predicate[Optional[str]]:
         match = re.match(pattern, val)
         return match is not None
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def str_not_matches(pattern: str) -> Predicate[Optional[str]]:
+def str_not_matches(pattern: str) -> Callable[[Optional[str]], bool]:
     """
     Checks if the call parameter string does *not* match the given regex pattern *at the beginning*.
     Uses `re.match`.
@@ -486,13 +486,13 @@ def str_not_matches(pattern: str) -> Predicate[Optional[str]]:
         pattern (str): The regular expression pattern.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
     # Reuses str_matches and not_
     return not_(str_matches(pattern))
 
 
-def str_longer_than(length: int) -> Predicate[Optional[str]]:
+def str_longer_than(length: int) -> Callable[[Optional[str]], bool]:
     """
     Checks if the call parameter string's length is greater than the specified value.
 
@@ -500,16 +500,16 @@ def str_longer_than(length: int) -> Predicate[Optional[str]]:
         length (int): The minimum exclusive length.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
 
     def wrap(val: Optional[str]) -> bool:
         return val is not None and len(val) > length
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def str_shorter_than(length: int) -> Predicate[Optional[str]]:
+def str_shorter_than(length: int) -> Callable[[Optional[str]], bool]:
     """
     Checks if the call parameter string's length is less than the specified value.
 
@@ -517,16 +517,16 @@ def str_shorter_than(length: int) -> Predicate[Optional[str]]:
         length (int): The maximum exclusive length.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
 
     def wrap(val: Optional[str]) -> bool:
         return val is not None and len(val) < length
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def str_longer_than_or_eq(length: int) -> Predicate[Optional[str]]:
+def str_longer_than_or_eq(length: int) -> Callable[[Optional[str]], bool]:
     """
     Checks if the call parameter string's length is greater than or equal to the specified value.
 
@@ -534,16 +534,16 @@ def str_longer_than_or_eq(length: int) -> Predicate[Optional[str]]:
         length (int): The minimum inclusive length.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
 
     def wrap(val: Optional[str]) -> bool:
         return val is not None and len(val) >= length
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def str_shorter_than_or_eq(length: int) -> Predicate[Optional[str]]:
+def str_shorter_than_or_eq(length: int) -> Callable[[Optional[str]], bool]:
     """
     Checks if the call parameter string's length is less than or equal to the specified value.
 
@@ -551,16 +551,16 @@ def str_shorter_than_or_eq(length: int) -> Predicate[Optional[str]]:
         length (int): The maximum inclusive length.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
 
     def wrap(val: Optional[str]) -> bool:
         return val is not None and len(val) <= length
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def equals_ignore_case(value: str) -> Predicate[Optional[str]]:
+def equals_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
     """
     Checks if the call parameter string equals the given value, ignoring case.
 
@@ -568,7 +568,7 @@ def equals_ignore_case(value: str) -> Predicate[Optional[str]]:
         value (str): The string to compare against.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
 
     # .lower() is standard.
@@ -576,7 +576,7 @@ def equals_ignore_case(value: str) -> Predicate[Optional[str]]:
         # Check both for None before comparing
         return val is not None and value.lower() == val.lower()
 
-    return Predicate.of(wrap)
+    return wrap
 
 
 # --- Numeric Predicates ---
@@ -616,108 +616,112 @@ def is_int(number: Optional[float]) -> bool:
     return number is not None and number == int(number)
 
 
-def _beween(interval_start: float, interval_end: float) -> Predicate[Optional[float]]:
+def _beween(
+    interval_start: float, interval_end: float
+) -> Callable[[Optional[float]], bool]:
     """Checks if a number is strictly between start and end (start < number < end)."""
 
     def wrap(val: Optional[float]) -> bool:
         return val is not None and interval_start < val < interval_end
 
-    return Predicate.of(wrap)
+    return wrap
 
 
 def _beween_closed(
     interval_start: float, interval_end: float
-) -> Predicate[Optional[float]]:
+) -> Callable[[Optional[float]], bool]:
     """Checks if a number is between start and end inclusive (start <= number <= end)."""
 
     def wrap(val: Optional[float]) -> bool:
         return val is not None and interval_start <= val <= interval_end
 
-    return Predicate.of(wrap)
+    return wrap
 
 
 def is_beween_closed(
     interval_start: float, interval_end: float
-) -> Predicate[Optional[float]]:
+) -> Callable[[Optional[float]], bool]:
     """Checks if a number is between start and end inclusive (start <= number <= end)."""
     return _beween_closed(interval_start, interval_end)
 
 
 def is_in_interval(
     interval_start: float, interval_end: float
-) -> Predicate[Optional[float]]:
+) -> Callable[[Optional[float]], bool]:
     """Checks if a number is between start and end inclusive (start <= number <= end)."""
     return _beween_closed(interval_start, interval_end)
 
 
-def is_beween(interval_start: float, interval_end: float) -> Predicate[Optional[float]]:
+def is_beween(
+    interval_start: float, interval_end: float
+) -> Callable[[Optional[float]], bool]:
     """Checks if a number is strictly between start and end (start < number < end)."""
     return _beween(interval_start, interval_end)
 
 
 def is_in_open_interval(
     interval_start: float, interval_end: float
-) -> Predicate[Optional[float]]:
+) -> Callable[[Optional[float]], bool]:
     """Checks if a number is strictly between start and end (start < number < end)."""
     return _beween(interval_start, interval_end)
 
 
 def is_beween_closed_start(
     interval_start: float, interval_end: float
-) -> Predicate[Optional[float]]:
+) -> Callable[[Optional[float]], bool]:
     """Checks if a number is between start (inclusive) and end (exclusive) (start <= number < end)."""
 
     def wrap(val: Optional[float]) -> bool:
         return val is not None and interval_start <= val < interval_end
 
-    return Predicate.of(wrap)
+    return wrap
 
 
 def is_beween_closed_end(
     interval_start: float, interval_end: float
-) -> Predicate[Optional[float]]:
+) -> Callable[[Optional[float]], bool]:
     """Checks if a number is between start (exclusive) and end (inclusive) (start < number <= end)."""
 
     def wrap(val: Optional[float]) -> bool:
         return val is not None and interval_start < val <= interval_end
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def is_higher_than(value: float) -> Predicate[Optional[float]]:
+def is_higher_than(value: float) -> Callable[[Optional[float]], bool]:
     """Checks if a number is strictly greater than the specified value."""
 
     def wrap(val: Optional[float]) -> bool:
         return val is not None and val > value
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def is_higher_than_or_eq(value: float) -> Predicate[Optional[float]]:
+def is_higher_than_or_eq(value: float) -> Callable[[Optional[float]], bool]:
     """Checks if a number is greater than or equal to the specified value."""
 
     def wrap(val: Optional[float]) -> bool:
         return val is not None and val >= value
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def is_less_than(value: float) -> Predicate[Optional[float]]:
+def is_less_than(value: float) -> Callable[[Optional[float]], bool]:
     """Checks if a number is strictly less than the specified value."""
 
     def wrap(val: Optional[float]) -> bool:
         return val is not None and val < value
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def is_less_than_or_eq(value: float) -> Predicate[Optional[float]]:
+def is_less_than_or_eq(value: float) -> Callable[[Optional[float]], bool]:
     """Checks if a number is less than or equal to the specified value."""
 
     def wrap(val: Optional[float]) -> bool:
         return val is not None and val <= value
 
-    return Predicate.of(wrap)
+    return wrap
 
 
 # --- Higher-Order Predicates ---
@@ -725,7 +729,7 @@ def is_less_than_or_eq(value: float) -> Predicate[Optional[float]]:
 
 def not_(
     predicate: Union[Predicate[Optional[T]], Callable[[Optional[T]], bool]],
-) -> Predicate[Optional[T]]:
+) -> Callable[[T], bool]:
     """
     Negates the result of the given predicate. Handles Optional input.
     Usage: not_(is_blank)("test") # Returns True
@@ -736,18 +740,13 @@ def not_(
     Returns:
         Predicate[Optional[T]]: The negated predicate.
     """
-    # Uses predicate_of to handle both Predicate objects and raw callables
-    wrapped_predicate = predicate_of(predicate)
 
-    def wrap(val: Optional[T]) -> bool:
-        return not wrapped_predicate.apply(val)
-
-    return Predicate.of(wrap)
+    return not_strict(predicate)
 
 
 def not_strict(
     predicate: Callable[[T], bool],
-) -> Predicate[T]:
+) -> Callable[[T], bool]:
     """
     Negates the result of the given predicate. Requires non-Optional input.
     Useful for maintaining stricter type checking in pipelines.
@@ -756,20 +755,16 @@ def not_strict(
         predicate: The predicate to negate (must accept non-Optional T).
 
     Returns:
-        Predicate[T]: The negated predicate.
+        Callable[[T], bool]: The negated predicate.
     """
-    wrapped_predicate = predicate_of(predicate)
 
-    def wrap(val: T) -> bool:
-        return not wrapped_predicate.apply(val)
-
-    return Predicate.of(wrap)
+    return lambda x: not predicate(x)
 
 
 # --- Mapping Predicates ---
 
 
-def has_key(key: Any) -> Predicate[Optional[Mapping[Any, Any]]]:
+def has_key(key: Any) -> Callable[[Optional[Mapping[Any, Any]]], bool]:
     """
     Produces a predicate that checks if the argument mapping contains the given key.
 
@@ -777,17 +772,17 @@ def has_key(key: Any) -> Predicate[Optional[Mapping[Any, Any]]]:
         key: The key to check for.
 
     Returns:
-        Predicate[Optional[Mapping[Any, Any]]]: The resulting predicate.
+        Callable[[Optional[Mapping[Any, Any]]], bool]: The resulting predicate.
     """
 
     # Using 'key in mapping' is generally preferred over 'key in mapping.keys()'
     def wrap(dct: Optional[Mapping[Any, Any]]) -> bool:
         return dct is not None and key in dct
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def has_value(value: Any) -> Predicate[Optional[Mapping[Any, Any]]]:
+def has_value(value: Any) -> Callable[[Optional[Mapping[Any, Any]]], bool]:
     """
     Produces a predicate that checks if the argument mapping contains the given value.
     Note: This requires iterating through values (O(n)).
@@ -796,17 +791,17 @@ def has_value(value: Any) -> Predicate[Optional[Mapping[Any, Any]]]:
         value: The value to check for.
 
     Returns:
-        Predicate[Optional[Mapping[Any, Any]]]: The resulting predicate.
+        Callable[[Optional[Mapping[Any, Any]]], bool]: The resulting predicate.
     """
 
     # 'value in mapping.values()' is the standard way
     def wrap(dct: Optional[Mapping[Any, Any]]) -> bool:
         return dct is not None and value in dct.values()
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def is_key_in(mapping: Mapping[Any, Any]) -> Predicate[Any]:
+def is_key_in(mapping: Mapping[Any, Any]) -> Callable[[Any], bool]:
     """
     Produces a predicate that checks if the argument key is present in the given mapping.
 
@@ -814,7 +809,7 @@ def is_key_in(mapping: Mapping[Any, Any]) -> Predicate[Any]:
         mapping: The mapping to check within.
 
     Returns:
-        Predicate[Any]: The resulting predicate.
+        Callable[[Any], bool]: The resulting predicate.
     """
 
     # Using 'key in mapping' is generally preferred
@@ -822,10 +817,10 @@ def is_key_in(mapping: Mapping[Any, Any]) -> Predicate[Any]:
         # Check key is not None if that's a requirement, depends on use case
         return key in mapping
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def is_value_in(mapping: Mapping[Any, Any]) -> Predicate[Any]:
+def is_value_in(mapping: Mapping[Any, Any]) -> Callable[[Any], bool]:
     """
     Produces a predicate that checks if the argument value is present in the given mapping.
     Note: This requires iterating through values (O(n)).
@@ -834,13 +829,13 @@ def is_value_in(mapping: Mapping[Any, Any]) -> Predicate[Any]:
         mapping: The mapping to check within.
 
     Returns:
-        Predicate[Any]: The resulting predicate.
+        Callable[[Any], bool]: The resulting predicate.
     """
 
     def wrap(value: Any) -> bool:
         return value in mapping.values()
 
-    return Predicate.of(wrap)
+    return wrap
 
 
 def is_truthy(val: Any) -> bool:
@@ -853,35 +848,35 @@ def is_falsy(val: Any) -> bool:
     return not bool(val)
 
 
-def is_identity(other: Any) -> Predicate[Any]:
+def is_identity(other: Any) -> Callable[[Any], bool]:
     """Checks if a value is the same object as 'other' (using 'is')."""
 
     def wrap(val: Any) -> bool:
         return val is other
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def has_length(length: int) -> Predicate[Optional[Sized]]:
+def has_length(length: int) -> Callable[[Optional[Sized]], bool]:
     """Checks if a Sized object has the specified length."""
 
     def wrap(val: Optional[Sized]) -> bool:
         # is_blank already checks for None
         return not is_blank(val) and len(val) == length  # type: ignore
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def is_instance(cls: type) -> Predicate[Any]:
+def is_instance(cls: type) -> Callable[[Any], bool]:
     """Checks if a value is an instance of the given class."""
 
     def wrap(val: Any) -> bool:
         return isinstance(val, cls)
 
-    return Predicate.of(wrap)
+    return wrap
 
 
-def str_fullmatch(pattern: str) -> Predicate[Optional[str]]:
+def str_fullmatch(pattern: str) -> Callable[[Optional[str]], bool]:
     """
     Checks if the *entire* string matches the given regex pattern (uses re.fullmatch).
     Complements `str_matches` which only checks from the beginning (`re.match`).
@@ -890,7 +885,7 @@ def str_fullmatch(pattern: str) -> Predicate[Optional[str]]:
         pattern (str): The regular expression pattern.
 
     Returns:
-        Predicate[Optional[str]]: A predicate.
+        Callable[[Optional[str]], bool]: A predicate.
     """
 
     # Consider compiling if performance is critical, but re caches patterns.
@@ -902,7 +897,7 @@ def str_fullmatch(pattern: str) -> Predicate[Optional[str]]:
         match = re.fullmatch(pattern, val)
         return match is not None
 
-    return Predicate.of(wrap)
+    return wrap
 
 
 def str_is_alpha(val: Optional[str]) -> bool:
