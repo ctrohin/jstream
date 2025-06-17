@@ -1,3 +1,4 @@
+from functools import cmp_to_key
 import json
 from typing import (
     Any,
@@ -235,35 +236,6 @@ def is_empty_or_none(
     return False
 
 
-def cmp_to_key(mycmp: Callable[[C, C], int]) -> type:
-    """Convert a cmp= function into a key= function"""
-
-    class Key(Generic[C]):  # type: ignore[misc]
-        __slots__ = ("obj",)
-
-        def __init__(self, obj: C) -> None:
-            self.obj = obj
-
-        def __lt__(self, other: "Key") -> bool:
-            return mycmp(self.obj, other.obj) < 0
-
-        def __gt__(self, other: "Key") -> bool:
-            return mycmp(self.obj, other.obj) > 0
-
-        def __eq__(self, other: object) -> bool:
-            if not isinstance(other, Key):
-                return NotImplemented
-            return mycmp(self.obj, other.obj) == 0
-
-        def __le__(self, other: "Key") -> bool:
-            return mycmp(self.obj, other.obj) <= 0
-
-        def __ge__(self, other: "Key") -> bool:
-            return mycmp(self.obj, other.obj) >= 0
-
-    return Key
-
-
 def each(target: Optional[Iterable[T]], action: Callable[[T], Any]) -> None:
     """
     Executes an action on each element of the given iterable
@@ -369,7 +341,7 @@ def chunk(data: Iterable[T], size: int) -> list[list[T]]:
     return chunks
 
 
-def flatten(data: Iterable[Iterable[T]]) -> list[T]:
+def flatten(data: Iterable[Iterable[T]]) -> Iterable[T]:
     """
     Flattens an iterable of iterables one level deep.
 
@@ -377,9 +349,9 @@ def flatten(data: Iterable[Iterable[T]]) -> list[T]:
         data (Iterable[Iterable[T]]): An iterable of iterables.
 
     Returns:
-        list[T]: A new list with elements from the sub-iterables.
+        Iterable[T]: A new iterable with elements from the sub-iterables.
     """
-    return [item for sublist in data for item in sublist]
+    return itertools.chain(*data)
 
 
 def flatten_deep(data: Iterable[Any]) -> list[Any]:
@@ -538,4 +510,4 @@ def repeat_value(value: T, n: int) -> Iterable[T]:
         raise ValueError("Number of repetitions 'n' must be non-negative.")
     if n == 0:
         return []
-    return [value] * n
+    return itertools.repeat(value, n)

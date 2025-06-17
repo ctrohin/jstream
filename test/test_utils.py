@@ -14,7 +14,6 @@ from jstreams import (
 from jstreams.utils import (
     Value,
     as_list,
-    cmp_to_key,
     dict_update,
     each,
     extract,
@@ -316,23 +315,6 @@ class TestHelpers(BaseTestCase):
         self.assertFalse(is_empty_or_none([1]))
         self.assertFalse(is_empty_or_none(10))
 
-    def test_cmp_to_key(self):
-        def num_comparator(a: int, b: int) -> int:
-            return a - b
-
-        KeyClass = cmp_to_key(num_comparator)
-        k1, k2, k3 = KeyClass(10), KeyClass(20), KeyClass(10)
-
-        self.assertTrue(k1 < k2)
-        self.assertFalse(k2 < k1)
-        self.assertTrue(k2 > k1)
-        self.assertTrue(k1 == k3)
-        self.assertEqual(k1.__eq__("not a key"), NotImplemented)
-        self.assertTrue(k1 <= k2)
-        self.assertTrue(k1 <= k3)
-        self.assertTrue(k2 >= k1)
-        self.assertTrue(k1 >= k3)
-
     def test_each(self):
         action_called_count = 0
 
@@ -396,12 +378,12 @@ class TestHelpers(BaseTestCase):
         self.assertThrowsExceptionOfType(lambda: chunk([1, 2], -1), ValueError)
 
     def test_flatten(self):
-        self.assertEqual(flatten([[1, 2], [3, 4], [5]]), [1, 2, 3, 4, 5])
-        self.assertEqual(flatten([[1], [2], [3]]), [1, 2, 3])
-        self.assertEqual(flatten([[], [1], [], [2, 3]]), [1, 2, 3])
-        self.assertEqual(flatten([]), [])
-        self.assertEqual(flatten([[]]), [])
-        self.assertEqual(flatten([iter([1, 2]), iter([3, 4])]), [1, 2, 3, 4])
+        self.assertEqual(list(flatten([[1, 2], [3, 4], [5]])), [1, 2, 3, 4, 5])
+        self.assertEqual(list(flatten([[1], [2], [3]])), [1, 2, 3])
+        self.assertEqual(list(flatten([[], [1], [], [2, 3]])), [1, 2, 3])
+        self.assertEqual(list(flatten([])), [])
+        self.assertEqual(list(flatten([[]])), [])
+        self.assertEqual(list(flatten([iter([1, 2]), iter([3, 4])])), [1, 2, 3, 4])
 
     def test_flatten_deep(self):
         self.assertEqual(

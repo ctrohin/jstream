@@ -553,15 +553,14 @@ def indexed(iterable: Iterable[T]) -> Iterable[Pair[int, T]]:
     return IndexedIterable(iterable)
 
 
-class ChunkedIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
-    __slots__ = ("_iterator", "_size", "_iterable")
+class ChunkedIterable(Generic[T], Iterable[list[T]]):
+    __slots__ = ("_size", "_iterable")
 
     def __init__(self, it: Iterable[T], size: int) -> None:
         if size <= 0:
             raise ValueError("Chunk size must be positive")
         # Store the original iterator directly
         self._iterable = it
-        self._iterator = iter(it)
         self._size = size
 
     def __iter__(self) -> Iterator[list[T]]:
@@ -570,22 +569,9 @@ class ChunkedIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
         # If re-iteration is needed, the original iterable must support it.
         # Or, store the original iterable and get a new iterator here.
         if sys.version_info >= (3, 12):
-            return map(list, batched(self._iterator, self._size))
-        self._iterator = iter(self._iterable)  # If storing _iterable instead
-        return self
-
-    def __next__(self) -> list[T]:
-        chunk = []
-        try:
-            for _ in range(self._size):
-                chunk.append(next(self._iterator))
-        except StopIteration:
-            # Reached the end of the underlying iterator
-            pass  # Allow the loop to finish
-
-        if not chunk:  # If no elements were added (end of iteration)
-            raise StopIteration
-        return chunk
+            return map(list, batched(iter(self._iterable), self._size))
+        it = iter(self._iterable)
+        return iter(lambda: list(islice(it, self._size)), [])
 
 
 def chunked(iterable: Iterable[T], size: int) -> Iterable[list[T]]:
@@ -1201,16 +1187,13 @@ def cycle(iterable: Iterable[T], n: Optional[int] = None) -> Iterable[T]:
 
 
 class DeferIterable(Generic[T], Iterable[T]):
-    __slots__ = ("_supplier", "_iterable")
+    __slots__ = ("_supplier",)
 
     def __init__(self, supplier: Callable[[], Iterable[T]]) -> None:
         self._supplier = supplier
-        self._iterable: Optional[Iterable[T]] = None
 
     def __iter__(self) -> Iterator[T]:
-        if self._iterable is None:
-            self._iterable = self._supplier()
-        return iter(self._iterable)
+        return iter(self._supplier())
 
 
 def defer(supplier: Callable[[], Iterable[T]]) -> Iterable[T]:

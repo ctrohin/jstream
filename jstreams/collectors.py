@@ -1,8 +1,8 @@
+from functools import cmp_to_key
 import itertools
 from typing import Any, Callable, Iterable, Optional, Sized, TypeVar
 
 from jstreams.stream import Opt
-from jstreams.utils import cmp_to_key
 
 T = TypeVar("T")
 R = TypeVar("R")
