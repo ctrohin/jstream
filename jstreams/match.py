@@ -1,4 +1,4 @@
-from typing import Callable, Generic, Optional, TypeVar, Union, cast, final, overload
+from typing import Callable, Generic, Optional, TypeVar, Union, final, overload
 
 from jstreams.stream import Opt, Stream
 from jstreams.predicate import Predicate, _extract_predicate_fn
@@ -75,32 +75,6 @@ class Case(Generic[T, V]):
             return self.__resulting()
         # Otherwise, return the direct value
         return self.__resulting
-
-
-@final
-class DefaultCase(Case[T, V]):
-    """
-    Represents a default case in a match expression that always matches.
-
-    This is a convenience subclass of Case where the matching condition
-    is implicitly `lambda _: True`. It should typically be the last case
-    provided to `Match.of()`.
-    """
-
-    def __init__(
-        self,
-        resulting: Union[V, Callable[[], V]],
-    ) -> None:
-        """
-        Initializes a DefaultCase.
-
-        Args:
-            resulting: The result value or a supplier function for the default case.
-                        - If a value, it's returned directly.
-                        - If a callable, it's invoked to produce the result.
-        """
-        # The matching condition is a lambda that always returns True
-        super().__init__(lambda _: True, resulting)
 
 
 @final
@@ -747,6 +721,25 @@ def match_opt(value: Optional[T]) -> Match[Optional[T]]:
     return Match(value)
 
 
+def DefaultCase(resulting: Union[V, Callable[[], V]]) -> Case[T, V]:
+    """
+    Factory function to create a DefaultCase instance.
+
+    This case will match any value if reached (i.e., if no preceding cases matched).
+    It should typically be the last case provided to `.of()`.
+
+    Syntactic sugar for `DefaultCase(resulting)`.
+
+    Args:
+        resulting: The result value or a supplier function for the default case.
+
+    Returns:
+        A new DefaultCase[T, V] instance (returned as Case[T, V] for compatibility).
+    """
+    # Cast is safe here because DefaultCase is a subtype of Case[T, V] for any T
+    return Case(lambda _: True, resulting)
+
+
 def default_case(resulting: Union[V, Callable[[], V]]) -> Case[T, V]:
     """
     Factory function to create a DefaultCase instance.
@@ -763,4 +756,4 @@ def default_case(resulting: Union[V, Callable[[], V]]) -> Case[T, V]:
         A new DefaultCase[T, V] instance (returned as Case[T, V] for compatibility).
     """
     # Cast is safe here because DefaultCase is a subtype of Case[T, V] for any T
-    return cast(Case[T, V], DefaultCase(resulting))
+    return DefaultCase(resulting)
