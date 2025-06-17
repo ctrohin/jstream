@@ -933,3 +933,9 @@ def str_is_space(val: Optional[str]) -> bool:
 def str_is_title(val: Optional[str]) -> bool:
     """Checks if a string is not None and is titlecased."""
     return val is not None and val.istitle()
+
+
+def _extract_predicate_fn(predicate: Callable[[T], bool]) -> Callable[[T], bool]:
+    if isinstance(predicate, Predicate):
+        return predicate.apply
+    return predicate

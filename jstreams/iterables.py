@@ -5,9 +5,9 @@ import itertools
 import sys
 from typing import Any, Callable, Generic, Iterable, Iterator, Optional, TypeVar, cast
 
-from jstreams.predicate import not_strict
+from jstreams.mapper import Mapper
+from jstreams.predicate import not_strict, _extract_predicate_fn
 from jstreams.tuples import Pair
-from jstreams.utils import require_non_null
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -37,12 +37,18 @@ class GenericIterable(ABC, Generic[T], Iterator[T], Iterable[T]):
         raise StopIteration()
 
 
+def _extract_mapper_fn(mapper: Callable[[T], V]) -> Callable[[T], V]:
+    if isinstance(mapper, Mapper):
+        return mapper.map
+    return mapper
+
+
 class FilterIterable(GenericIterable[T]):
     __slots__ = ("__predicate",)
 
     def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
         super().__init__(it)
-        self.__predicate = predicate
+        self.__predicate = _extract_predicate_fn(predicate)
 
     def __iter__(self) -> Iterator[V]:
         return filter(self.__predicate, self._iterable)  # type: ignore[arg-type]
@@ -333,7 +339,7 @@ class TakeWhileIterable(GenericIterable[T]):
         predicate: Callable[[T], bool],
     ) -> None:
         super().__init__(it)
-        self.__predicate = predicate
+        self.__predicate = _extract_predicate_fn(predicate)
 
     def __iter__(self) -> Iterator[T]:
         return takewhile(self.__predicate, self._iterable)
@@ -364,7 +370,7 @@ class DropWhileIterable(GenericIterable[T]):
         predicate: Callable[[T], bool],
     ) -> None:
         super().__init__(it)
-        self.__predicate = predicate
+        self.__predicate = _extract_predicate_fn(predicate)
 
     def __iter__(self) -> Iterator[T]:
         return dropwhile(self.__predicate, self._iterable)
@@ -457,7 +463,7 @@ class MapIterable(Generic[T, V], Iterable[V]):
     def __init__(self, it: Iterable[T], mapper: Callable[[T], V]) -> None:
         self._iterable = it
         self._iterator = self._iterable.__iter__()
-        self.__mapper = mapper
+        self.__mapper = _extract_mapper_fn(mapper)
 
     def __iter__(self) -> Iterator[V]:
         return map(self.__mapper, self._iterable)
@@ -645,7 +651,7 @@ class TakeUntilIterable(GenericIterable[T]):
 
     def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
         super().__init__(it)
-        self.__predicate = predicate
+        self.__predicate = _extract_predicate_fn(predicate)
 
     def __iter__(self) -> Iterator[T]:
         return takewhile(
@@ -677,7 +683,7 @@ class DropUntilIterable(GenericIterable[T]):
 
     def __init__(self, it: Iterable[T], predicate: Callable[[T], bool]) -> None:
         super().__init__(it)
-        self.__predicate = predicate
+        self.__predicate = _extract_predicate_fn(predicate)
 
     def __iter__(self) -> Iterator[T]:
         return dropwhile(not_strict(self.__predicate), self._iterable)
@@ -699,12 +705,9 @@ def drop_until(iterable: Iterable[T], predicate: Callable[[T], bool]) -> Iterabl
     return DropUntilIterable(iterable, predicate)
 
 
-class ScanIterable(Generic[T, V], Iterator[V], Iterable[V]):
+class ScanIterable(Generic[T, V], Iterable[V]):
     __slots__ = (
-        "_iterator",
         "_accumulator",
-        "_current_value",
-        "_first",
         "_iterable",
         "_initial_value",
     )
@@ -714,28 +717,13 @@ class ScanIterable(Generic[T, V], Iterator[V], Iterable[V]):
     ) -> None:
         # Store original iterable to allow re-iteration if needed
         self._iterable = it
-        self._iterator = iter(self._iterable)
         self._accumulator = accumulator
         self._initial_value = initial_value
-        # State for iteration
-        self._current_value = self._initial_value
-        self._first = True  # Flag to yield initial value first
 
     def __iter__(self) -> Iterator[V]:
-        # Reset state for new iteration
-        self._iterator = iter(self._iterable)
-        self._current_value = self._initial_value
-        self._first = True
-        return self
-
-    def __next__(self) -> V:
-        if self._first:
-            self._first = False
-            return self._current_value  # Yield initial value first
-
-        next_element = next(self._iterator)  # Get next element from source
-        self._current_value = self._accumulator(self._current_value, next_element)
-        return self._current_value
+        return itertools.accumulate(
+            self._iterable, self._accumulator, initial=self._initial_value
+        )
 
 
 def scan(
@@ -824,34 +812,14 @@ def concat_of(*iterables: Iterable[T]) -> Iterable[T]:
     return MultiConcatIterable(*iterables)
 
 
-class PairwiseIterable(Generic[T], Iterator[Pair[T, T]], Iterable[Pair[T, T]]):
-    __slots__ = ("_iterator", "_previous", "_first_element_consumed", "_iterable")
+class PairwiseIterable(Generic[T], Iterable[Pair[T, T]]):
+    __slots__ = "_iterable"
 
     def __init__(self, it: Iterable[T]) -> None:
         self._iterable = it  # Store original iterable if re-iteration needed
-        self._iterator = iter(self._iterable)
-        self._previous: Optional[T] = None
-        self._first_element_consumed = False
 
     def __iter__(self) -> Iterator[Pair[T, T]]:
-        self._iterator = iter(self._iterable)  # Reset iterator
-        self._previous = None
-        self._first_element_consumed = False
-        return self
-
-    def __next__(self) -> Pair[T, T]:
-        if not self._first_element_consumed:
-            # Consume the very first element to establish the initial 'previous'
-            self._previous = next(self._iterator)
-            self._first_element_consumed = True
-
-        # Get the next element to form a pair with the previous one
-        current = next(self._iterator)  # Raises StopIteration when done
-        pair_to_yield = Pair(
-            require_non_null(self._previous), current
-        )  # require_non_null is safe here
-        self._previous = current  # Update previous for the next iteration
-        return pair_to_yield
+        return map(lambda t: Pair(t[0], t[1]), itertools.pairwise(self._iterable))
 
 
 def pairwise(iterable: Iterable[T]) -> Iterable[Pair[T, T]]:
@@ -945,7 +913,7 @@ def sliding_window(
     return SlidingWindowIterable(iterable, size, step)
 
 
-class RepeatIterable(Generic[T], Iterator[T], Iterable[T]):
+class RepeatIterable(Generic[T], Iterable[T]):
     __slots__ = ("_buffered_elements", "_n", "_current_n", "_iterator")
 
     def __init__(self, it: Iterable[T], n: Optional[int]) -> None:
@@ -1123,10 +1091,9 @@ def unfold(seed: S, generator: Callable[[S], Optional[Pair[T, S]]]) -> Iterable[
 
 class ZipLongestIterable(
     Generic[T, V],
-    Iterator[Pair[Optional[T], Optional[V]]],
     Iterable[Pair[Optional[T], Optional[V]]],
 ):
-    __slots__ = ("_it1", "_it2", "_iter1", "_iter2", "_fillvalue", "_done1", "_done2")
+    __slots__ = ("_it1", "_it2", "_fillvalue")
 
     def __init__(
         self, it1: Iterable[T], it2: Iterable[V], fillvalue: Any = None
@@ -1134,38 +1101,12 @@ class ZipLongestIterable(
         self._it1 = it1
         self._it2 = it2
         self._fillvalue = fillvalue
-        self._iter1 = iter(self._it1)
-        self._iter2 = iter(self._it2)
-        self._done1 = False
-        self._done2 = False
 
     def __iter__(self) -> Iterator[Pair[Optional[T], Optional[V]]]:
-        self._iter1 = iter(self._it1)
-        self._iter2 = iter(self._it2)
-        self._done1 = False
-        self._done2 = False
-        return self
-
-    def __next__(self) -> Pair[Optional[T], Optional[V]]:
-        val1: Optional[T] = self._fillvalue
-        val2: Optional[V] = self._fillvalue
-
-        if not self._done1:
-            try:
-                val1 = next(self._iter1)
-            except StopIteration:
-                self._done1 = True
-
-        if not self._done2:
-            try:
-                val2 = next(self._iter2)
-            except StopIteration:
-                self._done2 = True
-
-        if self._done1 and self._done2:
-            raise StopIteration
-
-        return Pair(val1, val2)
+        return map(
+            lambda x: Pair(x[0], x[1]),
+            itertools.zip_longest(self._it1, self._it2, fillvalue=self._fillvalue),
+        )
 
 
 def zip_longest(
@@ -1259,25 +1200,17 @@ def cycle(iterable: Iterable[T], n: Optional[int] = None) -> Iterable[T]:
     return CycleIterable(iterable, n)
 
 
-class DeferIterable(Generic[T], Iterator[T], Iterable[T]):
-    __slots__ = ("_supplier", "_current_iterator")
+class DeferIterable(Generic[T], Iterable[T]):
+    __slots__ = ("_supplier", "_iterable")
 
     def __init__(self, supplier: Callable[[], Iterable[T]]) -> None:
         self._supplier = supplier
-        self._current_iterator: Optional[Iterator[T]] = None  # Initialized in __iter__
+        self._iterable: Optional[Iterable[T]] = None
 
     def __iter__(self) -> Iterator[T]:
-        self._current_iterator = iter(
-            self._supplier()
-        )  # Call supplier and get iterator
-        return self
-
-    def __next__(self) -> T:
-        if self._current_iterator is None:
-            raise RuntimeError(
-                "Iterator not initialized. __iter__ must be called first."
-            )
-        return next(self._current_iterator)
+        if self._iterable is None:
+            self._iterable = self._supplier()
+        return iter(self._iterable)
 
 
 def defer(supplier: Callable[[], Iterable[T]]) -> Iterable[T]:

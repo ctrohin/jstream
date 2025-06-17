@@ -1,7 +1,7 @@
 from typing import Callable, Generic, Optional, TypeVar, Union, cast, overload
 
 from jstreams.stream import Opt, Stream
-from jstreams.predicate import Predicate, predicate_of
+from jstreams.predicate import Predicate, _extract_predicate_fn
 from jstreams.utils import require_non_null
 
 T = TypeVar("T")
@@ -20,7 +20,7 @@ class Case(Generic[T, V]):
 
     def __init__(
         self,
-        matching: Union[T, Callable[[T], bool], Predicate[T]],
+        matching: Union[T, Callable[[T], bool]],
         resulting: Union[V, Callable[[], V]],
     ) -> None:
         """
@@ -35,7 +35,7 @@ class Case(Generic[T, V]):
                         - If a callable, it's invoked to produce the result.
         """
         self.__matching = (
-            predicate_of(matching)
+            _extract_predicate_fn(matching)
             if (callable(matching) or isinstance(matching, Predicate))
             else matching
         )
@@ -677,7 +677,7 @@ class Match(Generic[T]):
 
 
 def case(
-    matching: Union[T, Callable[[T], bool], Predicate[T]],
+    matching: Union[T, Callable[[T], bool]],
     resulting: Union[V, Callable[[], V]],
 ) -> Case[T, V]:
     """

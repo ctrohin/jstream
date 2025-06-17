@@ -1,4 +1,5 @@
-from typing import Any, Callable, Iterable, Optional, TypeVar
+import itertools
+from typing import Any, Callable, Iterable, Optional, Sized, TypeVar
 
 from jstreams.stream import Opt
 from jstreams.utils import cmp_to_key
@@ -26,14 +27,10 @@ def grouping_by(group_by: Callable[[T], K], elements: Iterable[T]) -> dict[K, li
         dict[K, list[T]]: A dictionary where keys are the results of the `group_by`
                         function and values are lists of elements belonging to that group.
     """
-    values: dict[K, list[T]] = {}
-    for element in elements:
-        key = group_by(element)
-        if key in values:
-            values.setdefault(key, []).append(element)
-        else:
-            values[key] = [element]
-    return values
+    return {
+        k[0]: list(k[1])
+        for k in map(lambda x: (x[0], x[1]), itertools.groupby(elements, group_by))
+    }
 
 
 def grouping_by_mapping(
@@ -57,14 +54,14 @@ def grouping_by_mapping(
         dict[K, list[R]]: A dictionary where keys are the results of the `group_by`
                         function and values are mapped lists of elements belonging to that group.
     """
-    values: dict[K, list[R]] = {}
-    for element in elements:
-        key = group_by(element)
-        if key in values:
-            values.setdefault(key, []).append(mapper(element))
-        else:
-            values[key] = [mapper(element)]
-    return values
+
+    return {
+        k[0]: list(k[1])
+        for k in map(
+            lambda x: (x[0], map(mapper, x[1])),
+            itertools.groupby(elements, group_by),
+        )
+    }
 
 
 def joining(separator: str, elements: Iterable[str]) -> str:
@@ -278,6 +275,8 @@ class Collectors:
         def transform(elements: Iterable[Any]) -> int:
             """Counts the elements in the iterable."""
             # Using sum(1 for _ in elements) is generally efficient for iterables
+            if isinstance(elements, Sized):
+                return len(elements)
             return sum(1 for _ in elements)
 
         return transform
