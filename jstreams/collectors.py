@@ -1,6 +1,7 @@
 from functools import cmp_to_key
 import itertools
-from typing import Any, Callable, Iterable, Optional, Sized, TypeVar
+from typing import Any, Callable, Iterable, Optional, TypeVar
+from collections.abc import Sized
 
 from jstreams.stream import Opt
 
