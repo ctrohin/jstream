@@ -1,4 +1,4 @@
-from typing import Callable, Generic, Optional, TypeVar, Union, cast, overload
+from typing import Callable, Generic, Optional, TypeVar, Union, cast, final, overload
 
 from jstreams.stream import Opt, Stream
 from jstreams.predicate import Predicate, _extract_predicate_fn
@@ -8,6 +8,7 @@ T = TypeVar("T")
 V = TypeVar("V")
 
 
+@final
 class Case(Generic[T, V]):
     """
     Represents a single case in a match expression.
@@ -52,9 +53,9 @@ class Case(Generic[T, V]):
             True if the value matches the condition, False otherwise.
         """
         match_condition = self.__matching
-        if isinstance(match_condition, Predicate):
-            # If it's a Predicate object, use its apply method
-            return match_condition.apply(value)
+        if callable(match_condition):
+            # If it's a Predicate function, apply it to the value
+            return match_condition(value)
         # Otherwise, perform direct equality check
         return value == match_condition
 
@@ -76,6 +77,7 @@ class Case(Generic[T, V]):
         return self.__resulting
 
 
+@final
 class DefaultCase(Case[T, V]):
     """
     Represents a default case in a match expression that always matches.
@@ -101,6 +103,7 @@ class DefaultCase(Case[T, V]):
         super().__init__(lambda _: True, resulting)
 
 
+@final
 class Match(Generic[T]):
     """
     Holds the value to be matched and provides the 'of' method to evaluate cases.
