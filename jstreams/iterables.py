@@ -8,6 +8,7 @@ from typing import Any, Callable, Generic, Iterable, Iterator, Optional, TypeVar
 from jstreams.mapper import Mapper
 from jstreams.predicate import not_strict, _extract_predicate_fn
 from jstreams.tuples import Pair
+from jstreams.utils import require_non_null
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -797,48 +798,46 @@ def concat_of(*iterables: Iterable[T]) -> Iterable[T]:
         return iterables[0]
     return MultiConcatIterable(*iterables)
 
+    # class PairwiseIterable(Generic[T], Iterable[Pair[T, T]]):
+    #     __slots__ = "_iterable"
 
-if sys.version_info >= (3, 10):
+    #     def __init__(self, it: Iterable[T]) -> None:
+    #         self._iterable = it  # Store original iterable if re-iteration needed
 
-    class PairwiseIterable(Generic[T], Iterable[Pair[T, T]]):
-        __slots__ = "_iterable"
+    #     def __iter__(self) -> Iterator[Pair[T, T]]:
+    #         return map(lambda t: Pair(t[0], t[1]), itertools.pairwise(self._iterable))
 
-        def __init__(self, it: Iterable[T]) -> None:
-            self._iterable = it  # Store original iterable if re-iteration needed
 
-        def __iter__(self) -> Iterator[Pair[T, T]]:
-            return map(lambda t: Pair(t[0], t[1]), itertools.pairwise(self._iterable))
-else:
-    from jstreams.utils import require_non_null
+class PairwiseIterable(Generic[T], Iterator[Pair[T, T]], Iterable[Pair[T, T]]):
+    __slots__ = ("_iterator", "_previous", "_first_element_consumed", "_iterable")
 
-    class PairwiseIterable(Generic[T], Iterator[Pair[T, T]], Iterable[Pair[T, T]]):
-        __slots__ = ("_iterator", "_previous", "_first_element_consumed", "_iterable")
+    def __init__(self, it: Iterable[T]) -> None:
+        self._iterable = (
+            it  # Store original iterable if re-iteration neededAdd commentMore actions
+        )
+        self._iterator = iter(self._iterable)
+        self._previous: Optional[T] = None
+        self._first_element_consumed = False
 
-        def __init__(self, it: Iterable[T]) -> None:
-            self._iterable = it  # Store original iterable if re-iteration neededAdd commentMore actions
-            self._iterator = iter(self._iterable)
-            self._previous: Optional[T] = None
-            self._first_element_consumed = False
+    def __iter__(self) -> Iterator[Pair[T, T]]:
+        self._iterator = iter(self._iterable)  # Reset iterator
+        self._previous = None
+        self._first_element_consumed = False
+        return self
 
-        def __iter__(self) -> Iterator[Pair[T, T]]:
-            self._iterator = iter(self._iterable)  # Reset iterator
-            self._previous = None
-            self._first_element_consumed = False
-            return self
+    def __next__(self) -> Pair[T, T]:
+        if not self._first_element_consumed:
+            # Consume the very first element to establish the initial 'previous'
+            self._previous = next(self._iterator)
+            self._first_element_consumed = True
 
-        def __next__(self) -> Pair[T, T]:
-            if not self._first_element_consumed:
-                # Consume the very first element to establish the initial 'previous'
-                self._previous = next(self._iterator)
-                self._first_element_consumed = True
-
-            # Get the next element to form a pair with the previous one
-            current = next(self._iterator)  # Raises StopIteration when done
-            pair_to_yield = Pair(
-                require_non_null(self._previous), current
-            )  # require_non_null is safe here
-            self._previous = current  # Update previous for the next iteration
-            return pair_to_yield
+        # Get the next element to form a pair with the previous one
+        current = next(self._iterator)  # Raises StopIteration when done
+        pair_to_yield = Pair(
+            require_non_null(self._previous), current
+        )  # require_non_null is safe here
+        self._previous = current  # Update previous for the next iteration
+        return pair_to_yield
 
 
 def pairwise(iterable: Iterable[T]) -> Iterable[Pair[T, T]]:
