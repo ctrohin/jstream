@@ -217,3 +217,11 @@ class TestIOC(BaseTestCase):
         self.assertEqual(test.float_val, 2.0)
         self.assertEqual(test.uncontrolled_float, 6.0)
         self.assertTrue(test.get_bool_val())
+
+    def test_cache(self) -> None:
+        injector().provide(str, "test")
+        injector().provide(str, "test1", "qual")
+        injector().get(str)
+        injector().get(str, "qual")
+        self.assertTrue((str, None) in injector()._Injector__comp_cache)
+        self.assertTrue((str, "qual") in injector()._Injector__comp_cache)

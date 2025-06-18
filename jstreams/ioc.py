@@ -141,7 +141,7 @@ class _Injector:
         self.__modules_to_scan: list[str] = []
         self.__modules_scanned = False
         self.__raise_beans_error = False
-        self.__comp_cache: dict[tuple[type, str], Any] = {}
+        self.__comp_cache: dict[tuple[type, Optional[str]], Any] = {}
         self.__var_cache: dict[tuple[type, str], Any] = {}
 
     def scan_modules(self, modules_to_scan: list[str]) -> "_Injector":
@@ -221,7 +221,7 @@ class _Injector:
         # Try to get the variable from the cache
         found_var = self.__var_cache.get((class_name, qualifier))
         if found_var is not None:
-            return found_var
+            return cast(T, found_var)
 
         # Try to get the dependency using the active profile
         found_var = self._get_var(class_name, qualifier)
@@ -233,6 +233,7 @@ class _Injector:
                 ),
                 True,
             )
+        # Store the variable in cache if it's not None
         if found_var is not None:
             self.__var_cache[(class_name, qualifier)] = found_var
         return found_var if found_var is None else cast(T, found_var)
@@ -247,7 +248,7 @@ class _Injector:
         # Try to get the component from the cache
         found_obj = self.__comp_cache.get((class_name, qualifier))
         if found_obj is not None:
-            return found_obj
+            return cast(T, found_obj)
 
         # Try to get the dependency using the active profile
         found_obj = self._get(class_name, qualifier)
@@ -260,6 +261,7 @@ class _Injector:
                 ),
                 True,
             )
+        # Store the object in cache if it's not None
         if found_obj is not None:
             self.__comp_cache[(class_name, qualifier)] = found_obj
         return found_obj if found_obj is None else cast(T, found_obj)
