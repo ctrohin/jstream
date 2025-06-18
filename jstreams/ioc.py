@@ -141,6 +141,8 @@ class _Injector:
         self.__modules_to_scan: list[str] = []
         self.__modules_scanned = False
         self.__raise_beans_error = False
+        self.__comp_cache: dict[tuple[type, str], Any] = {}
+        self.__var_cache: dict[tuple[type, str], Any] = {}
 
     def scan_modules(self, modules_to_scan: list[str]) -> "_Injector":
         self.__modules_to_scan = modules_to_scan
@@ -197,6 +199,8 @@ class _Injector:
         self.__profile = None
         self.__modules_scanned = False
         self.__modules_to_scan = []
+        self.__comp_cache = {}
+        self.__var_cache = {}
 
     def get(self, class_name: type[T], qualifier: Optional[str] = None) -> T:
         if (found_obj := self.find(class_name, qualifier)) is None:
@@ -214,6 +218,12 @@ class _Injector:
         return found_var
 
     def find_var(self, class_name: type[T], qualifier: str) -> Optional[T]:
+        # Try to get the variable from the cache
+        found_var = self.__var_cache.get((class_name, qualifier))
+        if found_var is not None:
+            return found_var
+
+        # Try to get the dependency using the active profile
         found_var = self._get_var(class_name, qualifier)
         if found_var is None:
             found_var = self._get_var(
@@ -223,7 +233,8 @@ class _Injector:
                 ),
                 True,
             )
-
+        if found_var is not None:
+            self.__var_cache[(class_name, qualifier)] = found_var
         return found_var if found_var is None else cast(T, found_var)
 
     def find_var_or(
@@ -233,6 +244,11 @@ class _Injector:
         return or_val if found_var is None else found_var
 
     def find(self, class_name: type[T], qualifier: Optional[str] = None) -> Optional[T]:
+        # Try to get the component from the cache
+        found_obj = self.__comp_cache.get((class_name, qualifier))
+        if found_obj is not None:
+            return found_obj
+
         # Try to get the dependency using the active profile
         found_obj = self._get(class_name, qualifier)
         if found_obj is None:
@@ -244,6 +260,8 @@ class _Injector:
                 ),
                 True,
             )
+        if found_obj is not None:
+            self.__comp_cache[(class_name, qualifier)] = found_obj
         return found_obj if found_obj is None else cast(T, found_obj)
 
     def find_or(
