@@ -619,27 +619,32 @@ def configuration(profiles: Optional[list[str]] = None) -> Callable[[type[T]], t
         Callable[[type[T]], type[T]]: The decorated class
     """
 
-    def run_bean(obj: Any, attr: str) -> None:
-        try:
-            getattr(obj, attr)(profiles=profiles)
-        except TypeError as _:
-            message = (
-                "Dependency "
-                + str(attr)
-                + " of class "
-                + str(type(obj))
-                + " is not properly decorated. In a configuration class, each public method must produce a dependency decorated with the @provide decorator. For internal logic, please use protected _method or private __method."
-            )
-            injector().handle_bean_error(message)
-
     def wrap(cls: type[T]) -> type[T]:
         obj = cls()
-        (
-            Stream(dir(obj))
-            .filter(lambda s: not s.startswith("_"))
-            .filter(lambda s: is_mth_or_fn(getattr(obj, s)))
-            .each(lambda s: run_bean(obj, s))
-        )
+        for attr_name in dir(obj):
+            if attr_name.startswith("_"):
+                continue
+
+            try:
+                attr_value = getattr(obj, attr_name)
+            except AttributeError:
+                # Should be rare if attr_name from dir(obj), but defensive
+                continue
+
+            if is_mth_or_fn(attr_value):
+                try:
+                    # attr_value is the bound method, e.g., obj.method_name
+                    # Pass 'profiles' kwarg as expected by @provide's wrapper
+                    attr_value(profiles=profiles)
+                except TypeError as e:
+                    # Original error handling for methods not properly decorated
+                    message = (
+                        f"Dependency method '{attr_name}' of class '{cls.__name__}' "
+                        "is not properly decorated or called. In a configuration class, "
+                        "each public method intended to provide a bean should be decorated "
+                        f"with @provide or @provide_variable. Original error: {e}"
+                    )
+                    injector().handle_bean_error(message)
         return cls
 
     return wrap
