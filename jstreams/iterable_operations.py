@@ -106,10 +106,7 @@ def any_match(iterable: Iterable[T], predicate: Callable[[T], bool]) -> bool:
     """
     if iterable is None:
         return False
-    for el in iterable:
-        if predicate(el):
-            return True
-    return False
+    return any(predicate(el) for el in iterable)
 
 
 def none_match(iterable: Iterable[T], predicate: Callable[[T], bool]) -> bool:
@@ -142,8 +139,4 @@ def all_match(iterable: Iterable[T], predicate: Callable[[T], bool]) -> bool:
     """
     if iterable is None:
         return False
-
-    for el in iterable:
-        if not predicate(el):
-            return False
-    return True
+    return all(predicate(el) for el in iterable)

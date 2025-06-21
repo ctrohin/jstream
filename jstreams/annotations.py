@@ -31,6 +31,13 @@ def builder() -> Callable[[type[T]], type[T]]:
     """
 
     def decorator(cls: type[T]) -> type[T]:
+        # Cache type hints at decoration time for performance.
+        try:
+            cls_type_hints = get_type_hints(cls)
+        except Exception:
+            # If get_type_hints fails (e.g., forward refs), treat as no hints.
+            cls_type_hints = {}
+
         class Builder:
             def __init__(self) -> None:
                 self._instance = cls.__new__(cls)
@@ -54,7 +61,8 @@ def builder() -> Callable[[type[T]], type[T]]:
                         raise AttributeError(
                             f"'{cls.__name__}.{type(self).__name__}' cannot access private field '{field_name}'"
                         )
-                    if field_name in get_type_hints(cls):
+                    # Use cached type hints for much better performance.
+                    if field_name in cls_type_hints:
 
                         def setter_mth(value: Any) -> "Builder":
                             self._fields[field_name] = value
@@ -167,6 +175,7 @@ def locked() -> Callable[[type[T]], type[T]]:
                 # Use object.__setattr__ to avoid triggering our wrapped __setattr__
                 object.__setattr__(self, "_lock", RLock())
                 object.__setattr__(self, "_original_instance", cls.__new__(cls))
+                object.__setattr__(self, "_method_cache", {})
 
                 # Call original __init__ under lock protection
                 with self._lock:
@@ -184,6 +193,10 @@ def locked() -> Callable[[type[T]], type[T]]:
                 acquires the lock before execution.
                 """
                 with self._lock:
+                    # Check cache first to avoid re-creating the wrapper
+                    if name in self._method_cache:
+                        return self._method_cache[name]
+
                     try:
                         # Try getting the attribute from the original instance
                         value = getattr(self._original_instance, name)
@@ -200,6 +213,8 @@ def locked() -> Callable[[type[T]], type[T]]:
                                 with self._lock:
                                     return value(*args, **kwargs)
 
+                            # Cache the wrapped method for future accesses
+                            self._method_cache[name] = wrapped_method
                             return wrapped_method
                         # If it's a regular attribute or a non-bound method/function, return directly
                         return value
@@ -216,17 +231,23 @@ def locked() -> Callable[[type[T]], type[T]]:
             def __setattr__(self, name: str, value: Any) -> None:
                 """Sets an attribute on the original instance, acquiring the lock."""
                 # Use object.__setattr__ for the wrapper's own attributes
-                if name in ("_lock", "_original_instance"):
+                if name in ("_lock", "_original_instance", "_method_cache"):
                     object.__setattr__(self, name, value)
                 else:
                     # Set attribute on the original instance under lock protection
                     with self._lock:
+                        # Invalidate method cache if an attribute with the same name is being set
+                        if name in self._method_cache:
+                            del self._method_cache[name]
                         # Use original setattr logic of the wrapped class
                         original_setattr(self._original_instance, name, value)
 
             def __delattr__(self, name: str) -> None:
                 """Deletes an attribute from the original instance, acquiring the lock."""
                 with self._lock:
+                    # Invalidate method cache if an attribute with the same name is being deleted
+                    if name in self._method_cache:
+                        del self._method_cache[name]
                     # Use original delattr logic of the wrapped class
                     original_delattr(self._original_instance, name)
 
