@@ -937,13 +937,12 @@ def str_fullmatch(pattern: str) -> Callable[[Optional[str]], bool]:
 
     require_non_null(pattern, "Pattern cannot be None")
 
-    # Consider compiling if performance is critical, but re caches patterns.
-    # compiled_pattern = re.compile(pattern)
+    compiled_pattern = re.compile(pattern)
+
     def wrap(val: Optional[str]) -> bool:
         if val is None:
             return False
-        # match = compiled_pattern.fullmatch(val)
-        match = re.fullmatch(pattern, val)
+        match = compiled_pattern.fullmatch(val)
         return match is not None
 
     return wrap
