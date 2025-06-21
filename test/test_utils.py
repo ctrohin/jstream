@@ -11,6 +11,7 @@ from jstreams import (
     is_number,
     require_non_null,
 )
+from jstreams.iterables import filter_it
 from jstreams.utils import (
     Value,
     as_list,
@@ -108,6 +109,9 @@ class TestHelpers(BaseTestCase):
     def test_isIn(self) -> None:
         self.assertTrue(is_in(["A", "B", "C"])("A"), "A should be in array")
         self.assertFalse(is_in(["A", "B", "C"])("D"), "D should not be in array")
+        filter_iterable = filter_it(["A", "B", "C"], lambda _: True)
+        self.assertTrue(is_in(filter_iterable)("A"), "A should be in array")
+        self.assertFalse(is_in(filter_iterable)("D"), "D should not be in array")
 
     def test_isNotIn(self) -> None:
         self.assertFalse(is_not_in(["A", "B", "C"])("A"), "A should be in array")

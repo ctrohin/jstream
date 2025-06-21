@@ -204,12 +204,17 @@ def is_in(it: Iterable[Any]) -> Callable[[Any], bool]:
     Returns:
         Callable[[Any], bool]: The predicate.
     """
+    # Convert to set for O(1) average lookup if 'it' is a list or tuple
+    # and its elements are hashable. This optimizes repeated lookups.
 
-    # Efficiency depends on the type of 'it' (set/dict is O(1), list/tuple is O(n))
-    def wrap(elem: Any) -> bool:
-        return elem in it
+    if isinstance(it, (list, tuple)):
+        try:
+            lookup_set = set(it)
+            return lambda elem: elem in lookup_set
+        except TypeError:  # Fallback if elements are not hashable
+            return lambda elem: elem in it
 
-    return wrap
+    return lambda elem: elem in it
 
 
 def is_not_in(it: Iterable[Any]) -> Callable[[Any], bool]:
@@ -866,10 +871,18 @@ def is_value_in(mapping: Mapping[Any, Any]) -> Callable[[Any], bool]:
         Callable[[Any], bool]: The resulting predicate.
     """
 
-    def wrap(value: Any) -> bool:
-        return value in mapping.values()
+    # Convert values to set for O(1) average lookup if possible
+    # and elements are hashable. This optimizes repeated lookups.
+    if isinstance(mapping, dict):  # Check for dict specifically as .values() is a view
+        try:
+            lookup_set = set(mapping.values())
 
-    return wrap
+            return lambda value: value in lookup_set
+
+        except TypeError:  # Fallback if elements are not hashable
+            return lambda value: value in mapping.values()
+
+    return lambda value: value in mapping.values()
 
 
 def is_truthy(val: Any) -> bool:
