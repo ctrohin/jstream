@@ -1,8 +1,7 @@
 from typing import Callable, Generic, Optional, TypeVar, Union, final, overload
 
-from jstreams.stream import Opt, Stream
+from jstreams.stream import Opt
 from jstreams.predicate import Predicate, _extract_predicate_fn
-from jstreams.utils import require_non_null
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -604,13 +603,10 @@ class Match(Generic[T]):
             An Opt containing the result (V) of the first matching case.
             Returns an empty Opt if no case matches the stored value.
         """
-        return (
-            Stream(cases)
-            .non_null()
-            .map(require_non_null)
-            .find_first(lambda c: c.matches(self.__value))  # Short-circuits
-            .map(lambda c: c.result())  # Get result only for the matched case
-        )
+        for case_item in cases:
+            if case_item is not None and case_item.matches(self.__value):
+                return Opt(case_item.result())
+        return Opt.empty()
 
     def of_list(self, cases: list[Optional[Case[T, V]]]) -> Optional[V]:
         """
@@ -727,8 +723,6 @@ def DefaultCase(resulting: Union[V, Callable[[], V]]) -> Case[T, V]:
 
     This case will match any value if reached (i.e., if no preceding cases matched).
     It should typically be the last case provided to `.of()`.
-
-    Syntactic sugar for `DefaultCase(resulting)`.
 
     Args:
         resulting: The result value or a supplier function for the default case.

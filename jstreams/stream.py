@@ -7,6 +7,7 @@ from typing import (
     TypeVar,
     Generic,
     cast,
+    final,
 )
 
 from jstreams.class_operations import ClassOps
@@ -68,6 +69,7 @@ S = TypeVar("S")
 U = TypeVar("U")
 
 
+@final
 class Opt(Generic[T]):
     __slots__ = ("__val",)
     __NONE: "Optional[Opt[Any]]" = None
@@ -799,6 +801,7 @@ class Opt(Generic[T]):
         return Stream(opts).find_first(Opt.is_present).flat_map(lambda x: x)
 
 
+@final
 class Stream(Generic[T]):
     __slots__ = ("__arg",)
 
