@@ -13,6 +13,7 @@ from typing import (
 )
 
 from jstreams.predicate import Predicate
+from jstreams.utils import Value
 
 NoneType = type(None)
 T = TypeVar("T")
@@ -766,3 +767,8 @@ def default_on_error(
         return cast(F, wrapper)  # Keep original signature for type checking
 
     return decorator
+
+
+@locked()
+class SynchronizedValue(Value[T]):
+    pass

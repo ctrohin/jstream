@@ -18,7 +18,6 @@ import itertools
 
 from types import FunctionType, MethodType
 
-from jstreams.annotations import locked
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -287,11 +286,6 @@ class Value(Generic[T]):
         if value is not None:
             self.__value = value
         return self.__value
-
-
-@locked()
-class SynchronizedValue(Value[T]):
-    pass
 
 
 def type_of(obj: T) -> type[T]:

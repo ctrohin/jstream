@@ -14,6 +14,8 @@ from typing import (
 
 from collections.abc import Sized
 
+from jstreams.utils import require_non_null
+
 T = TypeVar("T")
 K = TypeVar("K")
 
@@ -312,6 +314,8 @@ def default(default_val: T) -> Callable[[Optional[T]], T]:
         Callable[[Optional[T]], T]: A function that returns the input or the default.
     """
 
+    require_non_null(default_val, "Default value cannot be None")
+
     def wrap(val: Optional[T]) -> T:
         return default_val if val is None else val
 
@@ -334,6 +338,7 @@ def contains(value: Any) -> Callable[[Optional[Union[str, Iterable[Any]]]], bool
     Returns:
         Callable[[Optional[Union[str, Iterable[Any]]]], bool]: A predicate.
     """
+    require_non_null(value, "Value cannot be None")
 
     def wrap(val: Optional[Union[str, Iterable[Any]]]) -> bool:
         # Check for None before using 'in'
@@ -354,6 +359,7 @@ def str_contains(value: str) -> Callable[[Optional[str]], bool]:
     Returns:
         Callable[[Optional[str]], bool]: A predicate.
     """
+    require_non_null(value, "Value cannot be None")
     # Correctly uses casting for type specificity
     return cast(Callable[[Optional[str]], bool], contains(value))
 
@@ -368,6 +374,7 @@ def str_contains_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
     Returns:
         Callable[[Optional[str]], bool]: A predicate.
     """
+    require_non_null(value, "Value cannot be None")
 
     # .lower() is the standard way, creates temporary strings.
     def wrap(val: Optional[str]) -> bool:
@@ -387,6 +394,7 @@ def str_starts_with(value: str) -> Callable[[Optional[str]], bool]:
     Returns:
         Callable[[Optional[str]], bool]: A predicate.
     """
+    require_non_null(value, "Value cannot be None")
 
     # Uses efficient built-in str.startswith
     def wrap(val: Optional[str]) -> bool:
@@ -405,6 +413,7 @@ def str_starts_with_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
     Returns:
         Callable[[Optional[str]], bool]: A predicate.
     """
+    require_non_null(value, "Value cannot be None")
 
     # .lower() is standard.
     def wrap(val: Optional[str]) -> bool:
@@ -424,6 +433,7 @@ def str_ends_with(value: str) -> Callable[[Optional[str]], bool]:
     Returns:
         Callable[[Optional[str]], bool]: A predicate.
     """
+    require_non_null(value, "Value cannot be None")
 
     # Uses efficient built-in str.endswith
     def wrap(val: Optional[str]) -> bool:
@@ -442,6 +452,7 @@ def str_ends_with_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
     Returns:
         Callable[[Optional[str]], bool]: A predicate.
     """
+    require_non_null(value, "Value cannot be None")
 
     # .lower() is standard.
     def wrap(val: Optional[str]) -> bool:
@@ -463,6 +474,7 @@ def str_matches(pattern: str) -> Callable[[Optional[str]], bool]:
     Returns:
         Callable[[Optional[str]], bool]: A predicate.
     """
+    require_non_null(pattern, "Pattern cannot be None")
 
     # Compile regex for potential minor optimization if used repeatedly,
     # but re.match caches patterns anyway. Keeping it simple is fine.
@@ -489,6 +501,7 @@ def str_not_matches(pattern: str) -> Callable[[Optional[str]], bool]:
         Callable[[Optional[str]], bool]: A predicate.
     """
     # Reuses str_matches and not_
+    require_non_null(pattern, "Pattern cannot be None")
     return not_(str_matches(pattern))
 
 
@@ -502,6 +515,8 @@ def str_longer_than(length: int) -> Callable[[Optional[str]], bool]:
     Returns:
         Callable[[Optional[str]], bool]: A predicate.
     """
+    if length < 0:
+        raise ValueError("Length cannot be negative")
 
     def wrap(val: Optional[str]) -> bool:
         return val is not None and len(val) > length
@@ -519,6 +534,8 @@ def str_shorter_than(length: int) -> Callable[[Optional[str]], bool]:
     Returns:
         Callable[[Optional[str]], bool]: A predicate.
     """
+    if length < 0:
+        raise ValueError("Length cannot be negative")
 
     def wrap(val: Optional[str]) -> bool:
         return val is not None and len(val) < length
@@ -537,6 +554,9 @@ def str_longer_than_or_eq(length: int) -> Callable[[Optional[str]], bool]:
         Callable[[Optional[str]], bool]: A predicate.
     """
 
+    if length < 0:
+        raise ValueError("Length cannot be negative")
+
     def wrap(val: Optional[str]) -> bool:
         return val is not None and len(val) >= length
 
@@ -554,6 +574,9 @@ def str_shorter_than_or_eq(length: int) -> Callable[[Optional[str]], bool]:
         Callable[[Optional[str]], bool]: A predicate.
     """
 
+    if length < 0:
+        raise ValueError("Length cannot be negative")
+
     def wrap(val: Optional[str]) -> bool:
         return val is not None and len(val) <= length
 
@@ -570,6 +593,7 @@ def equals_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
     Returns:
         Callable[[Optional[str]], bool]: A predicate.
     """
+    require_non_null(value, "Value cannot be None")
 
     # .lower() is standard.
     def wrap(val: Optional[str]) -> bool:
@@ -620,6 +644,8 @@ def _beween(
     interval_start: float, interval_end: float
 ) -> Callable[[Optional[float]], bool]:
     """Checks if a number is strictly between start and end (start < number < end)."""
+    if interval_end < interval_start:
+        raise ValueError("End cannot be less than start")
 
     def wrap(val: Optional[float]) -> bool:
         return val is not None and interval_start < val < interval_end
@@ -631,6 +657,8 @@ def _beween_closed(
     interval_start: float, interval_end: float
 ) -> Callable[[Optional[float]], bool]:
     """Checks if a number is between start and end inclusive (start <= number <= end)."""
+    if interval_end < interval_start:
+        raise ValueError("End cannot be less than start")
 
     def wrap(val: Optional[float]) -> bool:
         return val is not None and interval_start <= val <= interval_end
@@ -671,6 +699,9 @@ def is_beween_closed_start(
 ) -> Callable[[Optional[float]], bool]:
     """Checks if a number is between start (inclusive) and end (exclusive) (start <= number < end)."""
 
+    if interval_end < interval_start:
+        raise ValueError("End cannot be less than start")
+
     def wrap(val: Optional[float]) -> bool:
         return val is not None and interval_start <= val < interval_end
 
@@ -681,6 +712,9 @@ def is_beween_closed_end(
     interval_start: float, interval_end: float
 ) -> Callable[[Optional[float]], bool]:
     """Checks if a number is between start (exclusive) and end (inclusive) (start < number <= end)."""
+
+    if interval_end < interval_start:
+        raise ValueError("End cannot be less than start")
 
     def wrap(val: Optional[float]) -> bool:
         return val is not None and interval_start < val <= interval_end
@@ -887,6 +921,8 @@ def str_fullmatch(pattern: str) -> Callable[[Optional[str]], bool]:
     Returns:
         Callable[[Optional[str]], bool]: A predicate.
     """
+
+    require_non_null(pattern, "Pattern cannot be None")
 
     # Consider compiling if performance is critical, but re caches patterns.
     # compiled_pattern = re.compile(pattern)

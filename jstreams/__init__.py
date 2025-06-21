@@ -213,7 +213,6 @@ from jstreams.utils import (
     dict_update,
     sort,
     Value,
-    SynchronizedValue,
     extract,
     identity,
     chunk,
@@ -368,6 +367,7 @@ from jstreams.annotations import (
     required_args,
     validate_args,
     default_on_error,
+    SynchronizedValue,
 )
 
 from jstreams.serialize import (
