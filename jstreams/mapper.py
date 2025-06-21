@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Generic, Iterable, TypeVar
+import itertools
 
-from jstreams.utils import each
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -155,26 +155,21 @@ def mapper_with_of(
 def flat_map(
     target: Iterable[T],
     mapper: Callable[[T], Iterable[V]],
-) -> list[V]:
+) -> Iterable[V]:
     """
-    Returns a flattened map. The mapper function is called for each element of the target
-    iterable, then all elements are added to a result list.
-    Ex: flat_map([1, 2], lambda x: [x, x + 1]) returns [1, 2, 2, 3]
+    Returns a lazily evaluated flattened map. The mapper function is called for each element of the target
+    iterable, and the resulting iterables are chained together.
+    Ex: list(flat_map([1, 2], lambda x: [x, x + 1])) returns [1, 2, 2, 3]
 
     Args:
         target (Iterable[T]): The target iterable
         mapper (Callable[[T], Iterable[V]]): The mapper
 
     Returns:
-        list[V]: The resulting flattened map
+        Iterable[V]: The resulting lazily flattened map
     """
-    ret: list[V] = []
     if target is None:
-        return ret
+        return []
 
-    mapper_obj = Mapper.of(mapper)
-
-    for el in target:
-        mapped = mapper_obj.map(el)
-        each(mapped, ret.append)
-    return ret
+    # The map() will be lazy, and chain.from_iterable() will also be lazy.
+    return itertools.chain.from_iterable(map(mapper, target))
