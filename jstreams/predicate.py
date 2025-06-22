@@ -1020,6 +1020,7 @@ def and_(
 ) -> Callable[[T], bool]: ...
 
 
+@overload
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
@@ -1028,6 +1029,180 @@ def and_(
     predicate5: Optional[Callable[[T], bool]] = None,
     predicate6: Optional[Callable[[T], bool]] = None,
     predicate7: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate12: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate12: Optional[Callable[[T], bool]] = None,
+    predicate13: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate12: Optional[Callable[[T], bool]] = None,
+    predicate13: Optional[Callable[[T], bool]] = None,
+    predicate14: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate12: Optional[Callable[[T], bool]] = None,
+    predicate13: Optional[Callable[[T], bool]] = None,
+    predicate14: Optional[Callable[[T], bool]] = None,
+    predicate15: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate12: Optional[Callable[[T], bool]] = None,
+    predicate13: Optional[Callable[[T], bool]] = None,
+    predicate14: Optional[Callable[[T], bool]] = None,
+    predicate15: Optional[Callable[[T], bool]] = None,
+    predicate16: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate12: Optional[Callable[[T], bool]] = None,
+    predicate13: Optional[Callable[[T], bool]] = None,
+    predicate14: Optional[Callable[[T], bool]] = None,
+    predicate15: Optional[Callable[[T], bool]] = None,
+    predicate16: Optional[Callable[[T], bool]] = None,
+    predicate17: Optional[Callable[[T], bool]] = None,
 ) -> Callable[[T], bool]:
     """
     Produces a predicate that returns True if all of the provided predicates returns True.
@@ -1040,6 +1215,16 @@ def and_(
         predicate5 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
         predicate6 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
         predicate7 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate8 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate9 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate10 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate11 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate12 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate13 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate14 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate15 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate16 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate17 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
 
     Returns:
         Callable[[T], bool]: The AND predicate
@@ -1055,6 +1240,16 @@ def and_(
             predicate5,
             predicate6,
             predicate7,
+            predicate8,
+            predicate9,
+            predicate10,
+            predicate11,
+            predicate12,
+            predicate13,
+            predicate14,
+            predicate15,
+            predicate16,
+            predicate17,
         ],
     )
     return lambda el: all(pred(el) for pred in predicates)
@@ -1104,6 +1299,7 @@ def or_(
 ) -> Callable[[T], bool]: ...
 
 
+@overload
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
@@ -1112,9 +1308,183 @@ def or_(
     predicate5: Optional[Callable[[T], bool]] = None,
     predicate6: Optional[Callable[[T], bool]] = None,
     predicate7: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate12: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate12: Optional[Callable[[T], bool]] = None,
+    predicate13: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate12: Optional[Callable[[T], bool]] = None,
+    predicate13: Optional[Callable[[T], bool]] = None,
+    predicate14: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate12: Optional[Callable[[T], bool]] = None,
+    predicate13: Optional[Callable[[T], bool]] = None,
+    predicate14: Optional[Callable[[T], bool]] = None,
+    predicate15: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate12: Optional[Callable[[T], bool]] = None,
+    predicate13: Optional[Callable[[T], bool]] = None,
+    predicate14: Optional[Callable[[T], bool]] = None,
+    predicate15: Optional[Callable[[T], bool]] = None,
+    predicate16: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate12: Optional[Callable[[T], bool]] = None,
+    predicate13: Optional[Callable[[T], bool]] = None,
+    predicate14: Optional[Callable[[T], bool]] = None,
+    predicate15: Optional[Callable[[T], bool]] = None,
+    predicate16: Optional[Callable[[T], bool]] = None,
+    predicate17: Optional[Callable[[T], bool]] = None,
 ) -> Callable[[T], bool]:
     """
-    Produces a predicate that returns True if any of the provided predicates returns True.
+    Produces a predicate that returns True if all of the provided predicates returns True.
 
     Args:
         predicate1 (Callable[[T], bool]): Predicate
@@ -1124,10 +1494,21 @@ def or_(
         predicate5 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
         predicate6 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
         predicate7 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate8 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate9 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate10 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate11 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate12 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate13 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate14 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate15 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate16 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate17 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
 
     Returns:
-        Callable[[T], bool]: The OR predicate
+        Callable[[T], bool]: The AND predicate
     """
+
     predicates: list[Callable[[T], bool]] = filter(  # type: ignore[assignment]
         lambda p: p is not None,
         [
@@ -1138,6 +1519,16 @@ def or_(
             predicate5,
             predicate6,
             predicate7,
+            predicate8,
+            predicate9,
+            predicate10,
+            predicate11,
+            predicate12,
+            predicate13,
+            predicate14,
+            predicate15,
+            predicate16,
+            predicate17,
         ],
     )
     return lambda el: any(pred(el) for pred in predicates)
