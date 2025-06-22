@@ -224,6 +224,7 @@ from jstreams.utils import (
     omit,
     head,
     tail,
+    tail_count,
     last,
     to_nullable,
     repeat_value,

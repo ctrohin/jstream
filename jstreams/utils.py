@@ -516,12 +516,13 @@ def initial_count(data: Sequence[T], count: int) -> list[T]:
 
     Args:
         data (Sequence[T]): The input sequence.
+        count (int): The number of items to get
 
     Returns:
         list[T]: A new list containing the first `count` elements.
                  Returns an empty list if data has 0 or 1 element.
     """
-    return list(data[:-1]) if len(data) > 1 else []
+    return list(data[:count]) if len(data) > 1 else []
 
 
 def repeat_value(value: T, n: int) -> Iterable[T]:
