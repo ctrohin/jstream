@@ -7,7 +7,7 @@ from jstreams import (
     default_case,
     match,
     match_opt,
-    is_beween_closed,
+    is_between_closed,
     is_higher_than_or_eq,
     is_less_than,
 )
@@ -36,7 +36,7 @@ class TestMatch(BaseTestCase):
         val = match(5).of(
             case(1, "test1"),
             case(2, "test2"),
-            case(is_beween_closed(3, 6), "testBetween"),
+            case(is_between_closed(3, 6), "testBetween"),
             case(7, "test7"),
         )
         self.assertEqual(val, "testBetween", "Value should be correct")
@@ -45,7 +45,7 @@ class TestMatch(BaseTestCase):
         val = match(5).of(
             case(1, "test1"),
             case(2, "test2"),
-            case(is_beween_closed(3, 6), lambda: "testBetween"),
+            case(is_between_closed(3, 6), lambda: "testBetween"),
             case(7, "test7"),
         )
         self.assertEqual(val, "testBetween", "Value should be correct")

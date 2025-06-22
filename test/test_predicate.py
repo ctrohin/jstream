@@ -22,10 +22,10 @@ from jstreams.predicate import (
     has_key,
     has_length,
     has_value,
-    is_beween,
-    is_beween_closed,
-    is_beween_closed_end,
-    is_beween_closed_start,
+    is_between,
+    is_between_closed,
+    is_between_closed_end,
+    is_between_closed_start,
     is_blank,
     is_even,
     is_false,
@@ -611,7 +611,7 @@ class TestPredicate(BaseTestCase):
 
     def test_numeric_interval_predicates(self):
         # is_beween_closed / is_in_interval
-        p_closed_1_5 = is_beween_closed(1.0, 5.0)  # Alias: is_in_interval
+        p_closed_1_5 = is_between_closed(1.0, 5.0)  # Alias: is_in_interval
         self.assertTrue(p_closed_1_5(1.0))
         self.assertTrue(p_closed_1_5(3.0))
         self.assertTrue(p_closed_1_5(5.0))
@@ -621,7 +621,7 @@ class TestPredicate(BaseTestCase):
         self.assertTrue(is_in_interval(1.0, 5.0)(3.0))
 
         # is_beween / is_in_open_interval
-        p_open_1_5 = is_beween(1.0, 5.0)  # Alias: is_in_open_interval
+        p_open_1_5 = is_between(1.0, 5.0)  # Alias: is_in_open_interval
         self.assertFalse(p_open_1_5(1.0))
         self.assertTrue(p_open_1_5(3.0))
         self.assertFalse(p_open_1_5(5.0))
@@ -631,7 +631,7 @@ class TestPredicate(BaseTestCase):
         self.assertTrue(is_in_open_interval(1.0, 5.0)(3.0))
 
         # is_beween_closed_start (start <= val < end)
-        p_closed_start_1_5 = is_beween_closed_start(1.0, 5.0)
+        p_closed_start_1_5 = is_between_closed_start(1.0, 5.0)
         self.assertTrue(p_closed_start_1_5(1.0))
         self.assertTrue(p_closed_start_1_5(4.9))
         self.assertFalse(p_closed_start_1_5(5.0))
@@ -639,7 +639,7 @@ class TestPredicate(BaseTestCase):
         self.assertFalse(p_closed_start_1_5(None))
 
         # is_beween_closed_end (start < val <= end)
-        p_closed_end_1_5 = is_beween_closed_end(1.0, 5.0)
+        p_closed_end_1_5 = is_between_closed_end(1.0, 5.0)
         self.assertFalse(p_closed_end_1_5(1.0))
         self.assertTrue(p_closed_end_1_5(1.1))
         self.assertTrue(p_closed_end_1_5(5.0))

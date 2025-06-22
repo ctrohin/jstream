@@ -645,20 +645,7 @@ def is_int(number: Optional[float]) -> bool:
     return number is not None and number == int(number)
 
 
-def _beween(
-    interval_start: float, interval_end: float
-) -> Callable[[Optional[float]], bool]:
-    """Checks if a number is strictly between start and end (start < number < end)."""
-    if interval_end < interval_start:
-        raise ValueError("End cannot be less than start")
-
-    def wrap(val: Optional[float]) -> bool:
-        return val is not None and interval_start < val < interval_end
-
-    return wrap
-
-
-def _beween_closed(
+def is_between_closed(
     interval_start: float, interval_end: float
 ) -> Callable[[Optional[float]], bool]:
     """Checks if a number is between start and end inclusive (start <= number <= end)."""
@@ -671,35 +658,34 @@ def _beween_closed(
     return wrap
 
 
-def is_beween_closed(
-    interval_start: float, interval_end: float
-) -> Callable[[Optional[float]], bool]:
-    """Checks if a number is between start and end inclusive (start <= number <= end)."""
-    return _beween_closed(interval_start, interval_end)
-
-
 def is_in_interval(
     interval_start: float, interval_end: float
 ) -> Callable[[Optional[float]], bool]:
     """Checks if a number is between start and end inclusive (start <= number <= end)."""
-    return _beween_closed(interval_start, interval_end)
+    return is_between_closed(interval_start, interval_end)
 
 
-def is_beween(
+def is_between(
     interval_start: float, interval_end: float
 ) -> Callable[[Optional[float]], bool]:
     """Checks if a number is strictly between start and end (start < number < end)."""
-    return _beween(interval_start, interval_end)
+    if interval_end < interval_start:
+        raise ValueError("End cannot be less than start")
+
+    def wrap(val: Optional[float]) -> bool:
+        return val is not None and interval_start < val < interval_end
+
+    return wrap
 
 
 def is_in_open_interval(
     interval_start: float, interval_end: float
 ) -> Callable[[Optional[float]], bool]:
     """Checks if a number is strictly between start and end (start < number < end)."""
-    return _beween(interval_start, interval_end)
+    return is_between(interval_start, interval_end)
 
 
-def is_beween_closed_start(
+def is_between_closed_start(
     interval_start: float, interval_end: float
 ) -> Callable[[Optional[float]], bool]:
     """Checks if a number is between start (inclusive) and end (exclusive) (start <= number < end)."""
@@ -713,7 +699,7 @@ def is_beween_closed_start(
     return wrap
 
 
-def is_beween_closed_end(
+def is_between_closed_end(
     interval_start: float, interval_end: float
 ) -> Callable[[Optional[float]], bool]:
     """Checks if a number is between start (exclusive) and end (inclusive) (start < number <= end)."""
