@@ -10,6 +10,7 @@ from typing import (
     Union,
     cast,
     Generic,
+    overload,
 )
 
 from collections.abc import Sized
@@ -973,3 +974,170 @@ def _extract_predicate_fn(predicate: Callable[[T], bool]) -> Callable[[T], bool]
     if isinstance(predicate, Predicate):
         return predicate.apply
     return predicate
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool], predicate2: Callable[[T], bool]
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+def and_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]:
+    """
+    Produces a predicate that returns True if all of the provided predicates returns True.
+
+    Args:
+        predicate1 (Callable[[T], bool]): Predicate
+        predicate2 (Callable[[T], bool]): Predicate
+        predicate3 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate4 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate5 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate6 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate7 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+
+    Returns:
+        Callable[[T], bool]: The AND predicate
+    """
+
+    predicates: list[Callable[[T], bool]] = filter(  # type: ignore[assignment]
+        lambda p: p is not None,
+        [
+            predicate1,
+            predicate2,
+            predicate3,
+            predicate4,
+            predicate5,
+            predicate6,
+            predicate7,
+        ],
+    )
+    return lambda el: all(pred(el) for pred in predicates)
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool], predicate2: Callable[[T], bool]
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+@overload
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]: ...
+
+
+def or_(
+    predicate1: Callable[[T], bool],
+    predicate2: Callable[[T], bool],
+    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate7: Optional[Callable[[T], bool]] = None,
+) -> Callable[[T], bool]:
+    """
+    Produces a predicate that returns True if any of the provided predicates returns True.
+
+    Args:
+        predicate1 (Callable[[T], bool]): Predicate
+        predicate2 (Callable[[T], bool]): Predicate
+        predicate3 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate4 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate5 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate6 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate7 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+
+    Returns:
+        Callable[[T], bool]: The OR predicate
+    """
+    predicates: list[Callable[[T], bool]] = filter(  # type: ignore[assignment]
+        lambda p: p is not None,
+        [
+            predicate1,
+            predicate2,
+            predicate3,
+            predicate4,
+            predicate5,
+            predicate6,
+            predicate7,
+        ],
+    )
+    return lambda el: any(pred(el) for pred in predicates)
