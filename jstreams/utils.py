@@ -469,6 +469,20 @@ def tail(data: Sequence[T]) -> list[T]:
     return list(data[1:]) if len(data) > 1 else []
 
 
+def tail_count(data: Sequence[T], count: int) -> list[T]:
+    """
+    Gets last `count` of a sequence.
+
+    Args:
+        data (Sequence[T]): The input sequence.
+
+    Returns:
+        list[T]: A new list containing the last `count` elements.
+                 Returns an empty list if data has 0 or 1 element.
+    """
+    return list(data[-count:]) if len(data) > 1 else []
+
+
 def last(data: Sequence[T]) -> Optional[T]:
     """
     Gets the last element of a sequence.
@@ -491,6 +505,20 @@ def initial(data: Sequence[T]) -> list[T]:
 
     Returns:
         list[T]: A new list containing all elements of data except the last.
+                 Returns an empty list if data has 0 or 1 element.
+    """
+    return list(data[:-1]) if len(data) > 1 else []
+
+
+def initial_count(data: Sequence[T], count: int) -> list[T]:
+    """
+    Gets first `count` elements of a sequence.
+
+    Args:
+        data (Sequence[T]): The input sequence.
+
+    Returns:
+        list[T]: A new list containing the first `count` elements.
                  Returns an empty list if data has 0 or 1 element.
     """
     return list(data[:-1]) if len(data) > 1 else []

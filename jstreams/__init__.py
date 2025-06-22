@@ -227,6 +227,8 @@ from jstreams.utils import (
     last,
     to_nullable,
     repeat_value,
+    initial,
+    initial_count,
 )
 
 from jstreams.predicate import (
@@ -649,6 +651,7 @@ __all__ = [
     "omit",
     "head",
     "tail",
+    "tail_count",
     "last",
     "extract_list_strict",
     "extract_non_null_list_strict",
@@ -707,4 +710,6 @@ __all__ = [
     "intersperse",
     "unfold",
     "zip_longest",
+    "initial",
+    "initial_count",
 ]
