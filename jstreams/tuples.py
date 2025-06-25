@@ -1,5 +1,5 @@
-from typing import Any, Callable, Generic, TypeVar
-
+from typing import Any, Generic, TypeVar
+from collections.abc import Callable
 from jstreams.predicate import Predicate, predicate_of
 
 T = TypeVar("T")

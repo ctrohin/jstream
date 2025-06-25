@@ -1,5 +1,5 @@
-from typing import Iterable, Optional, TypeVar, cast
-
+from typing import Optional, TypeVar, cast
+from collections.abc import Iterable
 from jstreams.stream import Stream
 from jstreams.utils import is_not_none, require_non_null
 

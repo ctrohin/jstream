@@ -1,4 +1,5 @@
-from typing import Any, Callable, Optional, TypeVar, overload
+from typing import Any, Optional, TypeVar, overload
+from collections.abc import Callable
 import inspect
 from threading import RLock
 

@@ -1,7 +1,7 @@
 from threading import Lock, Thread
 from time import sleep
-from typing import Any, Callable
-
+from typing import Any
+from collections.abc import Callable
 from jstreams.thread import LoopingThread, Cancellable
 
 

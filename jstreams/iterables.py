@@ -3,8 +3,8 @@ from collections import deque
 from itertools import dropwhile, islice, takewhile
 import itertools
 import sys
-from typing import Any, Callable, Generic, Iterable, Iterator, Optional, TypeVar, cast
-
+from typing import Any, Generic, Optional, TypeVar, cast
+from collections.abc import Callable, Iterable, Iterator
 from jstreams.mapper import Mapper
 from jstreams.predicate import not_strict, _extract_predicate_fn
 from jstreams.tuples import Pair

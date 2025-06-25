@@ -1,5 +1,5 @@
-from typing import Callable, Generic, Optional, TypeVar, Union, final, overload
-
+from typing import Generic, Optional, TypeVar, Union, final, overload
+from collections.abc import Callable
 from jstreams.stream import Opt
 from jstreams.predicate import Predicate, _extract_predicate_fn
 

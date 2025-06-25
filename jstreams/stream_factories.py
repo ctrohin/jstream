@@ -1,5 +1,5 @@
-from typing import Generic, Iterable, Iterator, TypeVar
-
+from typing import Generic, TypeVar
+from collections.abc import Iterable, Iterator
 from jstreams.stream import Stream
 from jstreams.tuples import Triplet
 

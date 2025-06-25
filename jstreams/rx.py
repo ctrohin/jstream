@@ -3,20 +3,18 @@ import logging
 from threading import Lock, Thread
 import time
 from typing import (
-    Callable,
     Generic,
-    Iterable,
     Optional,
     TypeVar,
-    Deque,
     Any,
     cast,
     Union,
     overload,
 )
+from collections import deque
+from collections.abc import Callable, Iterable
 import uuid
 from copy import deepcopy
-from collections import deque
 from dataclasses import dataclass
 
 from jstreams.iterables import ConcatIterable
@@ -935,7 +933,7 @@ class _ZipSubscriptionManager(Generic[T, V]):
         self._zipper_fn = zipper_fn
         self._merged_subscription = merged_subscription
         self._inner_subscriptions: list[ObservableSubscription[Any]] = []
-        self._queues: list[Deque[Any]] = [deque() for _ in sources]
+        self._queues: list[deque[Any]] = [deque() for _ in sources]
         self._completed_flags: list[bool] = [False] * len(sources)
         self._errored = False
         self._lock = Lock()

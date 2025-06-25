@@ -2,7 +2,8 @@ from enum import Enum
 import importlib
 import inspect
 from threading import Lock, RLock
-from typing import Any, Callable, Generic, Optional, TypeVar, Union, cast
+from typing import Any, Generic, Optional, TypeVar, Union, cast
+from collections.abc import Callable
 
 from jstreams.noop import NoOp, NoOpCls
 from jstreams.stream import Opt, Stream

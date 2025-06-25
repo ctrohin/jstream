@@ -1,6 +1,7 @@
 import abc
 from threading import Thread
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
+from collections.abc import Callable
 
 
 class Cancellable(Protocol):

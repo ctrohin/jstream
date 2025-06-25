@@ -3,7 +3,8 @@ import datetime
 import importlib
 from time import sleep
 import time
-from typing import Any, Callable, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from threading import Lock, Thread
 from jstreams.stream import Opt

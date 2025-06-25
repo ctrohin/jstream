@@ -4,10 +4,8 @@ from enum import Enum
 import re
 from typing import (
     Any,
-    Callable,
     Optional,
     TypeVar,
-    Iterable,
     Union,
     Protocol,
     runtime_checkable,
@@ -15,6 +13,7 @@ from typing import (
     get_origin,
     get_args,
 )
+from collections.abc import Callable, Iterable
 import inspect
 from uuid import UUID
 

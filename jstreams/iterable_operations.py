@@ -1,4 +1,5 @@
-from typing import Callable, Iterable, Optional, TypeVar
+from typing import Optional, TypeVar
+from collections.abc import Callable, Iterable
 import functools
 
 T = TypeVar("T")

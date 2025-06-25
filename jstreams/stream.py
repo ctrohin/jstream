@@ -1,15 +1,12 @@
 from typing import (
-    Callable,
-    Iterable,
     Any,
-    Iterator,
     Optional,
     TypeVar,
     Generic,
     cast,
     final,
 )
-
+from collections.abc import Callable, Iterable, Iterator
 from jstreams.class_operations import ClassOps
 import itertools
 from jstreams.iterable_operations import (

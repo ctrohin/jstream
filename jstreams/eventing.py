@@ -1,7 +1,7 @@
 import inspect
 from threading import Lock, Event as ThreadingEvent
-from typing import Any, Callable, Generic, Optional, TypeVar, Union, overload
-
+from typing import Any, Generic, Optional, TypeVar, Union, overload
+from collections.abc import Callable
 from jstreams.predicate import Predicate
 from jstreams.rx import (
     RX,

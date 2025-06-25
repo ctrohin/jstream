@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Generic, Iterable, TypeVar
+from typing import Any, Generic, TypeVar
+from collections.abc import Callable, Iterable
 import itertools
 
 

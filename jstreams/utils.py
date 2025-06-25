@@ -2,16 +2,13 @@ from functools import cmp_to_key
 import json
 from typing import (
     Any,
-    Callable,
     Generic,
-    Iterable,
     Optional,
-    Sequence,
     TypeVar,
     Union,
     cast,
 )
-
+from collections.abc import Callable, Iterable, Sequence
 from collections.abc import Sized
 
 import itertools

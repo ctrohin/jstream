@@ -1,5 +1,6 @@
 from jstreams import Stream, service, str_contains_ignore_case
-from typing import Any, Iterable
+from typing import Any
+from collections.abc import Iterable
 
 
 class User:

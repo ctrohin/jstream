@@ -2,9 +2,6 @@ from abc import ABC, abstractmethod
 import re
 from typing import (
     Any,
-    Callable,
-    Iterable,
-    Mapping,
     Optional,
     TypeVar,
     Union,
@@ -12,7 +9,7 @@ from typing import (
     Generic,
     overload,
 )
-
+from collections.abc import Callable, Iterable, Mapping
 from collections.abc import Sized
 
 from jstreams.utils import require_non_null

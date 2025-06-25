@@ -1,5 +1,5 @@
-from typing import Any, Callable, Iterable, Optional, TypeVar
-
+from typing import Any, Optional, TypeVar
+from collections.abc import Callable, Iterable
 from jstreams.predicate import Predicate, is_none, not_, predicate_of
 from jstreams.stream import Stream
 

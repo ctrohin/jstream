@@ -3,7 +3,6 @@ from logging import Logger
 from time import sleep
 from typing import (
     Any,
-    Callable,
     Final,
     Generic,
     Optional,
@@ -12,7 +11,7 @@ from typing import (
     Union,
     cast,
 )
-
+from collections.abc import Callable
 from jstreams.noop import noop
 from jstreams.predicate import is_identity
 from jstreams.stream import Opt
