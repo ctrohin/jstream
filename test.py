@@ -1,22 +1,23 @@
-from jstreams import synchronized
+import json
+import time
+from jstreams import take_while, take_until
+from itertools import groupby, takewhile
 
 
-class TestClass:
-    @synchronized()
-    def print_something(self, a: int, b: str) -> None:
-        print(str(a) + " " + b)
+max_val = 1000 * 1000 * 100
+while_val = max_val - 10
+it1 = range(max_val)
+it2 = range(max_val)
 
-    @synchronized()
-    def print_something_else(self) -> None:
-        print("something else")
+start = time.time()
+for e in takewhile(lambda x: x < while_val, it1):
+    pass
+end = time.time()
+print(end - start)
 
-    @synchronized()
-    def both(self) -> None:
-        self.print_something_else()
-        self.print_something(1, "a")
+start = time.time()
+for e in take_until(it2, lambda x: x >= while_val):
+    pass
 
-
-t = TestClass()
-t.print_something(10, "test")
-t.print_something_else()
-t.both()
+end = time.time()
+print(end - start)

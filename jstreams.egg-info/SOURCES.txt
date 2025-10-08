@@ -7,8 +7,10 @@ jstreams/annotations.py
 jstreams/class_operations.py
 jstreams/collectors.py
 jstreams/eventing.py
+jstreams/func.py
 jstreams/ioc.py
 jstreams/iterable_operations.py
+jstreams/iterables.py
 jstreams/mapper.py
 jstreams/match.py
 jstreams/noop.py
@@ -36,6 +38,7 @@ test/test_annotations.py
 test/test_class_ops.py
 test/test_collectors.py
 test/test_complex_ioc.py
+test/test_func.py
 test/test_ioc.py
 test/test_is_function.py
 test/test_iterable_operations.py
