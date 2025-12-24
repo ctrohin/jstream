@@ -230,8 +230,8 @@ class Tuple4(Generic[T1, T2, T3, T4]):
             isinstance(value, Tuple4)
             and value.val1() == self.val1()
             and value.val2() == self.val2()
-            and value.val2() == self.val3()
-            and value.val2() == self.val4()
+            and value.val3() == self.val3()
+            and value.val4() == self.val4()
         )
 
     def __hash__(self) -> int:

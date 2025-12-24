@@ -1,15 +1,20 @@
 from baseTest import BaseTestCase
 from jstreams.stream import pair_stream
 from jstreams.stream_factories import triplet_stream
-from jstreams.predicate import not_, contains, is_in_interval, is_zero
+from jstreams.predicate import not_, contains, is_in_interval, is_zero, equals
 from jstreams.tuples import (
     Pair,
     Triplet,
+    Tuple4,
     left_matches,
     middle_matches,
     pair,
     right_matches,
     triplet,
+    val1_matches,
+    val2_matches,
+    val3_matches,
+    val4_matches,
 )
 
 
@@ -52,6 +57,24 @@ class TestTuples(BaseTestCase):
         self.assertFalse(
             right_matches(is_in_interval(1.6, 2))(v), "Right should not match predicate"
         )
+
+    def test_tuple4(self) -> None:
+        v = Tuple4("a", 1, 2.0, True)
+        self.assertEqual(v.val1(), "a")
+        self.assertEqual(v.val2(), 1)
+        self.assertEqual(v.val3(), 2.0)
+        self.assertEqual(v.val4(), True)
+        self.assertEqual(v.unpack(), ("a", 1, 2.0, True))
+
+        v2 = Tuple4("a", 1, 2.0, True)
+        self.assertEqual(v, v2)
+
+    def test_tuple4_predicate(self) -> None:
+        v = Tuple4("test", 0, 1.5, False)
+        self.assertTrue(val1_matches(contains("es"))(v))
+        self.assertTrue(val2_matches(is_zero)(v))
+        self.assertTrue(val3_matches(is_in_interval(1, 2))(v))
+        self.assertTrue(val4_matches(equals(False))(v))
 
     def test_pair_stream(self) -> None:
         list1 = ["A", "B", "C"]
