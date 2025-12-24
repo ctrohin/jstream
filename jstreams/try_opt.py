@@ -24,6 +24,7 @@ EX_TYPE = TypeVar("EX_TYPE")
 
 UNCAUGHT_EXCEPTION_LOGGER_NAME: Final[str] = "uncaught_exception_logger"
 
+
 # Cache the default logger at the module level
 _default_logger: Final[Logger] = logging.getLogger(UNCAUGHT_EXCEPTION_LOGGER_NAME)
 
@@ -55,7 +56,7 @@ def _log_exception(
 
 
 def catch(
-    fn: Callable[[], T],
+    fn: Callable[[], Union[T, Optional[T]]],
     logger: Optional[ErrorLogger] = None,
 ) -> Optional[T]:
     """
@@ -78,9 +79,9 @@ def catch(
 
 def catch_with(
     with_val: K,
-    fn: Callable[[K], V],
+    fn: Callable[[K], Union[T, Optional[T]]],
     logger: Optional[ErrorLogger] = None,
-) -> Optional[V]:
+) -> Optional[T]:
     """
     Executes fn(with_val), catches any Exception, logs it using _log_exception,
     and returns None on failure.
