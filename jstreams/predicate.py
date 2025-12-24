@@ -379,9 +379,10 @@ def str_contains_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
     """
     require_non_null(value, "Value cannot be None")
 
-    # .lower() is the standard way, creates temporary strings.
+    value_lower = value.lower()
+
     def wrap(val: Optional[str]) -> bool:
-        return val is not None and value.lower() in val.lower()
+        return val is not None and value_lower in val.lower()
 
     return wrap
 
@@ -418,9 +419,10 @@ def str_starts_with_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
     """
     require_non_null(value, "Value cannot be None")
 
-    # .lower() is standard.
+    value_lower = value.lower()
+
     def wrap(val: Optional[str]) -> bool:
-        return val is not None and val.lower().startswith(value.lower())
+        return val is not None and val.lower().startswith(value_lower)
 
     return wrap
 
@@ -457,9 +459,10 @@ def str_ends_with_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
     """
     require_non_null(value, "Value cannot be None")
 
-    # .lower() is standard.
+    value_lower = value.lower()
+
     def wrap(val: Optional[str]) -> bool:
-        return val is not None and val.lower().endswith(value.lower())
+        return val is not None and val.lower().endswith(value_lower)
 
     return wrap
 
@@ -479,14 +482,12 @@ def str_matches(pattern: str) -> Callable[[Optional[str]], bool]:
     """
     require_non_null(pattern, "Pattern cannot be None")
 
-    # Compile regex for potential minor optimization if used repeatedly,
-    # but re.match caches patterns anyway. Keeping it simple is fine.
-    # compiled_pattern = re.compile(pattern) # Alternative
+    compiled_pattern = re.compile(pattern)
+
     def wrap(val: Optional[str]) -> bool:
         if val is None:
             return False
-        # match = compiled_pattern.match(val) # Alternative
-        match = re.match(pattern, val)
+        match = compiled_pattern.match(val)
         return match is not None
 
     return wrap
@@ -598,10 +599,10 @@ def equals_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
     """
     require_non_null(value, "Value cannot be None")
 
-    # .lower() is standard.
+    value_lower = value.lower()
+
     def wrap(val: Optional[str]) -> bool:
-        # Check both for None before comparing
-        return val is not None and value.lower() == val.lower()
+        return val is not None and value_lower == val.lower()
 
     return wrap
 
@@ -1227,9 +1228,9 @@ def and_(
         Callable[[T], bool]: The AND predicate
     """
 
-    predicates: list[Callable[[T], bool]] = filter(  # type: ignore[assignment]
-        lambda p: p is not None,
-        [
+    predicates: tuple[Callable[[T], bool], ...] = tuple(
+        p
+        for p in [
             predicate1,
             predicate2,
             predicate3,
@@ -1247,7 +1248,8 @@ def and_(
             predicate15,
             predicate16,
             predicate17,
-        ],
+        ]
+        if p is not None
     )
     return lambda el: all(pred(el) for pred in predicates)
 
@@ -1481,7 +1483,7 @@ def or_(
     predicate17: Optional[Callable[[T], bool]] = None,
 ) -> Callable[[T], bool]:
     """
-    Produces a predicate that returns True if all of the provided predicates returns True.
+    Produces a predicate that returns True if any of the provided predicates returns True.
 
     Args:
         predicate1 (Callable[[T], bool]): Predicate
@@ -1503,12 +1505,12 @@ def or_(
         predicate17 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
 
     Returns:
-        Callable[[T], bool]: The AND predicate
+        Callable[[T], bool]: The OR predicate
     """
 
-    predicates: list[Callable[[T], bool]] = filter(  # type: ignore[assignment]
-        lambda p: p is not None,
-        [
+    predicates: tuple[Callable[[T], bool], ...] = tuple(
+        p
+        for p in [
             predicate1,
             predicate2,
             predicate3,
@@ -1526,6 +1528,7 @@ def or_(
             predicate15,
             predicate16,
             predicate17,
-        ],
+        ]
+        if p is not None
     )
     return lambda el: any(pred(el) for pred in predicates)
