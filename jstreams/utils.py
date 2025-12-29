@@ -66,6 +66,8 @@ def is_number(any_val: Any) -> bool:
     Returns:
         bool: True if anyVal is a float, False otherwise
     """
+    if isinstance(any_val, bool):
+        return False
     try:
         float(any_val)
     except (ValueError, TypeError):

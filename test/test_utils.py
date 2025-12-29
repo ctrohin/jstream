@@ -187,9 +187,9 @@ class TestHelpers(BaseTestCase):
         self.assertTrue(is_number("3.14"))
         self.assertTrue(is_number("0.0"))
         self.assertTrue(is_number("-2.5e-3"))
-        self.assertTrue(is_number(True))  # float(True) is 1.0
-        self.assertTrue(is_number(False))  # float(False) is 0.0
 
+        self.assertFalse(is_number(True))  # float(True) is 1.0
+        self.assertFalse(is_number(False))  # float(False) is 0.0
         self.assertFalse(is_number("abc"))
         self.assertFalse(is_number("12a"))
         self.assertFalse(is_number(None))

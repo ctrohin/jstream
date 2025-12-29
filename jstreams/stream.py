@@ -1236,6 +1236,30 @@ class Stream(Generic[T]):
         """
         return Opt(reduce(self.__arg, reducer))
 
+    def min(self, comparator: Callable[[T, T], int]) -> Opt[T]:
+        """
+        Finds the minimum element of the stream according to the provided comparator.
+
+        Args:
+            comparator (Callable[[T, T], int]): The comparator function
+
+        Returns:
+            Opt[T]: The minimum element
+        """
+        return self.reduce(lambda a, b: a if comparator(a, b) <= 0 else b)
+
+    def max(self, comparator: Callable[[T, T], int]) -> Opt[T]:
+        """
+        Finds the maximum element of the stream according to the provided comparator.
+
+        Args:
+            comparator (Callable[[T, T], int]): The comparator function
+
+        Returns:
+            Opt[T]: The maximum element
+        """
+        return self.reduce(lambda a, b: a if comparator(a, b) >= 0 else b)
+
     def non_null(self) -> "Stream[T]":
         """
         Returns a stream of non null objects from this stream

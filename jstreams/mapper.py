@@ -7,6 +7,7 @@ import itertools
 T = TypeVar("T")
 V = TypeVar("V")
 K = TypeVar("K")
+R = TypeVar("R")
 
 
 class Mapper(ABC, Generic[T, V]):
@@ -54,6 +55,58 @@ class Mapper(ABC, Generic[T, V]):
         """
         return _WrapMapper(lambda _: value)
 
+    @staticmethod
+    def identity() -> "Mapper[T, T]":
+        """
+        Returns a mapper that always returns its input argument.
+
+        Returns:
+            Mapper[T, T]: A mapper that returns its input argument.
+        """
+        return _WrapMapper(lambda t: t)
+
+    def and_then(self, after: Callable[[V], K]) -> "Mapper[T, K]":
+        """
+        Returns a composed mapper that first applies this mapper to its input,
+        and then applies the after mapper to the result.
+
+        Args:
+            after (Callable[[V], K]): The mapper to apply after this mapper
+
+        Returns:
+            Mapper[T, K]: The composed mapper
+        """
+        after_mapper = Mapper.of(after)
+        return Mapper.of(lambda t: after_mapper.map(self.map(t)))
+
+    def compose(self, before: Callable[[K], T]) -> "Mapper[K, V]":
+        """
+        Returns a composed mapper that first applies the before mapper to its input,
+        and then applies this mapper to the result.
+
+        Args:
+            before (Callable[[K], T]): The mapper to apply before this mapper
+
+        Returns:
+            Mapper[K, V]: The composed mapper
+        """
+        before_mapper = Mapper.of(before)
+        return Mapper.of(lambda k: self.map(before_mapper.map(k)))
+
+    def zip(self, other: Callable[[T], K]) -> "Mapper[T, tuple[V, K]]":
+        """
+        Returns a mapper that applies this mapper and the other mapper to the same input
+        and returns a tuple of the results.
+
+        Args:
+            other (Callable[[T], K]): The other mapper
+
+        Returns:
+            Mapper[T, tuple[V, K]]: A mapper returning a tuple of results
+        """
+        other_mapper = Mapper.of(other)
+        return Mapper.of(lambda t: (self.map(t), other_mapper.map(t)))
+
 
 class MapperWith(ABC, Generic[T, K, V]):
     @abstractmethod
@@ -90,6 +143,43 @@ class MapperWith(ABC, Generic[T, K, V]):
         if isinstance(mapper, MapperWith):
             return mapper
         return _WrapMapperWith(mapper)
+
+    def and_then(self, after: Callable[[V], R]) -> "MapperWith[T, K, R]":
+        """
+        Returns a composed mapper that first applies this mapper to its input,
+        and then applies the after mapper to the result.
+
+        Args:
+            after (Callable[[V], R]): The mapper to apply after this mapper
+
+        Returns:
+            MapperWith[T, K, R]: The composed mapper
+        """
+        after_mapper = Mapper.of(after)
+        return MapperWith.of(lambda t, k: after_mapper.map(self.map(t, k)))
+
+    def bind(self, with_value: K) -> "Mapper[T, V]":
+        """
+        Returns a Mapper that applies this mapper with the given with_value fixed
+        as the second argument.
+
+        Args:
+            with_value (K): The value to bind to the second argument
+
+        Returns:
+            Mapper[T, V]: The bound mapper
+        """
+        return Mapper.of(lambda t: self.map(t, with_value))
+
+    def curry(self) -> "Mapper[T, Mapper[K, V]]":
+        """
+        Returns a Mapper that takes the first argument and returns a Mapper
+        that takes the second argument.
+
+        Returns:
+            Mapper[T, Mapper[K, V]]: The curried mapper
+        """
+        return Mapper.of(lambda t: Mapper.of(lambda k: self.map(t, k)))
 
 
 class _WrapMapper(Mapper[T, V]):
