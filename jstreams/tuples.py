@@ -321,3 +321,18 @@ def val4_matches(
         return predicate_arg(quadruplet_arg.val4())
 
     return predicate_of(wrap)
+
+
+def tuple4(val1: T1, val2: T2, val3: T3, val4: T4) -> Tuple4[T1, T2, T3, T4]:
+    """
+    Returns a Tuple4 object for the given values
+    """
+    return Tuple4(val1, val2, val3, val4)
+
+
+def tuple4_of(values: tuple[T1, T2, T3, T4]) -> Tuple4[T1, T2, T3, T4]:
+    """
+    Produces a Tuple4 from a tuple
+    """
+    val1, val2, val3, val4 = values
+    return tuple4(val1, val2, val3, val4)

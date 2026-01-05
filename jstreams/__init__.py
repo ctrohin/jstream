@@ -57,7 +57,7 @@ from jstreams.iterables import (
 
 from jstreams.reducer import reducer_of, Reducer
 
-from jstreams.stream_factories import triplet_stream
+from jstreams.stream_factories import triplet_stream, tuple4_stream
 from jstreams.stream_predicates import any_of, all_of, none_of, all_none, all_not_none
 
 from jstreams.try_opt import (
@@ -318,6 +318,15 @@ from jstreams.tuples import (
     middle_matches,
     pair_of,
     triplet_of,
+    Tuple2,
+    Tuple3,
+    Tuple4,
+    val1_matches,
+    val2_matches,
+    val3_matches,
+    val4_matches,
+    tuple4,
+    tuple4_of,
 )
 
 from jstreams.collectors import (
@@ -713,4 +722,14 @@ __all__ = [
     "zip_longest",
     "initial",
     "initial_count",
+    "tuple4_stream",
+    "Tuple2",
+    "Tuple3",
+    "Tuple4",
+    "val1_matches",
+    "val2_matches",
+    "val3_matches",
+    "val4_matches",
+    "tuple4",
+    "tuple4_of",
 ]
