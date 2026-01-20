@@ -160,12 +160,16 @@ class _Injector:
                 importlib.import_module(module)
 
     def __get_profile_str(self) -> str:
-        if self.__profile is None:
-            return self.__default_profile
-        return self.__profile
+        return self.__compute_profile(self.__profile)
 
     def __compute_profile(self, profile: Optional[str]) -> str:
-        return profile if profile is not None else self.__default_profile
+        return profile if profile is not None else self.__compute_default_profile()
+
+    def get_default_profile(self) -> str:
+        return self.__compute_default_profile()
+
+    def __compute_default_profile(self) -> str:
+        return self.__default_profile
 
     def activate_profile(self, profile: str) -> None:
         """
@@ -183,7 +187,7 @@ class _Injector:
         self.__profile = profile
 
     def get_active_profile(self) -> Optional[str]:
-        return self.__profile
+        return self.__get_profile_str()
 
     def raise_bean_errors(self, flag: bool) -> "_Injector":
         self.__raise_beans_error = flag
@@ -230,7 +234,8 @@ class _Injector:
             found_var = self._get_var(
                 class_name,
                 self.__get_component_key_with_profile(
-                    qualifier or self.__default_qualifier, self.__default_profile
+                    qualifier or self.__default_qualifier,
+                    self.__compute_default_profile(),
                 ),
                 True,
             )
@@ -258,7 +263,8 @@ class _Injector:
             found_obj = self._get(
                 class_name,
                 self.__get_component_key_with_profile(
-                    qualifier or self.__default_qualifier, self.__default_profile
+                    qualifier or self.__default_qualifier,
+                    self.__compute_default_profile(),
                 ),
                 True,
             )
