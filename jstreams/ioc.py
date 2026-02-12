@@ -210,7 +210,7 @@ class _Injector:
         self.__variables = {}
         self.__profile = None
         self.__modules_scanned = False
-        self.__modules_to_scan = []
+        self.__modules_to_scan = set()
         self.__comp_cache = {}
         self.__var_cache = {}
 

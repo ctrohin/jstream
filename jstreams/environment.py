@@ -14,7 +14,7 @@ JSTREAMS_CONFIG_JSON: Final[str] = "JSTREAMS_CONFIG_JSON"
 DEFAULT_FILE: Final[str] = "jstreams.json"
 
 
-def get_env_config_file():
+def get_env_config_file() -> str:
     return os.getenv(JSTREAMS_CONFIG_JSON, DEFAULT_FILE)
 
 
@@ -38,27 +38,28 @@ class JStreamsEnv:
         config_file = get_env_config_file()
         if os.path.exists(config_file):
             try:
-                config = load(open(config_file))
-                if self.__config.get(JSTREAMS_PROFILE) is None:
-                    self.__config[JSTREAMS_PROFILE] = (
-                        config.get(JSTREAMS_PROFILE)
-                        or config.get(JSTREAMS_PROFILE_LOWER)
-                        or config.get(JSTREAMS_PROFILE_CAMEL)
-                    )
-                if self.__config.get(JSTREAMS_PACKAGES) is None:
-                    self.__config[JSTREAMS_PACKAGES] = (
-                        config.get(JSTREAMS_PACKAGES)
-                        or config.get(JSTREAMS_PACKAGES_LOWER)
-                        or config.get(JSTREAMS_PACKAGES_CAMEL)
-                    )
+                with load(open(config_file, encoding="utf-8")) as config:
+                    if self.__config.get(JSTREAMS_PROFILE) is None:
+                        self.__config[JSTREAMS_PROFILE] = (
+                            config.get(JSTREAMS_PROFILE)
+                            or config.get(JSTREAMS_PROFILE_LOWER)
+                            or config.get(JSTREAMS_PROFILE_CAMEL)
+                        )
+                    if self.__config.get(JSTREAMS_PACKAGES) is None:
+                        self.__config[JSTREAMS_PACKAGES] = (
+                            config.get(JSTREAMS_PACKAGES)
+                            or config.get(JSTREAMS_PACKAGES_LOWER)
+                            or config.get(JSTREAMS_PACKAGES_CAMEL)
+                        )
             except Exception as e:
                 print(e)
 
     def get_profile(self) -> Optional[str]:
         return self.__config.get(JSTREAMS_PROFILE)
 
-    def get_packages(self) -> list[str]:
-        return self.__config.get(JSTREAMS_PACKAGES)
+    def get_packages(self) -> Optional[list[str]]:
+        packages: Optional[list[str]] = self.__config.get(JSTREAMS_PACKAGES)
+        return packages
 
     def __get_env_profile(self) -> Optional[str]:
         return (
