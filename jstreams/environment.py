@@ -3,7 +3,19 @@ from typing import Any, Final, Optional
 from json import load
 
 JSTREAMS_PROFILE: Final[str] = "JSTREAMS_PROFILE"
+JSTREAMS_PROFILE_LOWER: Final[str] = "jstreams_profile"
+JSTREAMS_PROFILE_CAMEL: Final[str] = "jstreamsProfile"
+
 JSTREAMS_PACKAGES: Final[str] = "JSTREAMS_PACKAGES"
+JSTREAMS_PACKAGES_LOWER: Final[str] = "jstreams_packages"
+JSTREAMS_PACKAGES_CAMEL: Final[str] = "jstreamsPackages"
+
+JSTREAMS_CONFIG_JSON: Final[str] = "JSTREAMS_CONFIG_JSON"
+DEFAULT_FILE: Final[str] = "jstreams.json"
+
+
+def get_env_config_file():
+    return os.getenv(JSTREAMS_CONFIG_JSON, DEFAULT_FILE)
 
 
 class JStreamsEnv:
@@ -11,7 +23,7 @@ class JStreamsEnv:
     Class that holds all the environment variables used by JStreams
     """
 
-    __slots__ = "__config"
+    __slots__ = ("__config",)
 
     def __init__(self) -> None:
         self.__config: dict[str, Any] = {}
@@ -23,13 +35,22 @@ class JStreamsEnv:
         if packages := self.__get_env_packages() is not None:
             self.__config[JSTREAMS_PACKAGES] = packages
 
-        if os.path.exists("jstreams.json"):
+        config_file = get_env_config_file()
+        if os.path.exists(config_file):
             try:
-                config = load(open("jstreams.json"))
+                config = load(open(config_file))
                 if self.__config.get(JSTREAMS_PROFILE) is None:
-                    self.__config[JSTREAMS_PROFILE] = config.get(JSTREAMS_PROFILE)
+                    self.__config[JSTREAMS_PROFILE] = (
+                        config.get(JSTREAMS_PROFILE)
+                        or config.get(JSTREAMS_PROFILE_LOWER)
+                        or config.get(JSTREAMS_PROFILE_CAMEL)
+                    )
                 if self.__config.get(JSTREAMS_PACKAGES) is None:
-                    self.__config[JSTREAMS_PACKAGES] = config.get(JSTREAMS_PACKAGES)
+                    self.__config[JSTREAMS_PACKAGES] = (
+                        config.get(JSTREAMS_PACKAGES)
+                        or config.get(JSTREAMS_PACKAGES_LOWER)
+                        or config.get(JSTREAMS_PACKAGES_CAMEL)
+                    )
             except Exception as e:
                 print(e)
 
@@ -40,10 +61,18 @@ class JStreamsEnv:
         return self.__config.get(JSTREAMS_PACKAGES)
 
     def __get_env_profile(self) -> Optional[str]:
-        return os.getenv(JSTREAMS_PROFILE)
+        return (
+            os.getenv(JSTREAMS_PROFILE)
+            or os.getenv(JSTREAMS_PROFILE_LOWER)
+            or os.getenv(JSTREAMS_PROFILE_CAMEL)
+        )
 
     def __get_env_packages(self) -> Optional[list[str]]:
-        packages = os.getenv(JSTREAMS_PACKAGES)
+        packages = (
+            os.getenv(JSTREAMS_PACKAGES)
+            or os.getenv(JSTREAMS_PACKAGES_LOWER)
+            or os.getenv(JSTREAMS_PACKAGES_CAMEL)
+        )
         if packages is None:
             return None
         return packages.split(",")

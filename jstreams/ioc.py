@@ -8,6 +8,7 @@ from collections.abc import Callable
 from jstreams.noop import NoOp, NoOpCls
 from jstreams.stream import Opt, Stream
 from jstreams.utils import is_mth_or_fn, require_non_null
+from jstreams.environment import JStreamsEnv
 
 
 class Strategy(Enum):
@@ -138,18 +139,24 @@ class _Injector:
         self.__variables: dict[type, _VariableDependency] = {}
         self.__default_qualifier: str = "__DEFAULT_QUALIFIER__"
         self.__default_profile: str = "__DEFAULT_PROFILE__"
-        self.__profile: Optional[str] = None
-        self.__modules_to_scan: list[str] = []
+
+        jstreams_env = JStreamsEnv()
+        self.__profile: Optional[str] = jstreams_env.get_profile()
+        env_packages = jstreams_env.get_packages()
+        self.__modules_to_scan: set[str] = set(
+            env_packages if env_packages is not None else []
+        )
+
         self.__modules_scanned = False
         self.__raise_beans_error = False
         self.__comp_cache: dict[tuple[type, Optional[str]], Any] = {}
         self.__var_cache: dict[tuple[type, str], Any] = {}
 
     def scan_modules(self, modules_to_scan: list[str]) -> "_Injector":
-        self.__modules_to_scan = modules_to_scan
+        self.__modules_to_scan = set(modules_to_scan)
         return self
 
-    def __retrieve_components(self) -> None:
+    def __scan_packages(self) -> None:
         if self.__modules_scanned:
             return
         with self.load_modules_lock:
@@ -441,7 +448,7 @@ class _Injector:
         qualifier: Optional[str],
         override_qualifier: bool = False,
     ) -> Any:
-        self.__retrieve_components()
+        self.__scan_packages()
         if (container_dep := self.__components.get(class_name)) is None:
             return None
         full_qualifier = self.__get_full_qualifier(qualifier, override_qualifier)
@@ -465,7 +472,7 @@ class _Injector:
     def _get_var(
         self, class_name: type, qualifier: str, override_qualifier: bool = False
     ) -> Any:
-        self.__retrieve_components()
+        self.__scan_packages()
 
         if (var_dep := self.__variables.get(class_name)) is None:
             return None
