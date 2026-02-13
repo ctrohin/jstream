@@ -1,6 +1,7 @@
 from __future__ import annotations
 import inspect
 from threading import Lock, RLock
+from types import UnionType
 from typing import (
     Any,
     Callable,
@@ -668,7 +669,7 @@ def validate_args(
 
                 is_valid = False
                 if (
-                    origin is Union
+                    origin is Union or origin is UnionType
                 ):  # Handles Union and Optional (Optional[T] is Union[T, NoneType])
                     # Check if the value's type is one of the types in the Union
                     for type_arg in args_types:

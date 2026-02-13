@@ -120,7 +120,7 @@ class TestValidateArgs(BaseTestCase):
     def test_union_type_invalid(self):
         with self.assertRaisesRegex(
             TypeError,
-            "Argument 'value'.*expected type typing.Union\\[str, float\\].*but got int",
+            "Argument 'value' for union_type expected type str | float, but got int.",
         ):
             union_type(123)  # type: ignore
 
