@@ -21,14 +21,14 @@ import abc
 
 class ValidationInterface(abc.ABC):
     @abc.abstractmethod
-    def is_valid(self, obj: Optional[str]) -> bool:
+    def is_valid(self, obj: str | None) -> bool:
         pass
 
 
 # This validator will check if the string is lowercase
 @component(class_name=ValidationInterface, qualifier="only_lower_case")
 class OnlyLowerCaseValidator(ValidationInterface):
-    def is_valid(self, obj: Optional[str]) -> bool:
+    def is_valid(self, obj: str | None) -> bool:
         return obj is not None and obj.lower() == obj
 
 
@@ -41,14 +41,14 @@ class MaxLengthValidator(ValidationInterface):
         super().__init__()
         self.max_len = max_len
 
-    def is_valid(self, obj: Optional[str]) -> bool:
+    def is_valid(self, obj: str | None) -> bool:
         return obj is not None and len(obj) < self.max_len
 
 
 # We can also define a non decorated class, that we can provide to the
 # injection mechanism using the configuration class below
 class NoSpaceValidator(ValidationInterface):
-    def is_valid(self, obj: Optional[str]) -> bool:
+    def is_valid(self, obj: str | None) -> bool:
         return obj is not None and " " not in obj
 
 

@@ -1,9 +1,10 @@
+from __future__ import annotations
 import inspect
 from threading import Lock, RLock
+from types import UnionType
 from typing import (
     Any,
     Callable,
-    Optional,
     TypeVar,
     Union,
     cast,
@@ -54,7 +55,7 @@ def builder() -> Callable[[type[T]], type[T]]:
                     setattr(self._instance, name, value)
                 return self._instance
 
-            def __getattr__(self, name: str) -> Callable[[Any], "Builder"]:
+            def __getattr__(self, name: str) -> Callable[[Any], Builder]:
                 if name.startswith("with_"):
                     field_name = name[5:]
                     if field_name.startswith("_"):
@@ -295,7 +296,7 @@ _lock_registry: dict[str, RLock] = {}
 _registry_access_lock = Lock()
 
 
-def _get_or_create_lock(func: Callable[..., Any], lock_name: Optional[str]) -> RLock:
+def _get_or_create_lock(func: Callable[..., Any], lock_name: str | None) -> RLock:
     """
     Retrieves or creates the appropriate RLock for the given function and lock name.
 
@@ -327,7 +328,7 @@ def _get_or_create_lock(func: Callable[..., Any], lock_name: Optional[str]) -> R
         return _lock_registry[final_lock_name]
 
 
-def synchronized_static(lock_name: Optional[str] = None) -> Callable[[F], F]:
+def synchronized_static(lock_name: str | None = None) -> Callable[[F], F]:
     """
     Decorator to synchronize access to a function or method using a static reentrant lock.
 
@@ -338,7 +339,7 @@ def synchronized_static(lock_name: Optional[str] = None) -> Callable[[F], F]:
     method using the same lock).
 
     Args:
-        lock_name (Optional[str]): An optional name for the lock.
+        lock_name (str | None): An optional name for the lock.
             - If provided (e.g., `@synchronized("my_resource_lock")`), all functions
                 decorated with the *same* `lock_name` string will share the same
                 underlying RLock. This synchronizes access across all those functions,
@@ -402,7 +403,7 @@ DEFAULT_INSTANCE_LOCK_ATTR = "_default_instance_sync_lock"
 
 
 def synchronized(
-    lock_attribute_name: Optional[str] = None,
+    lock_attribute_name: str | None = None,
 ) -> Callable[[F], F]:
     """
     Decorator to synchronize access to an instance method using an instance-specific reentrant lock.
@@ -416,7 +417,7 @@ def synchronized(
     instances can execute concurrently.
 
     Args:
-        lock_attribute_name (Optional[str]): An optional name for the attribute on the instance
+        lock_attribute_name (str | None): An optional name for the attribute on the instance
             that will hold the lock.
             - If provided (e.g., `@instance_synchronized("_my_resource_lock")`), this specific
                 attribute name will be used to store the RLock on the instance. All methods
@@ -462,7 +463,7 @@ def synchronized(
             # but let's rely on convention for 'self' being the first arg.
 
             # 2. Try to get the instance-specific lock attribute
-            lock: Optional[RLock] = getattr(instance, attr_name, None)
+            lock: RLock | None = getattr(instance, attr_name, None)
 
             # 3. Lazy, thread-safe lock creation if it doesn't exist on the instance yet
             if lock is None:
@@ -599,7 +600,7 @@ def all_args() -> Callable[[type[T]], type[T]]:
 
 
 def validate_args(
-    rules: Optional[dict[str, Predicate[Any]]] = None,
+    rules: dict[str, Predicate[Any]] | None = None,
 ) -> Callable[[F], F]:
     """
     Decorator to validate function arguments against their type hints at runtime.
@@ -614,11 +615,11 @@ def validate_args(
 
     Example:
         @validate_args()
-        def process_data(name: str, age: Optional[int] = None, tags: list = []):
+        def process_data(name: str, age: int | None = None, tags: list = []):
             print(f"Processing {name} ({age}) with tags {tags}")
 
         process_data("Alice", 30)       # OK
-        process_data("Bob", None)       # OK (Optional[int] allows None)
+        process_data("Bob", None)       # OK (int | None)
         process_data("Charlie", "twenty") # Raises TypeError (age should be int or None)
         process_data(123, 40)           # Raises TypeError (name should be str)
 
@@ -668,7 +669,7 @@ def validate_args(
 
                 is_valid = False
                 if (
-                    origin is Union
+                    origin is Union or origin is UnionType
                 ):  # Handles Union and Optional (Optional[T] is Union[T, NoneType])
                     # Check if the value's type is one of the types in the Union
                     for type_arg in args_types:
@@ -719,10 +720,9 @@ R = TypeVar("R")
 
 def default_on_error(
     default_value: R,
-    catch_exceptions: Optional[list[type]] = None,
-    logger: Optional[
-        Any
-    ] = None,  # Using Any for logger to avoid strict logging dependency
+    catch_exceptions: list[type] | None = None,
+    logger: Any
+    | None = None,  # Using Any for logger to avoid strict logging dependency
     log_message: str = "Caught exception in {func_name} ({exception}), returning default value.",
 ) -> Callable[[F], F]:
     """
@@ -730,9 +730,9 @@ def default_on_error(
 
     Args:
         default_value (R): The value to return if a specified exception is caught.
-        catch_exceptions (Optional[list[Type[E]]]): A list of exception types to catch.
+        catch_exceptions (list[Type[E]] | None): A list of exception types to catch.
             If None or empty, catches all `Exception` subclasses. Defaults to None.
-        logger (Optional[Any]): Logger-like object with an `error` or `warning` method
+        logger (Any | None): Logger-like object with an `error` or `warning` method
             to log the exception. If None, no logging occurs. Defaults to None.
         log_message (str): Format string for the log message. Available placeholders:
             {func_name}, {exception}, {args}, {kwargs}. Defaults to a standard message.

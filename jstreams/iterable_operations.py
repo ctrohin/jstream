@@ -1,22 +1,20 @@
-from typing import Optional, TypeVar
+from typing import TypeVar
 from collections.abc import Callable, Iterable
 import functools
 
 T = TypeVar("T")
 
 
-def find_first(
-    target: Optional[Iterable[T]], predicate: Callable[[T], bool]
-) -> Optional[T]:
+def find_first(target: Iterable[T] | None, predicate: Callable[[T], bool]) -> T | None:
     """
     Retrieves the first element of the given iterable that matches the given predicate
 
     Args:
-        target (Optional[Iterable[T]]): The target iterable
+        target (Iterable[T] | None): The target iterable
         predicate (Callable[[T], bool]): The predicate
 
     Returns:
-        Optional[T]: The first matching element, or None if no element matches the predicate
+        T | None: The first matching element, or None if no element matches the predicate
     """
     if target is None:
         return None
@@ -27,24 +25,22 @@ def find_first(
     return None
 
 
-def find_last(
-    target: Optional[Iterable[T]], predicate: Callable[[T], bool]
-) -> Optional[T]:
+def find_last(target: Iterable[T] | None, predicate: Callable[[T], bool]) -> T | None:
     """
     Retrieves the last element of the given iterable that matches the given predicate.
     Note: This function will iterate through the entire iterable.
 
     Args:
-        target (Optional[Iterable[T]]): The target iterable.
+        target (Iterable[T] | None): The target iterable.
         predicate (Callable[[T], bool]): The predicate.
 
     Returns:
-        Optional[T]: The last matching element, or None if no element matches the predicate.
+        T | None: The last matching element, or None if no element matches the predicate.
     """
     if target is None:
         return None
 
-    last_match: Optional[T] = None
+    last_match: T | None = None
     for el in target:
         if predicate(el):
             last_match = el
@@ -68,7 +64,7 @@ def matching(target: Iterable[T], predicate: Callable[[T], bool]) -> list[T]:
     return [el for el in target if predicate(el)]
 
 
-def reduce(target: Iterable[T], reducer: Callable[[T, T], T]) -> Optional[T]:
+def reduce(target: Iterable[T], reducer: Callable[[T, T], T]) -> T | None:
     """
     Reduces an iterable to a single value. The reducer function takes two values and
     returns only one. This function can be used to find min or max from a stream of ints.
@@ -77,7 +73,7 @@ def reduce(target: Iterable[T], reducer: Callable[[T, T], T]) -> Optional[T]:
         reducer (Callable[[T, T], T]): The reducer
 
     Returns:
-        Optional[T]: The resulting optional
+        T | None: The resulting optional
     """
     if target is None:
         return None

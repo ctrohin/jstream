@@ -1,5 +1,6 @@
+from __future__ import annotations
 from threading import Lock, Thread
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 from collections.abc import Callable
 from jstreams.utils import each
 
@@ -33,7 +34,7 @@ class _State(Generic[T]):
         return self.__value
 
     def add_on_change(
-        self, on_change: Optional[Callable[[T, T], Any]], asynchronous: bool
+        self, on_change: Callable[[T, T], Any] | None, asynchronous: bool
     ) -> None:
         if on_change is not None:
             if asynchronous:
@@ -46,7 +47,7 @@ class _State(Generic[T]):
 
 
 class _StateManager:
-    instance: Optional["_StateManager"] = None
+    instance: _StateManager | None = None
     instance_lock = Lock()
 
     def __init__(self) -> None:
@@ -56,7 +57,7 @@ class _StateManager:
         self,
         key: str,
         value: T,
-        on_change: Optional[Callable[[T, T], Any]],
+        on_change: Callable[[T, T], Any] | None,
         asynchronous: bool,
     ) -> _State[T]:
         if key in self.__states:
@@ -79,11 +80,11 @@ def _state_manager() -> _StateManager:
     return _StateManager.instance
 
 
-def default_state(typ: type[T], value: Optional[T] = None) -> Optional[T]:  # pylint: disable=unused-argument
+def default_state(typ: type[T], value: T | None = None) -> T | None:  # pylint: disable=unused-argument
     return value
 
 
-def null_state(typ: type[T]) -> Optional[T]:
+def null_state(typ: type[T]) -> T | None:
     """
     Returns a null state for the given type. This method is meant to be used when a state
     is not set but the typing context needs to know which type will be used.
@@ -91,7 +92,7 @@ def null_state(typ: type[T]) -> Optional[T]:
     Args:
         typ (type[T]): The type of the state
     Returns:
-        Optional[T]: The null state
+        T | None: The null state
     """
     return default_state(typ)
 
@@ -99,7 +100,7 @@ def null_state(typ: type[T]) -> Optional[T]:
 def use_state(
     key: str,
     default_value: T,
-    on_change: Optional[Callable[[T, T], Any]] = None,
+    on_change: Callable[[T, T], Any] | None = None,
 ) -> tuple[Callable[[], T], Callable[[T], None]]:
     """
     Returns a state (getter,setter) tuple for a managed state.
@@ -107,7 +108,7 @@ def use_state(
     Args:
         key (str): The key of the state
         default_value (T): The default value of the state
-        on_change (Optional[Callable[[T, T], Any]], optional): A function or method where the caller is notified about changes in the state.
+        on_change (Callable[[T, T], Any] | None, optional): A function or method where the caller is notified about changes in the state.
             The first argument in this function will be the new state value, and the second will be the old state value.
             The on change will be called synchonously.
             Defaults to None.
@@ -121,7 +122,7 @@ def use_state(
 def use_async_state(
     key: str,
     default_value: T,
-    on_change: Optional[Callable[[T, T], Any]] = None,
+    on_change: Callable[[T, T], Any] | None = None,
 ) -> tuple[Callable[[], T], Callable[[T], None]]:
     """
     Returns a state (getter,setter) tuple for a managed state.
@@ -129,7 +130,7 @@ def use_async_state(
     Args:
         key (str): The key of the state
         default_value (T): The default value of the state
-        on_change (Optional[Callable[[T, T], Any]], optional): A function or method where the caller is notified about changes in the state.
+        on_change (Callable[[T, T], Any] | None, optional): A function or method where the caller is notified about changes in the state.
             The first argument in this function will be the new state value, and the second will be the old state value.
             The on change will be called asynchonously.
             Defaults to None.

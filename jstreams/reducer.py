@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 from collections.abc import Callable
@@ -23,7 +24,7 @@ class Reducer(ABC, Generic[T]):
         return self.reduce(a, b)
 
     @staticmethod
-    def of(reducer: Callable[[T, T], T]) -> "Reducer[T]":
+    def of(reducer: Callable[[T, T], T]) -> Reducer[T]:
         if isinstance(reducer, Reducer):
             return reducer
         return _WrapReducer(reducer)

@@ -4,7 +4,6 @@ from enum import Enum
 import re
 from typing import (
     Any,
-    Optional,
     TypeVar,
     Union,
     Protocol,
@@ -230,11 +229,11 @@ def _deserialize_value(target_type: Any, data_value: Any) -> Any:
 
 def json_standard_serializable(
     ignore_unknown_fields: bool = True,
-    aliases: Optional[dict[str, str]] = None,
+    aliases: dict[str, str] | None = None,
     omit_none: bool = False,
-    custom_serializers: Optional[dict[str, Callable[[Any], Any]]] = None,
-    custom_deserializers: Optional[dict[str, Callable[[Any], Any]]] = None,
-    post_deserialize_hook_name: Optional[str] = "__post_deserialize__",
+    custom_serializers: dict[str, Callable[[Any], Any]] | None = None,
+    custom_deserializers: dict[str, Callable[[Any], Any]] | None = None,
+    post_deserialize_hook_name: str | None = "__post_deserialize__",
 ) -> Callable[[type[_T]], type[_T]]:
     """
     Alias for json_serializable with translate_snake_to_camel set to True.
@@ -242,11 +241,11 @@ def json_standard_serializable(
 
     Args:
         ignore_unknown_fields (bool, optional): _description_. Defaults to True.
-        aliases (Optional[dict[str, str]], optional): _description_. Defaults to None.
+        aliases (dict[str, str] | None, optional): _description_. Defaults to None.
         omit_none (bool, optional): _description_. Defaults to False.
-        custom_serializers (Optional[dict[str, Callable[[Any], Any]]], optional): _description_. Defaults to None.
-        custom_deserializers (Optional[dict[str, Callable[[Any], Any]]], optional): _description_. Defaults to None.
-        post_deserialize_hook_name (Optional[str], optional): _description_. Defaults to "__post_deserialize__".
+        custom_serializers (dict[str, Callable[[Any], Any]] | None, optional): _description_. Defaults to None.
+        custom_deserializers (dict[str, Callable[[Any], Any]] | None, optional): _description_. Defaults to None.
+        post_deserialize_hook_name (str | None, optional): _description_. Defaults to "__post_deserialize__".
 
     Returns:
         Callable[[type[_T]], type[_T]]: _description_
@@ -264,11 +263,11 @@ def json_standard_serializable(
 
 def json_serializable(
     ignore_unknown_fields: bool = True,
-    aliases: Optional[dict[str, str]] = None,
+    aliases: dict[str, str] | None = None,
     omit_none: bool = False,
-    custom_serializers: Optional[dict[str, Callable[[Any], Any]]] = None,
-    custom_deserializers: Optional[dict[str, Callable[[Any], Any]]] = None,
-    post_deserialize_hook_name: Optional[str] = "__post_deserialize__",
+    custom_serializers: dict[str, Callable[[Any], Any]] | None = None,
+    custom_deserializers: dict[str, Callable[[Any], Any]] | None = None,
+    post_deserialize_hook_name: str | None = "__post_deserialize__",
     translate_snake_to_camel: bool = False,
 ) -> Callable[[type[_T]], type[_T]]:
     """
@@ -308,18 +307,18 @@ def json_serializable(
     Args:
         ignore_unknown_fields (bool): If True, unknown fields in the input data
             will be ignored during deserialization.
-        aliases (Optional[dict[str, str]]): A dictionary mapping attribute names
+        aliases (dict[str, str] | None): A dictionary mapping attribute names
             to their aliases. This allows for renaming attributes during
             serialization/deserialization.  Defaults to None.
         omit_none (bool): If True, attributes with None values will be omitted
             from the serialized output. Defaults to False.
-        custom_serializers (Optional[dict[str, Callable[[Any], Any]]]): A dictionary
+        custom_serializers (dict[str, Callable[[Any], Any]] | None): A dictionary
             mapping attribute names to custom serializer functions. These functions
             will be called to serialize the corresponding attribute. Defaults to None.
-        custom_deserializers (Optional[dict[str, Callable[[Any], Any]]]): A dictionary
+        custom_deserializers (dict[str, Callable[[Any], Any]] | None): A dictionary
             mapping attribute names to custom deserializer functions. These functions
             will be called to deserialize the corresponding attribute. Defaults to None.
-        post_deserialize_hook_name (Optional[str]): The name of a method to be called
+        post_deserialize_hook_name (str | None): The name of a method to be called
             after deserialization. This method should be defined in the class and
             will be called with no arguments. Defaults to "__post_deserialize__".
         translate_snake_to_camel (bool): If True, attribute names will be converted
@@ -393,7 +392,7 @@ def json_serializable(
             # might include '__dict__' (allowing both slotted and dynamic attributes).
             if hasattr(cls, "__slots__"):
                 # cls.__slots__ can be a string or an iterable of strings
-                defined_slot_names: Union[str, Iterable[str]] = cls.__slots__  # type: ignore[attr-defined]
+                defined_slot_names: str | Iterable[str] = cls.__slots__  # type: ignore[attr-defined]
                 actual_slot_names: Iterable[str]
 
                 if isinstance(defined_slot_names, str):

@@ -1,6 +1,7 @@
+from __future__ import annotations
 import inspect
 from threading import Lock, Event as ThreadingEvent
-from typing import Any, Generic, Optional, TypeVar, Union, overload
+from typing import Any, Generic, TypeVar, overload
 from collections.abc import Callable
 from jstreams.predicate import Predicate
 from jstreams.rx import (
@@ -114,7 +115,7 @@ class _Event(Generic[T]):
         )
 
     def publish_if(
-        self, event_payload: T, condition: Union[Callable[[T], bool], Predicate[T]]
+        self, event_payload: T, condition: Callable[[T], bool] | Predicate[T]
     ) -> bool:
         """
         Publishes the event only if the condition is met.
@@ -313,19 +314,19 @@ class _Event(Generic[T]):
     def pipe(
         self,
         op1: RxOperator[T, A],
-        op2: Optional[RxOperator[A, B]] = None,
-        op3: Optional[RxOperator[B, C]] = None,
-        op4: Optional[RxOperator[C, D]] = None,
-        op5: Optional[RxOperator[D, E]] = None,
-        op6: Optional[RxOperator[E, F]] = None,
-        op7: Optional[RxOperator[F, G]] = None,
-        op8: Optional[RxOperator[G, H]] = None,
-        op9: Optional[RxOperator[H, N]] = None,
-        op10: Optional[RxOperator[N, J]] = None,
-        op11: Optional[RxOperator[J, K]] = None,
-        op12: Optional[RxOperator[K, L]] = None,
-        op13: Optional[RxOperator[L, M]] = None,
-        op14: Optional[RxOperator[M, V]] = None,
+        op2: RxOperator[A, B] | None = None,
+        op3: RxOperator[B, C] | None = None,
+        op4: RxOperator[C, D] | None = None,
+        op5: RxOperator[D, E] | None = None,
+        op6: RxOperator[E, F] | None = None,
+        op7: RxOperator[F, G] | None = None,
+        op8: RxOperator[G, H] | None = None,
+        op9: RxOperator[H, N] | None = None,
+        op10: RxOperator[N, J] | None = None,
+        op11: RxOperator[J, K] | None = None,
+        op12: RxOperator[K, L] | None = None,
+        op13: RxOperator[L, M] | None = None,
+        op14: RxOperator[M, V] | None = None,
     ) -> PipeObservable[T, V]:
         op_list = (
             Stream(
@@ -357,19 +358,19 @@ class _Event(Generic[T]):
     def _destroy(self) -> None:
         self.__subject.dispose()
 
-    def latest(self) -> Optional[T]:
+    def latest(self) -> T | None:
         return self.__subject.latest()
 
 
 class _EventBroadcaster:
-    _instance: Optional["_EventBroadcaster"] = None
+    _instance: _EventBroadcaster | None = None
     _instance_lock = Lock()
     _event_lock = Lock()
 
     def __init__(self) -> None:
         self._subjects: dict[type, dict[str, _Event[Any]]] = {}
 
-    def clear(self) -> "_EventBroadcaster":
+    def clear(self) -> _EventBroadcaster:
         """
         Clear all events.
         """
@@ -380,7 +381,7 @@ class _EventBroadcaster:
             self._subjects.clear()
         return self
 
-    def clear_event(self, event_type: type) -> "_EventBroadcaster":
+    def clear_event(self, event_type: type) -> _EventBroadcaster:
         """
         Clear a specific event.
 
@@ -427,7 +428,7 @@ class _EventBroadcaster:
             return self._subjects[event_type][event_name]
 
     @staticmethod
-    def get_instance() -> "_EventBroadcaster":
+    def get_instance() -> _EventBroadcaster:
         if _EventBroadcaster._instance is None:
             with _EventBroadcaster._instance_lock:
                 if _EventBroadcaster._instance is None:
@@ -440,18 +441,18 @@ class EventBroadcaster:
     Public interface for event broadcaster
     """
 
-    _instance: Optional["EventBroadcaster"] = None
+    _instance: "EventBroadcaster" | None = None
     _instance_lock = Lock()
 
     @staticmethod
-    def get_instance() -> "EventBroadcaster":
+    def get_instance() -> EventBroadcaster:
         if EventBroadcaster._instance is None:
             with EventBroadcaster._instance_lock:
                 if EventBroadcaster._instance is None:
                     EventBroadcaster._instance = EventBroadcaster()
         return EventBroadcaster._instance
 
-    def clear_event(self, event_type: type) -> "EventBroadcaster":
+    def clear_event(self, event_type: type) -> EventBroadcaster:
         """
         Clear a specific event.
 
@@ -461,7 +462,7 @@ class EventBroadcaster:
         _EventBroadcaster.get_instance().clear_event(event_type)
         return self
 
-    def clear(self) -> "EventBroadcaster":
+    def clear(self) -> EventBroadcaster:
         """
         Clear all events.
         """
@@ -708,8 +709,8 @@ def dispose_managed_events_from(obj: Any) -> None:
 def wait_for_event(
     event_type: type[T],
     event_name: str = __DEFAULT_EVENT_NAME__,
-    timeout: Optional[float] = None,
-    condition: Optional[Callable[[T], bool]] = None,
+    timeout: float | None = None,
+    condition: Callable[[T], bool] | None = None,
 ) -> Opt[T]:
     received_signal = ThreadingEvent()
     payload_holder: list[T] = []  # Use list for closure modification

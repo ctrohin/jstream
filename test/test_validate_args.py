@@ -20,12 +20,12 @@ def optional_type(value: Optional[int]) -> str:
 
 
 @validate_args()
-def union_type(value: Union[str, float]) -> str:
+def union_type(value: str | float) -> str:
     return f"Value: {value}"
 
 
 @validate_args()
-def union_with_none(value: Union[str, None]) -> str:
+def union_with_none(value: str | None) -> str:
     return f"Value: {value}"
 
 
@@ -120,7 +120,7 @@ class TestValidateArgs(BaseTestCase):
     def test_union_type_invalid(self):
         with self.assertRaisesRegex(
             TypeError,
-            "Argument 'value'.*expected type typing.Union\\[str, float\\].*but got int",
+            "Argument 'value' for union_type expected type str | float, but got int.",
         ):
             union_type(123)  # type: ignore
 
