@@ -291,7 +291,7 @@ class _Injector:
 
     def find_noop(
         self, class_name: type[T], qualifier: Optional[str] = None
-    ) -> Union[T, NoOpCls]:
+    ) -> T | NoOpCls:
         if (found_obj := self.find(class_name, qualifier)) is None:
             return NoOp
         return found_obj
@@ -345,9 +345,9 @@ class _Injector:
     def provide(
         self,
         class_name: type,
-        comp: Union[Any, Callable[[], Any]],
-        qualifier: Optional[str] = None,
-        profiles: Optional[list[str]] = None,
+        comp: Callable[[], Any] | Any,
+        qualifier: str | None = None,
+        profiles: list[str] | None = None,
     ) -> "_Injector":
         self.__provide(class_name, comp, qualifier, profiles, False)
         return self
@@ -367,7 +367,7 @@ class _Injector:
     def __provide(
         self,
         class_name: type,
-        comp: Union[Any, Callable[[], Any]],
+        comp: Callable[[], Any] | Any,
         qualifier: Optional[str] = None,
         profiles: Optional[list[str]] = None,
         override_qualifier: bool = False,
@@ -732,7 +732,7 @@ def validate_dependencies(dependencies: dict[str, Any]) -> None:
 
 
 def resolve_dependencies(
-    dependencies: dict[str, Union[type, Dependency]],
+    dependencies: dict[str, type | Dependency],
     eager: bool = False,
 ) -> Callable[[type[T]], type[T]]:
     """
@@ -747,19 +747,17 @@ def resolve_dependencies(
     Will inject the dependency associated with 'ClassName' into the 'test_field' member
 
     Args:
-        dependencies (dict[str, Union[type, Dependency]]): A map of dependencies
+        dependencies (dict[str, type | Dependency]): A map of dependencies
         eager (bool): Flag determining if the dependencies should be injected as soon as possible. Defaults to False.
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
-    return resolve(
-        cast(dict[str, Union[type, Dependency, Variable]], dependencies), eager
-    )
+    return resolve(cast(dict[str, type | Dependency | Variable], dependencies), eager)
 
 
 def resolve(
-    dependencies: dict[str, Union[type, Dependency, Variable]],
+    dependencies: dict[str, type | Dependency | Variable],
     eager: bool = False,
 ) -> Callable[[type[T]], type[T]]:
     """
@@ -838,10 +836,10 @@ def resolve_variables(
         Callable[[type[T]], type[T]]: The decorated class constructor
     """
 
-    return resolve(cast(dict[str, Union[type, Dependency, Variable]], variables), eager)
+    return resolve(cast(dict[str, type | Dependency | Variable], variables), eager)
 
 
-def _get_dep(dep: Union[type, Dependency, Variable]) -> Any:
+def _get_dep(dep: type | Dependency | Variable) -> Any:
     qualifier: Optional[str] = None
     is_optional = False
     is_variable = False
@@ -871,7 +869,7 @@ def _get_dep(dep: Union[type, Dependency, Variable]) -> Any:
 
 
 def inject_args(
-    dependencies: dict[str, Union[type, Dependency, Variable]],
+    dependencies: dict[str, type | Dependency | Variable],
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
     Injects dependencies/variables into function/method arguments if they are not already provided by the caller.
@@ -1046,7 +1044,7 @@ def inject_args(
 
 
 def autowired(
-    class_name: type[T], qualifier: Optional[str] = None
+    class_name: type[T], qualifier: str | None = None
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
     Decorator that replaces the decorated function's body entirely.
@@ -1097,7 +1095,7 @@ def return_wired(class_name: type[T]) -> T:  # pylint: disable=unused-argument
     return cast(T, NoOp)
 
 
-def return_wired_optional(class_name: type[T]) -> Optional[T]:  # pylint: disable=unused-argument
+def return_wired_optional(class_name: type[T]) -> T | None:  # pylint: disable=unused-argument
     """
     Placeholder function used for type hinting within methods decorated with `@autowired_optional`.
     It signals that the method's return value will be provided by the injector and might be None.
@@ -1113,8 +1111,8 @@ def return_wired_optional(class_name: type[T]) -> Optional[T]:  # pylint: disabl
 
 
 def autowired_optional(
-    class_name: type[T], qualifier: Optional[str] = None
-) -> Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]:
+    class_name: type[T], qualifier: str | None = None
+) -> Callable[[Callable[..., T | None]], Callable[..., T | None]]:
     """
     Decorator that replaces the decorated function's body entirely.
     When the decorated function is called, it will instead retrieve and return
@@ -1140,8 +1138,8 @@ def autowired_optional(
 
     optional_dependency = OptionalInjectedDependency(class_name, qualifier)
 
-    def wrapper(func: Callable[..., Optional[T]]) -> Callable[..., Optional[T]]:  # pylint: disable=unused-argument
-        def wrapped(*args: Any, **kwds: Any) -> Optional[T]:  # pylint: disable=unused-argument
+    def wrapper(func: Callable[..., T | None]) -> Callable[..., T | None]:  # pylint: disable=unused-argument
+        def wrapped(*args: Any, **kwds: Any) -> T | None:  # pylint: disable=unused-argument
             return optional_dependency.get()
 
         return wrapped

@@ -32,13 +32,15 @@ class JStreamsEnv:
     def __load_config(self) -> None:
         if profile := self.__get_env_profile() is not None:
             self.__config[JSTREAMS_PROFILE] = profile
+
         if packages := self.__get_env_packages() is not None:
             self.__config[JSTREAMS_PACKAGES] = packages
 
         config_file = get_env_config_file()
         if os.path.exists(config_file):
             try:
-                with load(open(config_file, encoding="utf-8")) as config:
+                with open(config_file, encoding="utf-8") as f:
+                    config = load(f)
                     if self.__config.get(JSTREAMS_PROFILE) is None:
                         self.__config[JSTREAMS_PROFILE] = (
                             config.get(JSTREAMS_PROFILE)

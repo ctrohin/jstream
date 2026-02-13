@@ -1,6 +1,6 @@
 import inspect
 from threading import Lock, Event as ThreadingEvent
-from typing import Any, Generic, Optional, TypeVar, Union, overload
+from typing import Any, Generic, Optional, TypeVar, overload
 from collections.abc import Callable
 from jstreams.predicate import Predicate
 from jstreams.rx import (
@@ -114,7 +114,7 @@ class _Event(Generic[T]):
         )
 
     def publish_if(
-        self, event_payload: T, condition: Union[Callable[[T], bool], Predicate[T]]
+        self, event_payload: T, condition: Callable[[T], bool] | Predicate[T]
     ) -> bool:
         """
         Publishes the event only if the condition is met.
