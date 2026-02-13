@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 from logging import Logger
 from time import sleep
@@ -5,10 +6,8 @@ from typing import (
     Any,
     Final,
     Generic,
-    Optional,
     Protocol,
     TypeVar,
-    Union,
     cast,
 )
 from collections.abc import Callable
@@ -40,13 +39,13 @@ class ErrorLog(Protocol):
         pass
 
 
-ErrorLogger = Union[ErrorLog, Logger]
+ErrorLogger = ErrorLog | Logger
 
 
 def _log_exception(
     exception: Exception,
-    logger: Optional[ErrorLogger] = None,
-    message: Optional[str] = None,
+    logger: ErrorLogger | None = None,
+    message: str | None = None,
 ) -> None:
     """Helper function to log exceptions using the provided or default logger."""
     log_target = logger if logger is not None else _default_logger
@@ -56,9 +55,9 @@ def _log_exception(
 
 
 def catch(
-    fn: Callable[[], Union[T, Optional[T]]],
-    logger: Optional[ErrorLogger] = None,
-) -> Optional[T]:
+    fn: Callable[[], T | None],
+    logger: ErrorLogger | None = None,
+) -> T | None:
     """
     Executes fn, catches any Exception, logs it using _log_exception,
     and returns None on failure.
@@ -79,9 +78,9 @@ def catch(
 
 def catch_with(
     with_val: K,
-    fn: Callable[[K], Union[T, Optional[T]]],
-    logger: Optional[ErrorLogger] = None,
-) -> Optional[T]:
+    fn: Callable[[K], T | None],
+    logger: ErrorLogger | None = None,
+) -> T | None:
     """
     Executes fn(with_val), catches any Exception, logs it using _log_exception,
     and returns None on failure.
@@ -149,22 +148,20 @@ class Try(Generic[T]):
         self.__fn = fn
         self.__is_resource = is_resource
         self.__then_chain: list[Callable[[T], Any]] = []
-        self.__on_success_chain: list[Callable[[Optional[T]], Any]] = []
-        self.__finally_chain: list[Callable[[Optional[T]], Any]] = []
+        self.__on_success_chain: list[Callable[[T | None], Any]] = []
+        self.__finally_chain: list[Callable[[T | None], Any]] = []
         self.__on_failure_chain: list[Callable[[Exception], Any]] = []
-        self.__error_log: Optional[ErrorLogger] = None
-        self.__error_message: Optional[str] = None
+        self.__error_log: ErrorLogger | None = None
+        self.__error_message: str | None = None
         self.__has_failed: bool = False
-        self.__failure_exception_supplier: Optional[Callable[[], Exception]] = None
-        self.__recovery_supplier: Optional[
-            Callable[[Optional[Exception]], Optional[T]]
-        ] = None
+        self.__failure_exception_supplier: Callable[[], Exception] | None = None
+        self.__recovery_supplier: Callable[[Exception | None], T | None] | None = None
         self.__recovery_suppliers: dict[type, Callable[[Any], T]] = {}
         self.__retries: int = 0
-        self.__retry_predicate: Optional[Callable[[Exception], bool]] = None
+        self.__retry_predicate: Callable[[Exception], bool] | None = None
         self.__retries_delay: float = 0.0
 
-    def mute(self) -> "Try[T]":
+    def mute(self) -> Try[T]:
         """
         Mutes the error logging for this Try instance.
         This is useful when you want to suppress error messages
@@ -172,12 +169,12 @@ class Try(Generic[T]):
         """
         return self.with_logger(noop())
 
-    def with_logger(self, logger: ErrorLogger) -> "Try[T]":
+    def with_logger(self, logger: ErrorLogger) -> Try[T]:
         """Sets a specific logger for handling errors within this Try block."""
         self.__error_log = logger
         return self
 
-    def with_error_message(self, error_message: str) -> "Try[T]":
+    def with_error_message(self, error_message: str) -> Try[T]:
         """Sets a custom error message to be used when logging failures."""
         self.__error_message = error_message
         return self
@@ -187,7 +184,7 @@ class Try(Generic[T]):
         predicate: Callable[[Exception], bool],
         retries: int,
         delay_between: float = 0.0,
-    ) -> "Try[T]":
+    ) -> Try[T]:
         """
         Configures the operation to retry on failure if the predicate is met.
 
@@ -206,7 +203,7 @@ class Try(Generic[T]):
         self.__retries_delay = delay_between
         return self
 
-    def retry(self, retries: int, delay_between: float = 0.0) -> "Try[T]":
+    def retry(self, retries: int, delay_between: float = 0.0) -> Try[T]:
         """
         Configures the operation to retry on any failure.
 
@@ -216,7 +213,7 @@ class Try(Generic[T]):
         """
         return self.retry_if(lambda _: True, retries, delay_between)
 
-    def and_then(self, fn: Callable[[T], Any]) -> "Try[T]":
+    def and_then(self, fn: Callable[[T], Any]) -> Try[T]:
         """
         Adds a function to be executed sequentially if the primary operation succeeds.
         The function receives the result of the preceding successful operation.
@@ -225,7 +222,7 @@ class Try(Generic[T]):
         self.__then_chain.append(fn)
         return self
 
-    def on_success(self, fn: Callable[[Optional[T]], Any]) -> "Try[T]":
+    def on_success(self, fn: Callable[[T | None], Any]) -> Try[T]:
         """
         Adds a function to be executed if the primary operation (including `and_then` chain)
         succeeds. The function receives the successful result.
@@ -235,7 +232,7 @@ class Try(Generic[T]):
         self.__on_success_chain.append(fn)
         return self
 
-    def on_failure(self, fn: Callable[[Exception], Any]) -> "Try[T]":
+    def on_failure(self, fn: Callable[[Exception], Any]) -> Try[T]:
         """
         Adds a function to be executed if the operation fails (after all retries).
         The function receives the exception that caused the failure.
@@ -244,7 +241,7 @@ class Try(Generic[T]):
         self.__on_failure_chain.append(fn)
         return self
 
-    def and_finally(self, fn: Callable[[Optional[T]], Any]) -> "Try[T]":
+    def and_finally(self, fn: Callable[[T | None], Any]) -> Try[T]:
         """
         Adds a function to be executed after the operation completes, regardless of success or failure.
         The function receives the successful result (if any), otherwise None.
@@ -253,7 +250,7 @@ class Try(Generic[T]):
         self.__finally_chain.append(fn)
         return self
 
-    def on_failure_log(self, message: str, error_log: ErrorLogger) -> "Try[T]":
+    def on_failure_log(self, message: str, error_log: ErrorLogger) -> Try[T]:
         """Convenience method to set both an error message and a logger for failures."""
         return self.with_error_message(message).with_logger(error_log)
 
@@ -270,7 +267,7 @@ class Try(Generic[T]):
             # If configured, raise a specific exception on failure
             raise self.__failure_exception_supplier()
 
-    def __finally(self, val: Optional[T]) -> None:
+    def __finally(self, val: T | None) -> None:
         """Internal method to execute all finally handlers."""
         for finally_fn in self.__finally_chain:
             # Use catch_with to execute finally handlers safely
@@ -286,8 +283,8 @@ class Try(Generic[T]):
                     or an empty Opt if the operation failed and could not recover.
         """
         self.__has_failed = False  # Reset failure flag for this execution attempt
-        val: Optional[T] = None
-        last_exception: Optional[Exception] = None
+        val: T | None = None
+        last_exception: Exception | None = None
 
         # Loop for initial attempt + configured retries
         for attempt in range(self.__retries + 1):
@@ -384,7 +381,7 @@ class Try(Generic[T]):
                 return Opt(None)
         return Opt(None)
 
-    def on_failure_raise(self, exception_supplier: Callable[[], Exception]) -> "Try[T]":
+    def on_failure_raise(self, exception_supplier: Callable[[], Exception]) -> Try[T]:
         """
         Configures the Try operation to raise a specific exception on failure,
         supplied by the provided function. This overrides default failure handling.
@@ -393,8 +390,8 @@ class Try(Generic[T]):
         return self
 
     def recover(
-        self, recovery_supplier: Callable[[Optional[Exception]], Optional[T]]
-    ) -> "Try[T]":
+        self, recovery_supplier: Callable[[Exception | None], T | None]
+    ) -> Try[T]:
         """
         Provides a function to generate a recovery value if the operation fails.
         The function receives the exception that caused the failure.
@@ -405,7 +402,7 @@ class Try(Generic[T]):
 
     def recover_from(
         self, exception_type: type[EX_TYPE], recovery_supplier: Callable[[EX_TYPE], T]
-    ) -> "Try[T]":
+    ) -> Try[T]:
         self.__recovery_suppliers[exception_type] = recovery_supplier
         return self
 
@@ -413,12 +410,12 @@ class Try(Generic[T]):
         self,
         exception_types: list[type],
         recovery_supplier: Callable[[BaseException], T],
-    ) -> "Try[T]":
+    ) -> Try[T]:
         for ex_type in exception_types:
             self.__recovery_suppliers[ex_type] = recovery_supplier
         return self
 
-    def or_else_try(self, fallback_supplier: Callable[[], "Try[T]"]) -> "Try[T]":
+    def or_else_try(self, fallback_supplier: Callable[[], Try[T]]) -> Try[T]:
         """
         If this Try operation fails (after all retries and recovery attempts),
         executes an alternative Try operation provided by the fallback_supplier.
@@ -478,7 +475,7 @@ class Try(Generic[T]):
         return self.__has_failed
 
     @staticmethod
-    def of(val: Optional[K]) -> "Try[K]":
+    def of(val: K | None) -> Try[K]:
         """
         Creates a Try instance from an existing value.
         The operation will fail if the provided value is None.
@@ -493,7 +490,7 @@ class Try(Generic[T]):
         return Try(lambda: require_non_null(val))
 
     @staticmethod
-    def with_resource(fn: Callable[[], T]) -> "Try[T]":
+    def with_resource(fn: Callable[[], T]) -> Try[T]:
         return Try(fn, True)
 
 
@@ -525,7 +522,7 @@ def try_with_resource(fn: Callable[[], T]) -> Try[T]:
     return Try.with_resource(fn)
 
 
-def try_of(value: Optional[T]) -> Try[T]:
+def try_of(value: T | None) -> Try[T]:
     """
     Factory function to create a Try instance from an existing value.
     Syntactic sugar for `Try.of(value)`. The operation fails if value is None.

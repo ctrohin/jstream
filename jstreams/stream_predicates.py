@@ -1,4 +1,4 @@
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 from collections.abc import Callable, Iterable
 from jstreams.predicate import Predicate, is_none, not_, predicate_of
 from jstreams.stream import Stream
@@ -7,12 +7,12 @@ from jstreams.stream import Stream
 T = TypeVar("T")
 
 
-def all_none(it: Iterable[Optional[Any]]) -> bool:
+def all_none(it: Iterable[Any | None]) -> bool:
     """
     Checks if all elements in an iterable are None.
 
     Args:
-        it (Iterable[Optional[Any]]): The iterable.
+        it (Iterable[Any | None]): The iterable.
 
     Returns:
         bool: True if all values are None, False if at least one value is not None.
@@ -21,12 +21,12 @@ def all_none(it: Iterable[Optional[Any]]) -> bool:
     return Stream(it).all_match(is_none)
 
 
-def all_not_none(it: Iterable[Optional[Any]]) -> bool:
+def all_not_none(it: Iterable[Any | None]) -> bool:
     """
     Checks if all elements in an iterable are not None.
 
     Args:
-        it (Iterable[Optional[Any]]): The iterable.
+        it (Iterable[Any | None]): The iterable.
 
     Returns:
         bool: True if all values differ from None, False if at least one None value is found.

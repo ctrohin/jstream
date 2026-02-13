@@ -1,9 +1,10 @@
+from __future__ import annotations
 import os
 import datetime
 import importlib
 from time import sleep
 import time
-from typing import Any, Optional
+from typing import Any
 from collections.abc import Callable
 
 from threading import Lock, Thread
@@ -71,7 +72,7 @@ class Duration:
         carry_days = total_hours // 24
         self._days += carry_days
 
-    def __add__(self, other: "Duration") -> "Duration":
+    def __add__(self, other: Duration) -> Duration:
         """
         Overloads the addition operator (+) for Duration objects.
 
@@ -97,7 +98,7 @@ class Duration:
         # Normalization happens in the constructor of the new Duration
         return result
 
-    def __sub__(self, other: "Duration") -> "Duration":
+    def __sub__(self, other: Duration) -> Duration:
         """
         Overloads the subtraction operator (-) for Duration objects.
         Calculates the absolute difference between the two durations.
@@ -160,9 +161,9 @@ class _Job:
         func: Callable[[], Any],
         run_once: bool = False,
         start_at: int = 0,
-        on_success: Optional[Callable[[Any], Any]] = None,
-        on_error: Optional[Callable[[Exception], Any]] = None,
-        logger: Optional[Callable[[Exception], Any]] = None,
+        on_success: Callable[[Any], Any] | None = None,
+        on_error: Callable[[Exception], Any] | None = None,
+        logger: Callable[[Exception], Any] | None = None,
     ) -> None:
         """
         Initializes a _Job instance.
@@ -174,8 +175,8 @@ class _Job:
             func (Callable[[], Any]): The function to execute.
             run_once (bool): If True, the job will run only once and then be removed. Defaults to False.
             start_at (int): The Unix timestamp when the job should first be considered for running.
-            on_success (Optional[Callable[[Any], Any]]): Callback executed on successful job completion. Receives the job's return value. Defaults to None.
-            on_error (Optional[Callable[[Exception], Any]]): Callback executed on job failure. Receives the exception. Defaults to None.
+            on_success (Callable[[Any], Any] | None): Callback executed on successful job completion. Receives the job's return value. Defaults to None.
+            on_error (Callable[[Exception], Any] | None): Callback executed on job failure. Receives the exception. Defaults to None.
                             Used for daily/hourly jobs to align the first run. Defaults to 0 (effectively now).
         """
         self.name = name
@@ -257,7 +258,7 @@ class _Scheduler(LoopingThread):
     - SCH_POLLING (int, default 10): The interval in seconds at which the scheduler checks for due jobs.
     """
 
-    instance: Optional["_Scheduler"] = None
+    instance: _Scheduler | None = None
     instance_lock: Lock = Lock()
 
     def __init__(self) -> None:
@@ -281,10 +282,10 @@ class _Scheduler(LoopingThread):
         # Ensure polling period is at least 1 second
         self.__polling_period = max(self.__polling_period, 1)
 
-        self.__logger: Optional[Callable[[Exception], Any]] = None
+        self.__logger: Callable[[Exception], Any] | None = None
 
     @staticmethod
-    def get_instance() -> "_Scheduler":
+    def get_instance() -> _Scheduler:
         """
         Gets the singleton instance of the Scheduler, creating it if necessary.
         This method is thread-safe.
@@ -415,17 +416,17 @@ class _Scheduler(LoopingThread):
         func: Callable[[], Any],
         period: int,
         one_time: bool = False,
-        on_success: Optional[Callable[[Any], Any]] = None,
-        on_error: Optional[Callable[[Exception], Any]] = None,
-    ) -> "_Scheduler":
+        on_success: Callable[[Any], Any] | None = None,
+        on_error: Callable[[Exception], Any] | None = None,
+    ) -> _Scheduler:
         """
         Schedules a function to run periodically or just once after a delay.
 
         Args:
             func (Callable[[], Any]): The function to schedule.
-            on_success (Optional[Callable[[Any], Any]]): Callback executed on successful job completion.
+            on_success (Callable[[Any], Any] | None): Callback executed on successful job completion.
                                                         Receives the job's return value. Defaults to None.
-            on_error (Optional[Callable[[Exception], Any]]): Callback executed on job failure.
+            on_error (Callable[[Exception], Any] | None): Callback executed on job failure.
                                                             Receives the exception. Defaults to None.
             period (int): The period in seconds between runs, or the delay for one_time jobs.
             one_time (bool): If True, run the job only once after the initial period. Defaults to False.
@@ -459,9 +460,9 @@ class _Scheduler(LoopingThread):
         func: Callable[[], Any],
         hour: int,
         minute: int,
-        on_success: Optional[Callable[[Any], Any]] = None,
-        on_error: Optional[Callable[[Exception], Any]] = None,
-    ) -> "_Scheduler":
+        on_success: Callable[[Any], Any] | None = None,
+        on_error: Callable[[Exception], Any] | None = None,
+    ) -> _Scheduler:
         """
         Schedules a function to run daily at a specific hour and minute (local time).
 
@@ -469,9 +470,9 @@ class _Scheduler(LoopingThread):
             func (Callable[[], Any]): The function to schedule.
             hour (int): The hour of the day (0-23).
             minute (int): The minute of the hour (0-59).
-            on_success (Optional[Callable[[Any], Any]]): Callback executed on successful job completion.
+            on_success (Callable[[Any], Any] | None): Callback executed on successful job completion.
                                                         Receives the job's return value. Defaults to None.
-            on_error (Optional[Callable[[Exception], Any]]): Callback executed on job failure.
+            on_error (Callable[[Exception], Any] | None): Callback executed on job failure.
                                                             Receives the exception. Defaults to None.
 
         Returns:
@@ -500,18 +501,18 @@ class _Scheduler(LoopingThread):
         self,
         func: Callable[[], Any],
         minute: int,
-        on_success: Optional[Callable[[Any], Any]] = None,
-        on_error: Optional[Callable[[Exception], Any]] = None,
-    ) -> "_Scheduler":
+        on_success: Callable[[Any], Any] | None = None,
+        on_error: Callable[[Exception], Any] | None = None,
+    ) -> _Scheduler:
         """
         Schedules a function to run hourly at a specific minute (local time).
 
         Args:
             func (Callable[[], Any]): The function to schedule.
             minute (int): The minute of the hour (0-59).
-            on_success (Optional[Callable[[Any], Any]]): Callback executed on successful job completion.
+            on_success (Callable[[Any], Any] | None): Callback executed on successful job completion.
                                                         Receives the job's return value. Defaults to None.
-            on_error (Optional[Callable[[Exception], Any]]): Callback executed on job failure.
+            on_error (Callable[[Exception], Any] | None): Callback executed on job failure.
                                                             Receives the exception. Defaults to None.
 
         Returns:
@@ -540,17 +541,17 @@ class _Scheduler(LoopingThread):
         self,
         func: Callable[[], Any],
         duration: Duration,
-        on_success: Optional[Callable[[Any], Any]] = None,
-        on_error: Optional[Callable[[Exception], Any]] = None,
-    ) -> "_Scheduler":
+        on_success: Callable[[Any], Any] | None = None,
+        on_error: Callable[[Exception], Any] | None = None,
+    ) -> _Scheduler:
         """
         Schedules a function to run periodically based on a Duration object.
 
         Args:
             func (Callable[[], Any]): The function to schedule.
-            on_success (Optional[Callable[[Any], Any]]): Callback executed on successful job completion.
+            on_success (Callable[[Any], Any] | None): Callback executed on successful job completion.
                                                         Receives the job's return value. Defaults to None.
-            on_error (Optional[Callable[[Exception], Any]]): Callback executed on job failure.
+            on_error (Callable[[Exception], Any] | None): Callback executed on job failure.
                                                             Receives the exception. Defaults to None.
             duration (Duration): The interval between runs.
 
@@ -575,8 +576,8 @@ def scheduler() -> _Scheduler:
 def schedule_periodic(
     period: int,
     one_time: bool = False,
-    on_success: Optional[Callable[[Any], Any]] = None,
-    on_error: Optional[Callable[[Exception], Any]] = None,
+    on_success: Callable[[Any], Any] | None = None,
+    on_error: Callable[[Exception], Any] | None = None,
 ) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
     """
     Decorator to schedule a function to be executed periodically or once.
@@ -591,9 +592,9 @@ def schedule_periodic(
     Args:
         period (int): The period in seconds between runs, or the delay for one_time jobs.
         one_time (bool): If True, run the job only once after the initial period. Defaults to False.
-        on_success (Optional[Callable[[Any], Any]]): Callback executed on successful job completion.
+        on_success (Callable[[Any], Any] | None): Callback executed on successful job completion.
                                                     Receives the job's return value. Defaults to None.
-        on_error (Optional[Callable[[Exception], Any]]): Callback executed on job failure.
+        on_error (Callable[[Exception], Any] | None): Callback executed on job failure.
                                                         Receives the exception. Defaults to None.
 
     Returns:
@@ -672,8 +673,8 @@ def get_timestamp_today(hour: int, minute: int) -> int:
 def schedule_daily(
     hour: int,
     minute: int,
-    on_success: Optional[Callable[[Any], Any]] = None,
-    on_error: Optional[Callable[[Exception], Any]] = None,
+    on_success: Callable[[Any], Any] | None = None,
+    on_error: Callable[[Exception], Any] | None = None,
 ) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
     """
     Decorator to schedule a function to run daily at a specific hour and minute (local time).
@@ -687,9 +688,9 @@ def schedule_daily(
     Args:
         hour (int): The hour of the day (0-23).
         minute (int): The minute of the hour (0-59).
-        on_success (Optional[Callable[[Any], Any]]): Callback executed on successful job completion.
+        on_success (Callable[[Any], Any] | None): Callback executed on successful job completion.
                                                     Receives the job's return value. Defaults to None.
-        on_error (Optional[Callable[[Exception], Any]]): Callback executed on job failure.
+        on_error (Callable[[Exception], Any] | None): Callback executed on job failure.
                                                         Receives the exception. Defaults to None.
 
     Returns:
@@ -711,8 +712,8 @@ def schedule_daily(
 
 def schedule_hourly(
     minute: int,
-    on_success: Optional[Callable[[Any], Any]] = None,
-    on_error: Optional[Callable[[Exception], Any]] = None,
+    on_success: Callable[[Any], Any] | None = None,
+    on_error: Callable[[Exception], Any] | None = None,
 ) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
     """
     Decorator to schedule a function to run hourly at a specific minute (local time).
@@ -725,9 +726,9 @@ def schedule_hourly(
 
     Args:
         minute (int): The minute of the hour (0-59).
-        on_success (Optional[Callable[[Any], Any]]): Callback executed on successful job completion.
+        on_success (Callable[[Any], Any] | None): Callback executed on successful job completion.
                                                     Receives the job's return value. Defaults to None.
-        on_error (Optional[Callable[[Exception], Any]]): Callback executed on job failure.
+        on_error (Callable[[Exception], Any] | None): Callback executed on job failure.
                                                         Receives the exception. Defaults to None.
 
     Returns:
@@ -750,8 +751,8 @@ def schedule_hourly(
 
 def schedule_duration(
     duration: Duration,
-    on_success: Optional[Callable[[Any], Any]] = None,
-    on_error: Optional[Callable[[Exception], Any]] = None,
+    on_success: Callable[[Any], Any] | None = None,
+    on_error: Callable[[Exception], Any] | None = None,
 ) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
     """
     Decorator to schedule a function to run periodically based on a Duration object.
@@ -764,9 +765,9 @@ def schedule_duration(
 
     Args:
         duration (Duration): The interval between runs.
-        on_success (Optional[Callable[[Any], Any]]): Callback executed on successful job completion.
+        on_success (Callable[[Any], Any] | None): Callback executed on successful job completion.
                                                     Receives the job's return value. Defaults to None.
-        on_error (Optional[Callable[[Exception], Any]]): Callback executed on job failure.
+        on_error (Callable[[Exception], Any] | None): Callback executed on job failure.
                                                         Receives the exception. Defaults to None.
 
     Returns:

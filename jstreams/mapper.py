@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 from collections.abc import Callable, Iterable
@@ -27,7 +28,7 @@ class Mapper(ABC, Generic[T, V]):
         return self.map(value)
 
     @staticmethod
-    def of(mapper: Callable[[T], V]) -> "Mapper[T, V]":
+    def of(mapper: Callable[[T], V]) -> Mapper[T, V]:
         """
         If the value passed is a mapper, it is returned without changes.
         If a function is passed, it will be wrapped into a Mapper object.
@@ -43,7 +44,7 @@ class Mapper(ABC, Generic[T, V]):
         return _WrapMapper(mapper)
 
     @staticmethod
-    def constant(value: K) -> "Mapper[Any, K]":
+    def constant(value: K) -> Mapper[Any, K]:
         """
         Returns a mapper that always returns the given constant value.
 
@@ -56,7 +57,7 @@ class Mapper(ABC, Generic[T, V]):
         return _WrapMapper(lambda _: value)
 
     @staticmethod
-    def identity() -> "Mapper[T, T]":
+    def identity() -> Mapper[T, T]:
         """
         Returns a mapper that always returns its input argument.
 
@@ -65,7 +66,7 @@ class Mapper(ABC, Generic[T, V]):
         """
         return _WrapMapper(lambda t: t)
 
-    def and_then(self, after: Callable[[V], K]) -> "Mapper[T, K]":
+    def and_then(self, after: Callable[[V], K]) -> Mapper[T, K]:
         """
         Returns a composed mapper that first applies this mapper to its input,
         and then applies the after mapper to the result.
@@ -79,7 +80,7 @@ class Mapper(ABC, Generic[T, V]):
         after_mapper = Mapper.of(after)
         return Mapper.of(lambda t: after_mapper.map(self.map(t)))
 
-    def compose(self, before: Callable[[K], T]) -> "Mapper[K, V]":
+    def compose(self, before: Callable[[K], T]) -> Mapper[K, V]:
         """
         Returns a composed mapper that first applies the before mapper to its input,
         and then applies this mapper to the result.
@@ -93,7 +94,7 @@ class Mapper(ABC, Generic[T, V]):
         before_mapper = Mapper.of(before)
         return Mapper.of(lambda k: self.map(before_mapper.map(k)))
 
-    def zip(self, other: Callable[[T], K]) -> "Mapper[T, tuple[V, K]]":
+    def zip(self, other: Callable[[T], K]) -> Mapper[T, tuple[V, K]]:
         """
         Returns a mapper that applies this mapper and the other mapper to the same input
         and returns a tuple of the results.
@@ -128,7 +129,7 @@ class MapperWith(ABC, Generic[T, K, V]):
     @staticmethod
     def of(
         mapper: Callable[[T, K], V],
-    ) -> "MapperWith[T, K, V]":
+    ) -> MapperWith[T, K, V]:
         """
         If the value passed is a mapper, it is returned without changes.
         If a function is passed, it will be wrapped into a Mapper object.
@@ -144,7 +145,7 @@ class MapperWith(ABC, Generic[T, K, V]):
             return mapper
         return _WrapMapperWith(mapper)
 
-    def and_then(self, after: Callable[[V], R]) -> "MapperWith[T, K, R]":
+    def and_then(self, after: Callable[[V], R]) -> MapperWith[T, K, R]:
         """
         Returns a composed mapper that first applies this mapper to its input,
         and then applies the after mapper to the result.
@@ -158,7 +159,7 @@ class MapperWith(ABC, Generic[T, K, V]):
         after_mapper = Mapper.of(after)
         return MapperWith.of(lambda t, k: after_mapper.map(self.map(t, k)))
 
-    def bind(self, with_value: K) -> "Mapper[T, V]":
+    def bind(self, with_value: K) -> Mapper[T, V]:
         """
         Returns a Mapper that applies this mapper with the given with_value fixed
         as the second argument.
@@ -171,7 +172,7 @@ class MapperWith(ABC, Generic[T, K, V]):
         """
         return Mapper.of(lambda t: self.map(t, with_value))
 
-    def curry(self) -> "Mapper[T, Mapper[K, V]]":
+    def curry(self) -> Mapper[T, Mapper[K, V]]:
         """
         Returns a Mapper that takes the first argument and returns a Mapper
         that takes the second argument.

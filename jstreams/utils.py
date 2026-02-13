@@ -3,9 +3,7 @@ import json
 from typing import (
     Any,
     Generic,
-    Optional,
     TypeVar,
-    Union,
     cast,
 )
 from collections.abc import Callable, Iterable, Sequence
@@ -36,14 +34,14 @@ def is_mth_or_fn(var: Any) -> bool:
     return var_type is FunctionType or var_type is MethodType
 
 
-def require_non_null(obj: Optional[T], message: Optional[str] = None) -> T:
+def require_non_null(obj: T | None, message: str | None = None) -> T:
     """
     Returns a non null value of the object provided. If the provided value is null,
     the function raises a ValueError.
 
     Args:
-        obj (Optional[T]): The object
-        message (Optional[str]): Error message
+        obj (T | None): The object
+        message (str | None): Error message
 
     Raises:
         ValueError: Thrown when obj is None
@@ -130,14 +128,14 @@ def keys_as_list(dct: dict[T, Any]) -> list[T]:
 
 
 def load_json(
-    s: Union[str, bytes, bytearray],
-) -> Optional[Union[list[Any], dict[Any, Any]]]:
+    s: str | bytes | bytearray,
+) -> list[Any] | dict[Any, Any] | None:
     return load_json_ex(s, None)
 
 
 def load_json_ex(
-    s: Union[str, bytes, bytearray], handler: Optional[Callable[[Exception], Any]]
-) -> Optional[Union[list[Any], dict[Any, Any]]]:
+    s: str | bytes | bytearray, handler: Callable[[Exception], Any] | None
+) -> list[Any] | dict[Any, Any] | None:
     try:
         return json.loads(s)  # type: ignore[no-any-return]
     except json.JSONDecodeError as ex:
@@ -160,8 +158,8 @@ def identity(value: T) -> T:
 
 
 def extract(
-    typ: type[T], val: Any, keys: list[Any], default_value: Optional[T] = None
-) -> Optional[T]:
+    typ: type[T], val: Any, keys: list[Any], default_value: T | None = None
+) -> T | None:
     """
     Extract a property from a complex object
 
@@ -169,10 +167,10 @@ def extract(
         typ (type[T]): The property type
         val (Any): The object the property will be extracted from
         keys (list[Any]): The list of keys to be applied. For each key, a value will be extracted recursively
-        default_value (Optional[T], optional): Default value if property is not found. Defaults to None.
+        default_value (T | None, optional): Default value if property is not found. Defaults to None.
 
     Returns:
-        Optional[T]: The found property or the default value
+        T | None: The found property or the default value
     """
     if val is None:
         return default_value
@@ -193,13 +191,13 @@ def extract(
     return default_value
 
 
-def is_not_none(element: Optional[T]) -> bool:
+def is_not_none(element: T | None) -> bool:
     """
     Checks if the given element is not None. This function is meant to be used
     instead of lambdas for non null checks
 
     Args:
-        element (Optional[T]): The given element
+        element (T | None): The given element
 
     Returns:
         bool: True if element is not None, False otherwise
@@ -208,14 +206,14 @@ def is_not_none(element: Optional[T]) -> bool:
 
 
 def is_empty_or_none(
-    obj: Union[list[Any], dict[Any, Any], str, None, Any, Iterable[Any]],
+    obj: list[Any] | dict[Any, Any] | str | None | Any | Iterable[Any] | Sized,
 ) -> bool:
     """
     Checkes whether the given object is either None, or is empty.
     For str and Sized objects, besides the None check, the len(obj) == 0 is also applied
 
     Args:
-        obj (Union[list[Any], dict[Any, Any], str, None, Any, Iterable[Any]]): The object
+        obj (list[Any] | dict[Any, Any] | str | None | Any | Iterable[Any]): The object
 
     Returns:
         bool: True if empty or None, False otherwise
@@ -234,12 +232,12 @@ def is_empty_or_none(
     return False
 
 
-def each(target: Optional[Iterable[T]], action: Callable[[T], Any]) -> None:
+def each(target: Iterable[T] | None, action: Callable[[T], Any]) -> None:
     """
     Executes an action on each element of the given iterable
 
     Args:
-        target (Optional[Iterable[T]]): The target iterable
+        target (Iterable[T] | None): The target iterable
         action (Callable[[T], Any]): The action to be executed
     """
     if target is None:
@@ -272,16 +270,16 @@ def sort(target: list[T], comparator: Callable[[T, T], int]) -> list[T]:
 class Value(Generic[T]):
     __slots__ = ("__value",)
 
-    def __init__(self, value: Optional[T]) -> None:
+    def __init__(self, value: T | None) -> None:
         self.__value = value
 
-    def set(self, value: Optional[T]) -> None:
+    def set(self, value: T | None) -> None:
         self.__value = value
 
-    def get(self) -> Optional[T]:
+    def get(self) -> T | None:
         return self.__value
 
-    def __call__(self, value: Optional[T] = None) -> Optional[T]:
+    def __call__(self, value: T | None = None) -> T | None:
         if value is not None:
             self.__value = value
         return self.__value
@@ -291,7 +289,7 @@ def type_of(obj: T) -> type[T]:
     return type(obj)
 
 
-def to_nullable(value: T) -> Optional[T]:
+def to_nullable(value: T) -> T | None:
     """
     Converts the given value to a nullable type.
     This is a placeholder function that does not perform any actual conversion.
@@ -301,7 +299,7 @@ def to_nullable(value: T) -> Optional[T]:
     Args:
         value (T): The value to convert
     Returns:
-        Optional[T]: The nullable value
+        T | None: The nullable value
     """
     return value
 
@@ -441,7 +439,7 @@ def omit(source_dict: dict[K, V], keys_to_omit: Iterable[K]) -> dict[K, V]:
     return {k: v for k, v in source_dict.items() if k not in keys_to_skip}
 
 
-def head(data: Sequence[T]) -> Optional[T]:
+def head(data: Sequence[T]) -> T | None:
     """
     Gets the first element of a sequence.
 
@@ -449,7 +447,7 @@ def head(data: Sequence[T]) -> Optional[T]:
         data (Sequence[T]): The input sequence.
 
     Returns:
-        Optional[T]: The first element, or None if the sequence is empty.
+        T | None: The first element, or None if the sequence is empty.
     """
     return data[0] if data else None
 
@@ -482,7 +480,7 @@ def tail_count(data: Sequence[T], count: int) -> list[T]:
     return list(data[-count:]) if len(data) > 1 else []
 
 
-def last(data: Sequence[T]) -> Optional[T]:
+def last(data: Sequence[T]) -> T | None:
     """
     Gets the last element of a sequence.
 
@@ -490,7 +488,7 @@ def last(data: Sequence[T]) -> Optional[T]:
         data (Sequence[T]): The input sequence.
 
     Returns:
-        Optional[T]: The last element, or None if the sequence is empty.
+        T | None: The last element, or None if the sequence is empty.
     """
     return data[-1] if data else None
 

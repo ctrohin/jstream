@@ -1,10 +1,9 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 import re
 from typing import (
     Any,
-    Optional,
     TypeVar,
-    Union,
     cast,
     Generic,
     overload,
@@ -31,10 +30,10 @@ class Predicate(ABC, Generic[T]):
             bool: True if the value matches, False otherwise
         """
 
-    def or_(self, other: Callable[[T], bool]) -> "Predicate[T]":
+    def or_(self, other: Callable[[T], bool]) -> Predicate[T]:
         return Predicate.of(lambda v: self.apply(v) or predicate_of(other).apply(v))
 
-    def and_(self, other: Callable[[T], bool]) -> "Predicate[T]":
+    def and_(self, other: Callable[[T], bool]) -> Predicate[T]:
         return Predicate.of(lambda v: self.apply(v) and predicate_of(other).apply(v))
 
     def __call__(self, value: T) -> bool:
@@ -43,7 +42,7 @@ class Predicate(ABC, Generic[T]):
     @staticmethod
     def of(
         predicate: Callable[[T], bool],
-    ) -> "Predicate[T]":
+    ) -> Predicate[T]:
         """
         If the value passed is a predicate, it is returned without any changes.
         If a function is passed, it will be wrapped into a Predicate object.
@@ -73,10 +72,10 @@ class PredicateWith(ABC, Generic[T, K]):
             bool: True if the values matche the predicate, False otherwise
         """
 
-    def or_(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
+    def or_(self, other: "PredicateWith[T, K]") -> PredicateWith[T, K]:
         return predicate_with_of(lambda v, k: self.apply(v, k) or other.apply(v, k))
 
-    def and_(self, other: "PredicateWith[T, K]") -> "PredicateWith[T, K]":
+    def and_(self, other: "PredicateWith[T, K]") -> PredicateWith[T, K]:
         return predicate_with_of(lambda v, k: self.apply(v, k) and other.apply(v, k))
 
     def __call__(self, value: T, with_value: K) -> bool:
@@ -85,7 +84,7 @@ class PredicateWith(ABC, Generic[T, K]):
     @staticmethod
     def of(
         predicate: Callable[[T, K], bool],
-    ) -> "PredicateWith[T, K]":
+    ) -> PredicateWith[T, K]:
         """
         If the value passed is a predicate, it is returned without any changes.
         If a function is passed, it will be wrapped into a Predicate object.
@@ -304,7 +303,7 @@ def is_not_blank(obj: Any) -> bool:
     return not_(is_blank)(obj)
 
 
-def default(default_val: T) -> Callable[[Optional[T]], T]:
+def default(default_val: T) -> Callable[[T | None], T]:
     """
     Default value provider. Returns the default value if the input is None.
     Usage: default(defaultValue)(myValue)
@@ -314,18 +313,18 @@ def default(default_val: T) -> Callable[[Optional[T]], T]:
         default_val (T): The default value.
 
     Returns:
-        Callable[[Optional[T]], T]: A function that returns the input or the default.
+        Callable[[T | None], T]: A function that returns the input or the default.
     """
 
     require_non_null(default_val, "Default value cannot be None")
 
-    def wrap(val: Optional[T]) -> T:
+    def wrap(val: T | None) -> T:
         return default_val if val is None else val
 
     return wrap
 
 
-def contains(value: Any) -> Callable[[Optional[Union[str, Iterable[Any]]]], bool]:
+def contains(value: Any) -> Callable[[str | Iterable[Any] | None], bool]:
     """
     Checks if the given value is contained in the call parameter (string or iterable).
     Usage:
@@ -339,18 +338,18 @@ def contains(value: Any) -> Callable[[Optional[Union[str, Iterable[Any]]]], bool
         value (Any): The value to check for containment.
 
     Returns:
-        Callable[[Optional[Union[str, Iterable[Any]]]], bool]: A predicate.
+        Callable[[str | Iterable[Any] | None], bool]: A predicate.
     """
     require_non_null(value, "Value cannot be None")
 
-    def wrap(val: Optional[Union[str, Iterable[Any]]]) -> bool:
+    def wrap(val: str | Iterable[Any] | None) -> bool:
         # Check for None before using 'in'
         return val is not None and value in val
 
     return wrap
 
 
-def str_contains(value: str) -> Callable[[Optional[str]], bool]:
+def str_contains(value: str) -> Callable[[str | None], bool]:
     """
     Checks if the given string value is contained in the call parameter string.
     Usage: str_contains("test")("This is the test string") # Returns True
@@ -360,14 +359,14 @@ def str_contains(value: str) -> Callable[[Optional[str]], bool]:
         value (str): The substring to check for.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
     require_non_null(value, "Value cannot be None")
     # Correctly uses casting for type specificity
-    return cast(Callable[[Optional[str]], bool], contains(value))
+    return cast(Callable[[str | None], bool], contains(value))
 
 
-def str_contains_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
+def str_contains_ignore_case(value: str) -> Callable[[str | None], bool]:
     """
     Case-insensitive version of str_contains.
 
@@ -375,19 +374,19 @@ def str_contains_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
         value (str): The substring to check for.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
     require_non_null(value, "Value cannot be None")
 
     value_lower = value.lower()
 
-    def wrap(val: Optional[str]) -> bool:
+    def wrap(val: str | None) -> bool:
         return val is not None and value_lower in val.lower()
 
     return wrap
 
 
-def str_starts_with(value: str) -> Callable[[Optional[str]], bool]:
+def str_starts_with(value: str) -> Callable[[str | None], bool]:
     """
     Checks if the call parameter string starts with the given value.
     Usage: str_starts_with("test")("test string") # Returns True
@@ -396,18 +395,18 @@ def str_starts_with(value: str) -> Callable[[Optional[str]], bool]:
         value (str): The prefix string.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
     require_non_null(value, "Value cannot be None")
 
     # Uses efficient built-in str.startswith
-    def wrap(val: Optional[str]) -> bool:
+    def wrap(val: str | None) -> bool:
         return val is not None and val.startswith(value)
 
     return wrap
 
 
-def str_starts_with_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
+def str_starts_with_ignore_case(value: str) -> Callable[[str | None], bool]:
     """
     Case-insensitive version of str_starts_with.
 
@@ -415,19 +414,19 @@ def str_starts_with_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
         value (str): The prefix string.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
     require_non_null(value, "Value cannot be None")
 
     value_lower = value.lower()
 
-    def wrap(val: Optional[str]) -> bool:
+    def wrap(val: str | None) -> bool:
         return val is not None and val.lower().startswith(value_lower)
 
     return wrap
 
 
-def str_ends_with(value: str) -> Callable[[Optional[str]], bool]:
+def str_ends_with(value: str) -> Callable[[str | None], bool]:
     """
     Checks if the call parameter string ends with the given value.
     Usage: str_ends_with("string")("test string") # Returns True
@@ -436,18 +435,18 @@ def str_ends_with(value: str) -> Callable[[Optional[str]], bool]:
         value (str): The suffix string.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
     require_non_null(value, "Value cannot be None")
 
     # Uses efficient built-in str.endswith
-    def wrap(val: Optional[str]) -> bool:
+    def wrap(val: str | None) -> bool:
         return val is not None and val.endswith(value)
 
     return wrap
 
 
-def str_ends_with_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
+def str_ends_with_ignore_case(value: str) -> Callable[[str | None], bool]:
     """
     Case-insensitive version of str_ends_with.
 
@@ -455,19 +454,19 @@ def str_ends_with_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
         value (str): The suffix string.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
     require_non_null(value, "Value cannot be None")
 
     value_lower = value.lower()
 
-    def wrap(val: Optional[str]) -> bool:
+    def wrap(val: str | None) -> bool:
         return val is not None and val.lower().endswith(value_lower)
 
     return wrap
 
 
-def str_matches(pattern: str) -> Callable[[Optional[str]], bool]:
+def str_matches(pattern: str) -> Callable[[str | None], bool]:
     """
     Checks if the call parameter string matches the given regex pattern *at the beginning*.
     Uses `re.match`.
@@ -478,13 +477,13 @@ def str_matches(pattern: str) -> Callable[[Optional[str]], bool]:
         pattern (str): The regular expression pattern.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
     require_non_null(pattern, "Pattern cannot be None")
 
     compiled_pattern = re.compile(pattern)
 
-    def wrap(val: Optional[str]) -> bool:
+    def wrap(val: str | None) -> bool:
         if val is None:
             return False
         match = compiled_pattern.match(val)
@@ -493,7 +492,7 @@ def str_matches(pattern: str) -> Callable[[Optional[str]], bool]:
     return wrap
 
 
-def str_not_matches(pattern: str) -> Callable[[Optional[str]], bool]:
+def str_not_matches(pattern: str) -> Callable[[str | None], bool]:
     """
     Checks if the call parameter string does *not* match the given regex pattern *at the beginning*.
     Uses `re.match`.
@@ -502,14 +501,14 @@ def str_not_matches(pattern: str) -> Callable[[Optional[str]], bool]:
         pattern (str): The regular expression pattern.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
     # Reuses str_matches and not_
     require_non_null(pattern, "Pattern cannot be None")
     return not_(str_matches(pattern))
 
 
-def str_longer_than(length: int) -> Callable[[Optional[str]], bool]:
+def str_longer_than(length: int) -> Callable[[str | None], bool]:
     """
     Checks if the call parameter string's length is greater than the specified value.
 
@@ -517,18 +516,18 @@ def str_longer_than(length: int) -> Callable[[Optional[str]], bool]:
         length (int): The minimum exclusive length.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
     if length < 0:
         raise ValueError("Length cannot be negative")
 
-    def wrap(val: Optional[str]) -> bool:
+    def wrap(val: str | None) -> bool:
         return val is not None and len(val) > length
 
     return wrap
 
 
-def str_shorter_than(length: int) -> Callable[[Optional[str]], bool]:
+def str_shorter_than(length: int) -> Callable[[str | None], bool]:
     """
     Checks if the call parameter string's length is less than the specified value.
 
@@ -536,18 +535,18 @@ def str_shorter_than(length: int) -> Callable[[Optional[str]], bool]:
         length (int): The maximum exclusive length.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
     if length < 0:
         raise ValueError("Length cannot be negative")
 
-    def wrap(val: Optional[str]) -> bool:
+    def wrap(val: str | None) -> bool:
         return val is not None and len(val) < length
 
     return wrap
 
 
-def str_longer_than_or_eq(length: int) -> Callable[[Optional[str]], bool]:
+def str_longer_than_or_eq(length: int) -> Callable[[str | None], bool]:
     """
     Checks if the call parameter string's length is greater than or equal to the specified value.
 
@@ -555,19 +554,19 @@ def str_longer_than_or_eq(length: int) -> Callable[[Optional[str]], bool]:
         length (int): The minimum inclusive length.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
 
     if length < 0:
         raise ValueError("Length cannot be negative")
 
-    def wrap(val: Optional[str]) -> bool:
+    def wrap(val: str | None) -> bool:
         return val is not None and len(val) >= length
 
     return wrap
 
 
-def str_shorter_than_or_eq(length: int) -> Callable[[Optional[str]], bool]:
+def str_shorter_than_or_eq(length: int) -> Callable[[str | None], bool]:
     """
     Checks if the call parameter string's length is less than or equal to the specified value.
 
@@ -575,19 +574,19 @@ def str_shorter_than_or_eq(length: int) -> Callable[[Optional[str]], bool]:
         length (int): The maximum inclusive length.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
 
     if length < 0:
         raise ValueError("Length cannot be negative")
 
-    def wrap(val: Optional[str]) -> bool:
+    def wrap(val: str | None) -> bool:
         return val is not None and len(val) <= length
 
     return wrap
 
 
-def equals_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
+def equals_ignore_case(value: str) -> Callable[[str | None], bool]:
     """
     Checks if the call parameter string equals the given value, ignoring case.
 
@@ -595,13 +594,13 @@ def equals_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
         value (str): The string to compare against.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
     require_non_null(value, "Value cannot be None")
 
     value_lower = value.lower()
 
-    def wrap(val: Optional[str]) -> bool:
+    def wrap(val: str | None) -> bool:
         return val is not None and value_lower == val.lower()
 
     return wrap
@@ -610,35 +609,35 @@ def equals_ignore_case(value: str) -> Callable[[Optional[str]], bool]:
 # --- Numeric Predicates ---
 
 
-def is_even(integer: Optional[int]) -> bool:
+def is_even(integer: int | None) -> bool:
     """Checks if an integer is even."""
     return integer is not None and integer % 2 == 0
 
 
-def is_odd(integer: Optional[int]) -> bool:
+def is_odd(integer: int | None) -> bool:
     """Checks if an integer is odd."""
     return (
         integer is not None and integer % 2 != 0
     )  # Changed from == 1 for robustness with negative numbers
 
 
-def is_positive(number: Optional[float]) -> bool:
+def is_positive(number: float | None) -> bool:
     """Checks if a number is positive (> 0)."""
     return number is not None and number > 0
 
 
-def is_negative(number: Optional[float]) -> bool:
+def is_negative(number: float | None) -> bool:
     """Checks if a number is negative (< 0)."""
     return number is not None and number < 0
 
 
-def is_zero(number: Optional[float]) -> bool:
+def is_zero(number: float | None) -> bool:
     """Checks if a number is zero (== 0)."""
     # Consider floating point precision issues if exact zero is critical
     return number is not None and number == 0
 
 
-def is_int(number: Optional[float]) -> bool:
+def is_int(number: float | None) -> bool:
     """Checks if a float represents a whole number."""
     # Handles None check and potential float precision
     return number is not None and number == int(number)
@@ -646,12 +645,12 @@ def is_int(number: Optional[float]) -> bool:
 
 def is_between_closed(
     interval_start: float, interval_end: float
-) -> Callable[[Optional[float]], bool]:
+) -> Callable[[float | None], bool]:
     """Checks if a number is between start and end inclusive (start <= number <= end)."""
     if interval_end < interval_start:
         raise ValueError("End cannot be less than start")
 
-    def wrap(val: Optional[float]) -> bool:
+    def wrap(val: float | None) -> bool:
         return val is not None and interval_start <= val <= interval_end
 
     return wrap
@@ -659,19 +658,19 @@ def is_between_closed(
 
 def is_in_interval(
     interval_start: float, interval_end: float
-) -> Callable[[Optional[float]], bool]:
+) -> Callable[[float | None], bool]:
     """Checks if a number is between start and end inclusive (start <= number <= end)."""
     return is_between_closed(interval_start, interval_end)
 
 
 def is_between(
     interval_start: float, interval_end: float
-) -> Callable[[Optional[float]], bool]:
+) -> Callable[[float | None], bool]:
     """Checks if a number is strictly between start and end (start < number < end)."""
     if interval_end < interval_start:
         raise ValueError("End cannot be less than start")
 
-    def wrap(val: Optional[float]) -> bool:
+    def wrap(val: float | None) -> bool:
         return val is not None and interval_start < val < interval_end
 
     return wrap
@@ -679,20 +678,20 @@ def is_between(
 
 def is_in_open_interval(
     interval_start: float, interval_end: float
-) -> Callable[[Optional[float]], bool]:
+) -> Callable[[float | None], bool]:
     """Checks if a number is strictly between start and end (start < number < end)."""
     return is_between(interval_start, interval_end)
 
 
 def is_between_closed_start(
     interval_start: float, interval_end: float
-) -> Callable[[Optional[float]], bool]:
+) -> Callable[[float | None], bool]:
     """Checks if a number is between start (inclusive) and end (exclusive) (start <= number < end)."""
 
     if interval_end < interval_start:
         raise ValueError("End cannot be less than start")
 
-    def wrap(val: Optional[float]) -> bool:
+    def wrap(val: float | None) -> bool:
         return val is not None and interval_start <= val < interval_end
 
     return wrap
@@ -700,49 +699,49 @@ def is_between_closed_start(
 
 def is_between_closed_end(
     interval_start: float, interval_end: float
-) -> Callable[[Optional[float]], bool]:
+) -> Callable[[float | None], bool]:
     """Checks if a number is between start (exclusive) and end (inclusive) (start < number <= end)."""
 
     if interval_end < interval_start:
         raise ValueError("End cannot be less than start")
 
-    def wrap(val: Optional[float]) -> bool:
+    def wrap(val: float | None) -> bool:
         return val is not None and interval_start < val <= interval_end
 
     return wrap
 
 
-def is_higher_than(value: float) -> Callable[[Optional[float]], bool]:
+def is_higher_than(value: float) -> Callable[[float | None], bool]:
     """Checks if a number is strictly greater than the specified value."""
 
-    def wrap(val: Optional[float]) -> bool:
+    def wrap(val: float | None) -> bool:
         return val is not None and val > value
 
     return wrap
 
 
-def is_higher_than_or_eq(value: float) -> Callable[[Optional[float]], bool]:
+def is_higher_than_or_eq(value: float) -> Callable[[float | None], bool]:
     """Checks if a number is greater than or equal to the specified value."""
 
-    def wrap(val: Optional[float]) -> bool:
+    def wrap(val: float | None) -> bool:
         return val is not None and val >= value
 
     return wrap
 
 
-def is_less_than(value: float) -> Callable[[Optional[float]], bool]:
+def is_less_than(value: float) -> Callable[[float | None], bool]:
     """Checks if a number is strictly less than the specified value."""
 
-    def wrap(val: Optional[float]) -> bool:
+    def wrap(val: float | None) -> bool:
         return val is not None and val < value
 
     return wrap
 
 
-def is_less_than_or_eq(value: float) -> Callable[[Optional[float]], bool]:
+def is_less_than_or_eq(value: float) -> Callable[[float | None], bool]:
     """Checks if a number is less than or equal to the specified value."""
 
-    def wrap(val: Optional[float]) -> bool:
+    def wrap(val: float | None) -> bool:
         return val is not None and val <= value
 
     return wrap
@@ -752,7 +751,7 @@ def is_less_than_or_eq(value: float) -> Callable[[Optional[float]], bool]:
 
 
 def not_(
-    predicate: Union[Predicate[Optional[T]], Callable[[Optional[T]], bool]],
+    predicate: Predicate[T | None] | Callable[[T | None], bool],
 ) -> Callable[[T], bool]:
     """
     Negates the result of the given predicate. Handles Optional input.
@@ -762,7 +761,7 @@ def not_(
         predicate: The predicate to negate.
 
     Returns:
-        Predicate[Optional[T]]: The negated predicate.
+        Predicate[T | None]: The negated predicate.
     """
 
     return not_strict(predicate)
@@ -788,7 +787,7 @@ def not_strict(
 # --- Mapping Predicates ---
 
 
-def has_key(key: Any) -> Callable[[Optional[Mapping[Any, Any]]], bool]:
+def has_key(key: Any) -> Callable[[Mapping[Any, Any] | None], bool]:
     """
     Produces a predicate that checks if the argument mapping contains the given key.
 
@@ -796,17 +795,17 @@ def has_key(key: Any) -> Callable[[Optional[Mapping[Any, Any]]], bool]:
         key: The key to check for.
 
     Returns:
-        Callable[[Optional[Mapping[Any, Any]]], bool]: The resulting predicate.
+        Callable[[Mapping[Any, Any] | None], bool]: The resulting predicate.
     """
 
     # Using 'key in mapping' is generally preferred over 'key in mapping.keys()'
-    def wrap(dct: Optional[Mapping[Any, Any]]) -> bool:
+    def wrap(dct: Mapping[Any, Any] | None) -> bool:
         return dct is not None and key in dct
 
     return wrap
 
 
-def has_value(value: Any) -> Callable[[Optional[Mapping[Any, Any]]], bool]:
+def has_value(value: Any) -> Callable[[Mapping[Any, Any] | None], bool]:
     """
     Produces a predicate that checks if the argument mapping contains the given value.
     Note: This requires iterating through values (O(n)).
@@ -815,11 +814,11 @@ def has_value(value: Any) -> Callable[[Optional[Mapping[Any, Any]]], bool]:
         value: The value to check for.
 
     Returns:
-        Callable[[Optional[Mapping[Any, Any]]], bool]: The resulting predicate.
+        Callable[[Mapping[Any, Any] | None], bool]: The resulting predicate.
     """
 
     # 'value in mapping.values()' is the standard way
-    def wrap(dct: Optional[Mapping[Any, Any]]) -> bool:
+    def wrap(dct: Mapping[Any, Any] | None) -> bool:
         return dct is not None and value in dct.values()
 
     return wrap
@@ -889,10 +888,10 @@ def is_identity(other: Any) -> Callable[[Any], bool]:
     return wrap
 
 
-def has_length(length: int) -> Callable[[Optional[Sized]], bool]:
+def has_length(length: int) -> Callable[[Sized | None], bool]:
     """Checks if a Sized object has the specified length."""
 
-    def wrap(val: Optional[Sized]) -> bool:
+    def wrap(val: Sized | None) -> bool:
         # is_blank already checks for None
         return not is_blank(val) and len(val) == length  # type: ignore
 
@@ -908,7 +907,7 @@ def is_instance(cls: type) -> Callable[[Any], bool]:
     return wrap
 
 
-def str_fullmatch(pattern: str) -> Callable[[Optional[str]], bool]:
+def str_fullmatch(pattern: str) -> Callable[[str | None], bool]:
     """
     Checks if the *entire* string matches the given regex pattern (uses re.fullmatch).
     Complements `str_matches` which only checks from the beginning (`re.match`).
@@ -917,14 +916,14 @@ def str_fullmatch(pattern: str) -> Callable[[Optional[str]], bool]:
         pattern (str): The regular expression pattern.
 
     Returns:
-        Callable[[Optional[str]], bool]: A predicate.
+        Callable[[str | None], bool]: A predicate.
     """
 
     require_non_null(pattern, "Pattern cannot be None")
 
     compiled_pattern = re.compile(pattern)
 
-    def wrap(val: Optional[str]) -> bool:
+    def wrap(val: str | None) -> bool:
         if val is None:
             return False
         match = compiled_pattern.fullmatch(val)
@@ -933,37 +932,37 @@ def str_fullmatch(pattern: str) -> Callable[[Optional[str]], bool]:
     return wrap
 
 
-def str_is_alpha(val: Optional[str]) -> bool:
+def str_is_alpha(val: str | None) -> bool:
     """Checks if a string is not None and all characters are alphabetic."""
     return val is not None and val.isalpha()
 
 
-def str_is_digit(val: Optional[str]) -> bool:
+def str_is_digit(val: str | None) -> bool:
     """Checks if a string is not None and all characters are digits."""
     return val is not None and val.isdigit()
 
 
-def str_is_alnum(val: Optional[str]) -> bool:
+def str_is_alnum(val: str | None) -> bool:
     """Checks if a string is not None and all characters are alphanumeric."""
     return val is not None and val.isalnum()
 
 
-def str_is_lower(val: Optional[str]) -> bool:
+def str_is_lower(val: str | None) -> bool:
     """Checks if a string is not None and all cased characters are lowercase."""
     return val is not None and val.islower()
 
 
-def str_is_upper(val: Optional[str]) -> bool:
+def str_is_upper(val: str | None) -> bool:
     """Checks if a string is not None and all cased characters are uppercase."""
     return val is not None and val.isupper()
 
 
-def str_is_space(val: Optional[str]) -> bool:
+def str_is_space(val: str | None) -> bool:
     """Checks if a string is not None and all characters are whitespace."""
     return val is not None and val.isspace()
 
 
-def str_is_title(val: Optional[str]) -> bool:
+def str_is_title(val: str | None) -> bool:
     """Checks if a string is not None and is titlecased."""
     return val is not None and val.istitle()
 
@@ -984,7 +983,7 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -992,8 +991,8 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1001,9 +1000,9 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1011,10 +1010,10 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1022,11 +1021,11 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1034,12 +1033,12 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1047,13 +1046,13 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1061,14 +1060,14 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1076,15 +1075,15 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1092,16 +1091,16 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
-    predicate12: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
+    predicate12: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1109,17 +1108,17 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
-    predicate12: Optional[Callable[[T], bool]] = None,
-    predicate13: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
+    predicate12: Callable[[T], bool] | None = None,
+    predicate13: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1127,18 +1126,18 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
-    predicate12: Optional[Callable[[T], bool]] = None,
-    predicate13: Optional[Callable[[T], bool]] = None,
-    predicate14: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
+    predicate12: Callable[[T], bool] | None = None,
+    predicate13: Callable[[T], bool] | None = None,
+    predicate14: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1146,19 +1145,19 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
-    predicate12: Optional[Callable[[T], bool]] = None,
-    predicate13: Optional[Callable[[T], bool]] = None,
-    predicate14: Optional[Callable[[T], bool]] = None,
-    predicate15: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
+    predicate12: Callable[[T], bool] | None = None,
+    predicate13: Callable[[T], bool] | None = None,
+    predicate14: Callable[[T], bool] | None = None,
+    predicate15: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1166,41 +1165,41 @@ def and_(
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
-    predicate12: Optional[Callable[[T], bool]] = None,
-    predicate13: Optional[Callable[[T], bool]] = None,
-    predicate14: Optional[Callable[[T], bool]] = None,
-    predicate15: Optional[Callable[[T], bool]] = None,
-    predicate16: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
+    predicate12: Callable[[T], bool] | None = None,
+    predicate13: Callable[[T], bool] | None = None,
+    predicate14: Callable[[T], bool] | None = None,
+    predicate15: Callable[[T], bool] | None = None,
+    predicate16: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
 def and_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
-    predicate12: Optional[Callable[[T], bool]] = None,
-    predicate13: Optional[Callable[[T], bool]] = None,
-    predicate14: Optional[Callable[[T], bool]] = None,
-    predicate15: Optional[Callable[[T], bool]] = None,
-    predicate16: Optional[Callable[[T], bool]] = None,
-    predicate17: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
+    predicate12: Callable[[T], bool] | None = None,
+    predicate13: Callable[[T], bool] | None = None,
+    predicate14: Callable[[T], bool] | None = None,
+    predicate15: Callable[[T], bool] | None = None,
+    predicate16: Callable[[T], bool] | None = None,
+    predicate17: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]:
     """
     Produces a predicate that returns True if all of the provided predicates returns True.
@@ -1208,21 +1207,21 @@ def and_(
     Args:
         predicate1 (Callable[[T], bool]): Predicate
         predicate2 (Callable[[T], bool]): Predicate
-        predicate3 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate4 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate5 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate6 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate7 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate8 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate9 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate10 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate11 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate12 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate13 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate14 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate15 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate16 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate17 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate3 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate4 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate5 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate6 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate7 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate8 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate9 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate10 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate11 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate12 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate13 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate14 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate15 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate16 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate17 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
 
     Returns:
         Callable[[T], bool]: The AND predicate
@@ -1264,7 +1263,7 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1272,8 +1271,8 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1281,9 +1280,9 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1291,10 +1290,10 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1302,11 +1301,11 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1314,12 +1313,12 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1327,13 +1326,13 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1341,14 +1340,14 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1356,15 +1355,15 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1372,16 +1371,16 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
-    predicate12: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
+    predicate12: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1389,17 +1388,17 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
-    predicate12: Optional[Callable[[T], bool]] = None,
-    predicate13: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
+    predicate12: Callable[[T], bool] | None = None,
+    predicate13: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1407,18 +1406,18 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
-    predicate12: Optional[Callable[[T], bool]] = None,
-    predicate13: Optional[Callable[[T], bool]] = None,
-    predicate14: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
+    predicate12: Callable[[T], bool] | None = None,
+    predicate13: Callable[[T], bool] | None = None,
+    predicate14: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1426,19 +1425,19 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
-    predicate12: Optional[Callable[[T], bool]] = None,
-    predicate13: Optional[Callable[[T], bool]] = None,
-    predicate14: Optional[Callable[[T], bool]] = None,
-    predicate15: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
+    predicate12: Callable[[T], bool] | None = None,
+    predicate13: Callable[[T], bool] | None = None,
+    predicate14: Callable[[T], bool] | None = None,
+    predicate15: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
@@ -1446,41 +1445,41 @@ def or_(
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
-    predicate12: Optional[Callable[[T], bool]] = None,
-    predicate13: Optional[Callable[[T], bool]] = None,
-    predicate14: Optional[Callable[[T], bool]] = None,
-    predicate15: Optional[Callable[[T], bool]] = None,
-    predicate16: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
+    predicate12: Callable[[T], bool] | None = None,
+    predicate13: Callable[[T], bool] | None = None,
+    predicate14: Callable[[T], bool] | None = None,
+    predicate15: Callable[[T], bool] | None = None,
+    predicate16: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]: ...
 
 
 def or_(
     predicate1: Callable[[T], bool],
     predicate2: Callable[[T], bool],
-    predicate3: Optional[Callable[[T], bool]] = None,
-    predicate4: Optional[Callable[[T], bool]] = None,
-    predicate5: Optional[Callable[[T], bool]] = None,
-    predicate6: Optional[Callable[[T], bool]] = None,
-    predicate7: Optional[Callable[[T], bool]] = None,
-    predicate8: Optional[Callable[[T], bool]] = None,
-    predicate9: Optional[Callable[[T], bool]] = None,
-    predicate10: Optional[Callable[[T], bool]] = None,
-    predicate11: Optional[Callable[[T], bool]] = None,
-    predicate12: Optional[Callable[[T], bool]] = None,
-    predicate13: Optional[Callable[[T], bool]] = None,
-    predicate14: Optional[Callable[[T], bool]] = None,
-    predicate15: Optional[Callable[[T], bool]] = None,
-    predicate16: Optional[Callable[[T], bool]] = None,
-    predicate17: Optional[Callable[[T], bool]] = None,
+    predicate3: Callable[[T], bool] | None = None,
+    predicate4: Callable[[T], bool] | None = None,
+    predicate5: Callable[[T], bool] | None = None,
+    predicate6: Callable[[T], bool] | None = None,
+    predicate7: Callable[[T], bool] | None = None,
+    predicate8: Callable[[T], bool] | None = None,
+    predicate9: Callable[[T], bool] | None = None,
+    predicate10: Callable[[T], bool] | None = None,
+    predicate11: Callable[[T], bool] | None = None,
+    predicate12: Callable[[T], bool] | None = None,
+    predicate13: Callable[[T], bool] | None = None,
+    predicate14: Callable[[T], bool] | None = None,
+    predicate15: Callable[[T], bool] | None = None,
+    predicate16: Callable[[T], bool] | None = None,
+    predicate17: Callable[[T], bool] | None = None,
 ) -> Callable[[T], bool]:
     """
     Produces a predicate that returns True if any of the provided predicates returns True.
@@ -1488,21 +1487,21 @@ def or_(
     Args:
         predicate1 (Callable[[T], bool]): Predicate
         predicate2 (Callable[[T], bool]): Predicate
-        predicate3 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate4 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate5 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate6 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate7 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate8 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate9 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate10 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate11 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate12 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate13 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate14 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate15 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate16 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
-        predicate17 (Optional[Callable[[T], bool]], optional): Predicate. Defaults to None.
+        predicate3 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate4 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate5 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate6 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate7 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate8 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate9 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate10 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate11 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate12 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate13 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate14 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate15 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate16 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
+        predicate17 (Callable[[T], bool] | None, optional): Predicate. Defaults to None.
 
     Returns:
         Callable[[T], bool]: The OR predicate

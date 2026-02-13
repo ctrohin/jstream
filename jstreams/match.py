@@ -1,4 +1,4 @@
-from typing import Generic, Optional, TypeVar, Union, final, overload
+from typing import Generic, TypeVar, final, overload
 from collections.abc import Callable
 from jstreams.stream import Opt
 from jstreams.predicate import Predicate, _extract_predicate_fn
@@ -109,20 +109,20 @@ class Match(Generic[T]):
     # These overloads help type checkers understand the return type based on the
     # number of cases provided, ensuring all cases return the same type V.
     @overload
-    def of(self, case1: Case[T, V]) -> Optional[V]: ...
+    def of(self, case1: Case[T, V]) -> V | None: ...
 
     @overload
-    def of(self, case1: Case[T, V], case2: Case[T, V]) -> Optional[V]: ...
+    def of(self, case1: Case[T, V], case2: Case[T, V]) -> V | None: ...
 
     @overload
     def of(
         self, case1: Case[T, V], case2: Case[T, V], case3: Case[T, V]
-    ) -> Optional[V]: ...
+    ) -> V | None: ...
 
     @overload
     def of(
         self, case1: Case[T, V], case2: Case[T, V], case3: Case[T, V], case4: Case[T, V]
-    ) -> Optional[V]: ...
+    ) -> V | None: ...
 
     @overload
     def of(
@@ -132,7 +132,7 @@ class Match(Generic[T]):
         case3: Case[T, V],
         case4: Case[T, V],
         case5: Case[T, V],
-    ) -> Optional[V]: ...
+    ) -> V | None: ...
 
     @overload
     def of(
@@ -143,7 +143,7 @@ class Match(Generic[T]):
         case4: Case[T, V],
         case5: Case[T, V],
         case6: Case[T, V],
-    ) -> Optional[V]: ...
+    ) -> V | None: ...
 
     @overload
     def of(
@@ -155,7 +155,7 @@ class Match(Generic[T]):
         case5: Case[T, V],
         case6: Case[T, V],
         case7: Case[T, V],
-    ) -> Optional[V]: ...
+    ) -> V | None: ...
 
     @overload
     def of(
@@ -168,7 +168,7 @@ class Match(Generic[T]):
         case6: Case[T, V],
         case7: Case[T, V],
         case8: Case[T, V],
-    ) -> Optional[V]: ...
+    ) -> V | None: ...
 
     @overload
     def of(
@@ -182,7 +182,7 @@ class Match(Generic[T]):
         case7: Case[T, V],
         case8: Case[T, V],
         case9: Case[T, V],
-    ) -> Optional[V]: ...
+    ) -> V | None: ...
 
     @overload
     def of(
@@ -197,7 +197,7 @@ class Match(Generic[T]):
         case8: Case[T, V],
         case9: Case[T, V],
         case10: Case[T, V],
-    ) -> Optional[V]: ...
+    ) -> V | None: ...
 
     @overload
     def of(
@@ -213,7 +213,7 @@ class Match(Generic[T]):
         case9: Case[T, V],
         case10: Case[T, V],
         case11: Case[T, V],
-    ) -> Optional[V]: ...
+    ) -> V | None: ...
 
     @overload
     def of(
@@ -230,7 +230,7 @@ class Match(Generic[T]):
         case10: Case[T, V],
         case11: Case[T, V],
         case12: Case[T, V],
-    ) -> Optional[V]: ...
+    ) -> V | None: ...
 
     @overload
     def of(
@@ -248,7 +248,7 @@ class Match(Generic[T]):
         case11: Case[T, V],
         case12: Case[T, V],
         case13: Case[T, V],
-    ) -> Optional[V]: ...
+    ) -> V | None: ...
 
     @overload
     def of(
@@ -267,7 +267,7 @@ class Match(Generic[T]):
         case12: Case[T, V],
         case13: Case[T, V],
         case14: Case[T, V],
-    ) -> Optional[V]: ...
+    ) -> V | None: ...
 
     @overload
     def of(
@@ -287,31 +287,29 @@ class Match(Generic[T]):
         case13: Case[T, V],
         case14: Case[T, V],
         case15: Case[T, V],
-    ) -> Optional[V]: ...
+    ) -> V | None: ...
 
     # --- End Overloads ---
 
     def of(
         self,
         case1: Case[T, V],
-        case2: Optional[Case[T, V]] = None,
-        case3: Optional[Case[T, V]] = None,
-        case4: Optional[Case[T, V]] = None,
-        case5: Optional[Case[T, V]] = None,
-        case6: Optional[Case[T, V]] = None,
-        case7: Optional[Case[T, V]] = None,
-        case8: Optional[Case[T, V]] = None,
-        case9: Optional[Case[T, V]] = None,
-        case10: Optional[Case[T, V]] = None,
-        case11: Optional[Case[T, V]] = None,
-        case12: Optional[Case[T, V]] = None,
-        case13: Optional[Case[T, V]] = None,
-        case14: Optional[Case[T, V]] = None,
-        case15: Optional[Case[T, V]] = None,
-        case16: Optional[
-            Case[T, V]
-        ] = None,  # Added one more optional case for symmetry
-    ) -> Optional[V]:
+        case2: Case[T, V] | None = None,
+        case3: Case[T, V] | None = None,
+        case4: Case[T, V] | None = None,
+        case5: Case[T, V] | None = None,
+        case6: Case[T, V] | None = None,
+        case7: Case[T, V] | None = None,
+        case8: Case[T, V] | None = None,
+        case9: Case[T, V] | None = None,
+        case10: Case[T, V] | None = None,
+        case11: Case[T, V] | None = None,
+        case12: Case[T, V] | None = None,
+        case13: Case[T, V] | None = None,
+        case14: Case[T, V] | None = None,
+        case15: Case[T, V] | None = None,
+        case16: Case[T, V] | None = None,  # Added one more optional case for symmetry
+    ) -> V | None:
         """
         Evaluates the provided cases against the stored value and returns the result
         of the first matching case.
@@ -534,23 +532,21 @@ class Match(Generic[T]):
     def opt(
         self,
         case1: Case[T, V],
-        case2: Optional[Case[T, V]] = None,
-        case3: Optional[Case[T, V]] = None,
-        case4: Optional[Case[T, V]] = None,
-        case5: Optional[Case[T, V]] = None,
-        case6: Optional[Case[T, V]] = None,
-        case7: Optional[Case[T, V]] = None,
-        case8: Optional[Case[T, V]] = None,
-        case9: Optional[Case[T, V]] = None,
-        case10: Optional[Case[T, V]] = None,
-        case11: Optional[Case[T, V]] = None,
-        case12: Optional[Case[T, V]] = None,
-        case13: Optional[Case[T, V]] = None,
-        case14: Optional[Case[T, V]] = None,
-        case15: Optional[Case[T, V]] = None,
-        case16: Optional[
-            Case[T, V]
-        ] = None,  # Added one more optional case for symmetry
+        case2: Case[T, V] | None = None,
+        case3: Case[T, V] | None = None,
+        case4: Case[T, V] | None = None,
+        case5: Case[T, V] | None = None,
+        case6: Case[T, V] | None = None,
+        case7: Case[T, V] | None = None,
+        case8: Case[T, V] | None = None,
+        case9: Case[T, V] | None = None,
+        case10: Case[T, V] | None = None,
+        case11: Case[T, V] | None = None,
+        case12: Case[T, V] | None = None,
+        case13: Case[T, V] | None = None,
+        case14: Case[T, V] | None = None,
+        case15: Case[T, V] | None = None,
+        case16: Case[T, V] | None = None,  # Added one more optional case for symmetry
     ) -> Opt[V]:
         """
         Evaluates the provided cases against the stored value and returns the result
@@ -588,7 +584,7 @@ class Match(Generic[T]):
             ]
         )
 
-    def opt_list(self, cases: list[Optional[Case[T, V]]]) -> Opt[V]:
+    def opt_list(self, cases: list[Case[T, V] | None]) -> Opt[V]:
         """
         Evaluates the provided cases against the stored value and returns the result
         of the first matching case.
@@ -608,7 +604,7 @@ class Match(Generic[T]):
                 return Opt(case_item.result())
         return Opt.empty()
 
-    def of_list(self, cases: list[Optional[Case[T, V]]]) -> Optional[V]:
+    def of_list(self, cases: list[Case[T, V] | None]) -> V | None:
         """
         Evaluates the provided cases against the stored value and returns the result
         of the first matching case.
@@ -625,7 +621,7 @@ class Match(Generic[T]):
         """
         return self.opt_list(cases).get_actual()
 
-    def of_list_exhaustive(self, cases: list[Optional[Case[T, V]]]) -> V:
+    def of_list_exhaustive(self, cases: list[Case[T, V] | None]) -> V:
         """
         Evaluates the provided cases against the stored value and returns the result
         of the first matching case. Raises MatchError if no case matches.
@@ -650,8 +646,8 @@ class Match(Generic[T]):
 
 
 def case(
-    matching: Union[T, Callable[[T], bool]],
-    resulting: Union[V, Callable[[], V]],
+    matching: T | Callable[[T], bool],
+    resulting: V | Callable[[], V],
 ) -> Case[T, V]:
     """
     Factory function to create a Case instance.
@@ -690,14 +686,14 @@ def match(value: T) -> Match[T]:
     return Match(value)
 
 
-def match_opt(value: Optional[T]) -> Match[Optional[T]]:
+def match_opt(value: T | None) -> Match[T | None]:
     """
     Factory function to start a match expression specifically for an Optional value.
 
     This allows using predicates that work on Optional types, like `is_none`
     or `is_not_none`, directly in the cases.
 
-    Syntactic sugar for `Match(value)` where value is Optional[T].
+    Syntactic sugar for `Match(value)` where value is T | None.
 
     Example:
         from jstreams.predicate import is_none, is_not_none
@@ -712,12 +708,12 @@ def match_opt(value: Optional[T]) -> Match[Optional[T]]:
         value: The Optional value to match against cases.
 
     Returns:
-        A new Match[Optional[T]] instance, ready to call `.of(...)` on.
+        A new Match[T | None] instance, ready to call `.of(...)` on.
     """
     return Match(value)
 
 
-def DefaultCase(resulting: Union[V, Callable[[], V]]) -> Case[T, V]:
+def DefaultCase(resulting: V | Callable[[], V]) -> Case[T, V]:
     """
     Factory function to create a DefaultCase instance.
 
@@ -734,7 +730,7 @@ def DefaultCase(resulting: Union[V, Callable[[], V]]) -> Case[T, V]:
     return Case(lambda _: True, resulting)
 
 
-def default_case(resulting: Union[V, Callable[[], V]]) -> Case[T, V]:
+def default_case(resulting: V | Callable[[], V]) -> Case[T, V]:
     """
     Factory function to create a DefaultCase instance.
 

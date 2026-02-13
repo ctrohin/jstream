@@ -3,7 +3,7 @@ from collections import deque
 from itertools import dropwhile, islice, takewhile
 import itertools
 import sys
-from typing import Any, Generic, Optional, TypeVar, cast
+from typing import Any, Generic, TypeVar, cast
 from collections.abc import Callable, Iterable, Iterator
 from jstreams.mapper import Mapper
 from jstreams.predicate import not_strict, _extract_predicate_fn
@@ -125,7 +125,7 @@ class GroupAdjacentIterable(Generic[T, K], Iterator[list[T]], Iterable[list[T]])
         self._iterator = iter(self._iterable)
         self.__key_func = key_func
         self._current_group: list[T] = []
-        self._current_key: Optional[K] = None
+        self._current_key: K | None = None
 
     def __iter__(self) -> Iterator[list[T]]:
         self._iterator = iter(self._iterable)
@@ -421,7 +421,7 @@ class DistinctIterable(GenericIterable[T]):
     __slots__ = ("__seen", "__key_func")  # Use __seen instead of __set for clarity
 
     def __init__(
-        self, it: Iterable[T], key_func: Optional[Callable[[T], Any]] = None
+        self, it: Iterable[T], key_func: Callable[[T], Any] | None = None
     ) -> None:
         super().__init__(it)
         self.__seen: set[Any] = (
@@ -442,7 +442,7 @@ class DistinctIterable(GenericIterable[T]):
 
 
 def distinct(
-    iterable: Iterable[T], key: Optional[Callable[[T], Any]] = None
+    iterable: Iterable[T], key: Callable[[T], Any] | None = None
 ) -> Iterable[T]:
     """
     Returns an iterable consisting of the distinct elements of the given iterable.
@@ -453,7 +453,7 @@ def distinct(
 
     Args:
         iterable (Iterable[T]): The iterable
-        key (Optional[Callable[[T], Any]]): A function to extract the key for uniqueness comparison. If None, the element itself is used. Defaults to None.
+        key (Callable[[T], Any] | None): A function to extract the key for uniqueness comparison. If None, the element itself is used. Defaults to None.
     """
     return DistinctIterable(iterable, key)
 
@@ -490,7 +490,7 @@ class PeekIterable(GenericIterable[T]):
         self,
         it: Iterable[T],
         action: Callable[[T], Any],
-        logger: Optional[Callable[[Exception], Any]] = None,
+        logger: Callable[[Exception], Any] | None = None,
     ) -> None:
         super().__init__(it)
         self.__action = action
@@ -513,7 +513,7 @@ class PeekIterable(GenericIterable[T]):
 def peek(
     it: Iterable[T],
     action: Callable[[T], Any],
-    logger: Optional[Callable[[Exception], Any]] = None,
+    logger: Callable[[Exception], Any] | None = None,
 ) -> Iterable[T]:
     return PeekIterable(it, action, logger)
 
@@ -816,7 +816,7 @@ class PairwiseIterable(Generic[T], Iterator[Pair[T, T]], Iterable[Pair[T, T]]):
             it  # Store original iterable if re-iteration neededAdd commentMore actions
         )
         self._iterator = iter(self._iterable)
-        self._previous: Optional[T] = None
+        self._previous: T | None = None
         self._first_element_consumed = False
 
     def __iter__(self) -> Iterator[Pair[T, T]]:
@@ -904,7 +904,7 @@ class SlidingWindowIterable(Generic[T], Iterator[list[T]], Iterable[list[T]]):
 
 def sliding_window(
     iterable: Iterable[T], size: int, step: int = 1
-) -> "Iterable[list[T]]":
+) -> Iterable[list[T]]:
     """
     Returns an iterable of lists, where each list is a sliding window of
     elements from the original iterable.
@@ -934,7 +934,7 @@ def sliding_window(
 class RepeatIterable(Generic[T], Iterable[T]):
     __slots__ = ("_buffered_elements", "_n", "_current_n", "_iterator")
 
-    def __init__(self, it: Iterable[T], n: Optional[int]) -> None:
+    def __init__(self, it: Iterable[T], n: int | None) -> None:
         # Buffer the original iterable ONCE
         self._buffered_elements = list(it)
         self._n = n  # None means infinite
@@ -963,14 +963,14 @@ class RepeatIterable(Generic[T], Iterable[T]):
             return next(self._iterator)  # Get first element of next cycle
 
 
-def repeat(iterable: Iterable[T], n: Optional[int] = None) -> Iterable[T]:
+def repeat(iterable: Iterable[T], n: int | None = None) -> Iterable[T]:
     """
     Returns an iterable that repeats the elements of the given iterable n times,
     or indefinitely if n is None.
 
     Args:
         iterable (Iterable[T]): The initial iterable
-        n (Optional[int]): The number of times to repeat the iterable.
+        n (int | None): The number of times to repeat the iterable.
                         If None, repeats indefinitely. Defaults to None.
 
     Returns:
@@ -1041,12 +1041,12 @@ def intersperse(iterable: Iterable[T], separator: T) -> Iterable[T]:
 class UnfoldIterable(Generic[T, S], Iterator[T], Iterable[T]):
     __slots__ = ("_initial_seed", "_generator", "_current_seed", "_next_pair")
 
-    def __init__(self, seed: S, generator: Callable[[S], Optional[Pair[T, S]]]) -> None:
+    def __init__(self, seed: S, generator: Callable[[S], Pair[T, S] | None]) -> None:
         self._initial_seed = seed
         self._generator = generator
         # State for iteration
         self._current_seed = self._initial_seed
-        self._next_pair: Optional[Pair[T, S]] = self._generator(
+        self._next_pair: Pair[T, S] | None = self._generator(
             self._current_seed
         )  # Compute first pair
 
@@ -1071,16 +1071,16 @@ class UnfoldIterable(Generic[T, S], Iterator[T], Iterable[T]):
         return current_element  # Return the element generated in the previous step
 
 
-def unfold(seed: S, generator: Callable[[S], Optional[Pair[T, S]]]) -> Iterable[T]:
+def unfold(seed: S, generator: Callable[[S], Pair[T, S] | None]) -> Iterable[T]:
     """
     Creates an iterable by repeatedly applying a generator function to a seed value.
 
     The generator function takes the current state (seed) and returns an
-    Optional Pair containing the next element for the iterable and the next state (seed).
+    Pair | None containing the next element for the iterable and the next state (seed).
     The iterable terminates when the generator returns None.
 
     Example (Fibonacci sequence):
-        def fib_generator(state: Pair[int, int]) -> Optional[Pair[int, Pair[int, int]]]:
+        def fib_generator(state: Pair[int, int]) -> Pair[int, Pair[int, int]] | None:
             a, b = state.left(), state.right()
             return Pair(a, Pair(b, a + b)) # Yield a, next state is (b, a+b)
 
@@ -1088,7 +1088,7 @@ def unfold(seed: S, generator: Callable[[S], Optional[Pair[T, S]]]) -> Iterable[
         # Output: [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
 
     Example (Range):
-        def range_generator(current: int) -> Optional[Pair[int, int]]:
+        def range_generator(current: int) -> Pair[int, int] | None:
             if current >= 10:
                 return None
             return Pair(current, current + 1) # Yield current, next state is current + 1
@@ -1098,8 +1098,8 @@ def unfold(seed: S, generator: Callable[[S], Optional[Pair[T, S]]]) -> Iterable[
 
     Args:
         seed (S): The initial state.
-        generator (Callable[[S], Optional[Pair[T, S]]]): Function that takes the
-            current state and returns an Optional Pair(next_element, next_state).
+        generator (Callable[[S], Pair[T, S] | None]): Function that takes the
+            current state and returns an Pair(next_element, next_state) | None.
 
     Returns:
         Iterable[T]: The generated stream.
@@ -1109,7 +1109,7 @@ def unfold(seed: S, generator: Callable[[S], Optional[Pair[T, S]]]) -> Iterable[
 
 class ZipLongestIterable(
     Generic[T, V],
-    Iterable[Pair[Optional[T], Optional[V]]],
+    Iterable[Pair[T | None, V | None]],
 ):
     __slots__ = ("_it1", "_it2", "_fillvalue")
 
@@ -1120,7 +1120,7 @@ class ZipLongestIterable(
         self._it2 = it2
         self._fillvalue = fillvalue
 
-    def __iter__(self) -> Iterator[Pair[Optional[T], Optional[V]]]:
+    def __iter__(self) -> Iterator[Pair[T | None, V | None]]:
         return map(
             lambda x: Pair(x[0], x[1]),
             itertools.zip_longest(self._it1, self._it2, fillvalue=self._fillvalue),
@@ -1129,7 +1129,7 @@ class ZipLongestIterable(
 
 def zip_longest(
     iterable1: Iterable[T], iterable2: Iterable[V], fillvalue: Any = None
-) -> Iterable[Pair[Optional[T], Optional[V]]]:
+) -> Iterable[Pair[T | None, V | None]]:
     """
     Zips iterable1 and iterable2, producing an iterable of Pairs.
     Continues until the longest iterable is exhausted, filling missing
@@ -1142,19 +1142,19 @@ def zip_longest(
                     Defaults to None.
 
     Returns:
-        Iterable[Pair[Optional[T], Optional[V]]]: An iterable of pairs, potentially
+        Iterable[Pair[T | None, V | None]]: An iterable of pairs, potentially
                                                 containing the fillvalue.
     """
     # Note: The Pair type hints need to reflect the Optional nature
-    # Pair[Optional[T], Optional[V]] is correct.
+    # Pair[T | None, V | None] is correct.
     return ZipLongestIterable(iterable1, iterable2, fillvalue)
 
 
 class CycleIterable(Generic[T], Iterator[T], Iterable[T]):
     __slots__ = ("_elements", "_n", "_current_n", "_iterator")
 
-    def __init__(self, it: Iterable[T], n: Optional[int]) -> None:
-        self._n: Optional[int] = n
+    def __init__(self, it: Iterable[T], n: int | None) -> None:
+        self._n: int | None = n
         self._elements = list(it)  # Buffer elements
         if not self._elements and n is not None and n > 0:
             # Cannot cycle an empty iterable a fixed number of times > 0
@@ -1191,7 +1191,7 @@ class CycleIterable(Generic[T], Iterator[T], Iterable[T]):
             return next(self._iterator)
 
 
-def cycle(iterable: Iterable[T], n: Optional[int] = None) -> Iterable[T]:
+def cycle(iterable: Iterable[T], n: int | None = None) -> Iterable[T]:
     """
     Creates an iterable that cycles over the elements of the initial iterable.
 
@@ -1200,7 +1200,7 @@ def cycle(iterable: Iterable[T], n: Optional[int] = None) -> Iterable[T]:
 
     Args:
         iterable (Iterable[T]): The iterable whose elements are to be cycled.
-        n (Optional[int]): The number of times to cycle through the iterable.
+        n (int | None): The number of times to cycle through the iterable.
             If None (default), cycles indefinitely.
             If 0, results in an empty iterable.
             If the input iterable is empty and n > 0, an empty iterable is also produced.

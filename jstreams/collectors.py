@@ -1,5 +1,5 @@
 from functools import cmp_to_key
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 from collections.abc import Sized, Callable, Iterable
 
 from jstreams.stream import Opt
@@ -306,7 +306,7 @@ class Collectors:
         return transform
 
     @staticmethod
-    def averaging_float() -> Callable[[Iterable[float]], Optional[float]]:
+    def averaging_float() -> Callable[[Iterable[float]], float | None]:
         """
         Returns a collector function that calculates the average of float elements.
         Returns None if the iterable is empty. Assumes the iterable contains floats.
@@ -315,11 +315,11 @@ class Collectors:
             avg = stream_of_floats.collect_using(Collectors.averaging_float())
 
         Returns:
-            Callable[[Iterable[float]], Optional[float]]: A function that takes an iterable of floats
+            Callable[[Iterable[float]], float | None]: A function that takes an iterable of floats
                                                         and returns their average, or None if empty.
         """
 
-        def transform(elements: Iterable[float]) -> Optional[float]:
+        def transform(elements: Iterable[float]) -> float | None:
             """Calculates the average of float elements."""
             count = 0
             total = 0.0
@@ -386,7 +386,7 @@ class Collectors:
         return transform
 
     @staticmethod
-    def averaging_int() -> Callable[[Iterable[int]], Optional[float]]:
+    def averaging_int() -> Callable[[Iterable[int]], float | None]:
         """
         Returns a collector function that calculates the average of integer elements.
         Returns None if the iterable is empty. Assumes the iterable contains integers.
@@ -396,11 +396,11 @@ class Collectors:
             avg = stream_of_ints.collect_using(Collectors.averaging_int())
 
         Returns:
-            Callable[[Iterable[int]], Optional[float]]: A function that takes an iterable of ints
+            Callable[[Iterable[int]], float | None]: A function that takes an iterable of ints
                                                         and returns their average as a float, or None if empty.
         """
 
-        def transform(elements: Iterable[int]) -> Optional[float]:
+        def transform(elements: Iterable[int]) -> float | None:
             """Calculates the average of integer elements."""
             count = 0
             total = 0

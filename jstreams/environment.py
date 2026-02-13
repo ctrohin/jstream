@@ -1,5 +1,5 @@
 import os
-from typing import Any, Final, Optional
+from typing import Any, Final
 from json import load
 
 JSTREAMS_PROFILE: Final[str] = "JSTREAMS_PROFILE"
@@ -56,21 +56,21 @@ class JStreamsEnv:
             except Exception as e:
                 print(e)
 
-    def get_profile(self) -> Optional[str]:
+    def get_profile(self) -> str | None:
         return self.__config.get(JSTREAMS_PROFILE)
 
-    def get_packages(self) -> Optional[list[str]]:
-        packages: Optional[list[str]] = self.__config.get(JSTREAMS_PACKAGES)
+    def get_packages(self) -> list[str] | None:
+        packages: list[str] | None = self.__config.get(JSTREAMS_PACKAGES)
         return packages
 
-    def __get_env_profile(self) -> Optional[str]:
+    def __get_env_profile(self) -> str | None:
         return (
             os.getenv(JSTREAMS_PROFILE)
             or os.getenv(JSTREAMS_PROFILE_LOWER)
             or os.getenv(JSTREAMS_PROFILE_CAMEL)
         )
 
-    def __get_env_packages(self) -> Optional[list[str]]:
+    def __get_env_packages(self) -> list[str] | None:
         packages = (
             os.getenv(JSTREAMS_PACKAGES)
             or os.getenv(JSTREAMS_PACKAGES_LOWER)

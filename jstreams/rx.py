@@ -1,14 +1,13 @@
+from __future__ import annotations
 from enum import Enum
 import logging
 from threading import Lock, Thread
 import time
 from typing import (
     Generic,
-    Optional,
     TypeVar,
     Any,
     cast,
-    Union,
     overload,
 )
 from collections import deque
@@ -42,10 +41,10 @@ N = TypeVar("N")
 V = TypeVar("V")
 
 
-ErrorHandler = Optional[Callable[[Exception], Any]]
-CompletedHandler = Optional[Callable[[Optional[T]], Any]]
+ErrorHandler = Callable[[Exception], Any] | None
+CompletedHandler = Callable[[T | None], Any] | None
 NextHandler = Callable[[T], Any]
-DisposeHandler = Optional[Callable[[], Any]]
+DisposeHandler = Callable[[], Any] | None
 
 
 class BackpressureException(Exception):
@@ -84,9 +83,9 @@ class RxOperator(Generic[T, V], abc.ABC):
 class _WrapOperator:
     def __init__(self, op: RxOperator[Any, Any]) -> None:
         self.__op = op
-        self.__next: Optional[Union[_WrapOperator, Callable[[Any], Any]]] = None
+        self.__next: _WrapOperator | Callable[[Any], Any] | None = None
 
-    def set_next(self, next_op: Union["_WrapOperator", Callable[[Any], Any]]) -> None:
+    def set_next(self, next_op: _WrapOperator | Callable[[Any], Any]) -> None:
         self.__next = next_op
 
     def process(self, v: Any) -> None:
@@ -135,7 +134,7 @@ class Pipe(Generic[T, V]):
         chain = self.__build_chain(callback)
         chain[0].process(val)
 
-    def clone(self) -> "Pipe[T, V]":
+    def clone(self) -> Pipe[T, V]:
         return Pipe(T, V, deepcopy(self.__operators))  # type: ignore[misc]
 
     def init(self) -> None:
@@ -169,7 +168,7 @@ class ObservableSubscription(Generic[T]):
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
-        backpressure: Optional[BackpressureStrategy] = None,
+        backpressure: BackpressureStrategy | None = None,
     ) -> None:
         if not asynchronous and backpressure is not None:
             raise BackpressureMismatchException(
@@ -227,7 +226,7 @@ class ObservableSubscription(Generic[T]):
                 # Log uncaught exceptions in the error handler
                 logging.getLogger("observable").error(exc)
 
-    def on_completed(self, obj: Optional[T]) -> None:
+    def on_completed(self, obj: T | None) -> None:
         if self.__on_completed:
             self.__on_completed(obj)
 
@@ -260,13 +259,13 @@ class _ObservableParent(Generic[T]):
 
 
 class _OnNext(Generic[T]):
-    def on_next(self, val: Optional[T]) -> None:
+    def on_next(self, val: T | None) -> None:
         if not hasattr(self, "__lock"):
             self.__lock = Lock()  # pylint: disable=attribute-defined-outside-init
         with self.__lock:
             self._on_next(val)
 
-    def _on_next(self, val: Optional[T]) -> None:
+    def _on_next(self, val: T | None) -> None:
         pass
 
 
@@ -274,14 +273,13 @@ class Subscribable(abc.ABC, Generic[T]):
     @abc.abstractmethod
     def subscribe(
         self,
-        on_next: Optional[NextHandler[T]] = None,
+        on_next: NextHandler[T] | None = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,  # Added for consistency with Observable.subscribe
-        backpressure: Optional[
-            BackpressureStrategy
-        ] = None,  # Added for consistency with Observable.subscribe
+        backpressure: BackpressureStrategy
+        | None = None,  # Added for consistency with Observable.subscribe
     ) -> ObservableSubscription[Any]:
         pass
 
@@ -291,14 +289,14 @@ class Piped(abc.ABC, Generic[T, V]):
     def pipe(
         self,
         op1: RxOperator[T, V],
-    ) -> "PipeObservable[T, V]": ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
         self,
         op1: RxOperator[T, A],
         op2: RxOperator[A, V],
-    ) -> "PipeObservable[T, V]": ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -306,7 +304,7 @@ class Piped(abc.ABC, Generic[T, V]):
         op1: RxOperator[T, A],
         op2: RxOperator[A, B],
         op3: RxOperator[B, V],
-    ) -> "PipeObservable[T, V]": ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -315,7 +313,7 @@ class Piped(abc.ABC, Generic[T, V]):
         op2: RxOperator[A, B],
         op3: RxOperator[B, C],
         op4: RxOperator[C, V],
-    ) -> "PipeObservable[T, V]": ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -325,7 +323,7 @@ class Piped(abc.ABC, Generic[T, V]):
         op3: RxOperator[B, C],
         op4: RxOperator[C, D],
         op5: RxOperator[D, V],
-    ) -> "PipeObservable[T, V]": ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -336,7 +334,7 @@ class Piped(abc.ABC, Generic[T, V]):
         op4: RxOperator[C, D],
         op5: RxOperator[D, E],
         op6: RxOperator[E, V],
-    ) -> "PipeObservable[T, V]": ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -348,7 +346,7 @@ class Piped(abc.ABC, Generic[T, V]):
         op5: RxOperator[D, E],
         op6: RxOperator[E, F],
         op7: RxOperator[F, V],
-    ) -> "PipeObservable[T, V]": ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -361,7 +359,7 @@ class Piped(abc.ABC, Generic[T, V]):
         op6: RxOperator[E, F],
         op7: RxOperator[F, G],
         op8: RxOperator[G, V],
-    ) -> "PipeObservable[T, V]": ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -375,7 +373,7 @@ class Piped(abc.ABC, Generic[T, V]):
         op7: RxOperator[F, G],
         op8: RxOperator[G, H],
         op9: RxOperator[H, V],
-    ) -> "PipeObservable[T, V]": ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -390,7 +388,7 @@ class Piped(abc.ABC, Generic[T, V]):
         op8: RxOperator[G, H],
         op9: RxOperator[H, N],
         op10: RxOperator[N, V],
-    ) -> "PipeObservable[T, V]": ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -406,7 +404,7 @@ class Piped(abc.ABC, Generic[T, V]):
         op9: RxOperator[H, N],
         op10: RxOperator[N, J],
         op11: RxOperator[J, V],
-    ) -> "PipeObservable[T, V]": ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -423,7 +421,7 @@ class Piped(abc.ABC, Generic[T, V]):
         op10: RxOperator[N, J],
         op11: RxOperator[J, K],
         op12: RxOperator[K, V],
-    ) -> "PipeObservable[T, V]": ...
+    ) -> PipeObservable[T, V]: ...
 
     @overload
     def pipe(
@@ -441,26 +439,26 @@ class Piped(abc.ABC, Generic[T, V]):
         op11: RxOperator[J, K],
         op12: RxOperator[K, L],
         op13: RxOperator[L, V],
-    ) -> "PipeObservable[T, V]": ...
+    ) -> PipeObservable[T, V]: ...
 
     @abc.abstractmethod
     def pipe(
         self,
         op1: RxOperator[T, A],
-        op2: Optional[RxOperator[A, B]] = None,
-        op3: Optional[RxOperator[B, C]] = None,
-        op4: Optional[RxOperator[C, D]] = None,
-        op5: Optional[RxOperator[D, E]] = None,
-        op6: Optional[RxOperator[E, F]] = None,
-        op7: Optional[RxOperator[F, G]] = None,
-        op8: Optional[RxOperator[G, H]] = None,
-        op9: Optional[RxOperator[H, N]] = None,
-        op10: Optional[RxOperator[N, J]] = None,
-        op11: Optional[RxOperator[J, K]] = None,
-        op12: Optional[RxOperator[K, L]] = None,
-        op13: Optional[RxOperator[L, M]] = None,
-        op14: Optional[RxOperator[M, V]] = None,
-    ) -> "PipeObservable[T, V]":
+        op2: RxOperator[A, B] | None = None,
+        op3: RxOperator[B, C] | None = None,
+        op4: RxOperator[C, D] | None = None,
+        op5: RxOperator[D, E] | None = None,
+        op6: RxOperator[E, F] | None = None,
+        op7: RxOperator[F, G] | None = None,
+        op8: RxOperator[G, H] | None = None,
+        op9: RxOperator[H, N] | None = None,
+        op10: RxOperator[N, J] | None = None,
+        op11: RxOperator[J, K] | None = None,
+        op12: RxOperator[K, L] | None = None,
+        op13: RxOperator[L, M] | None = None,
+        op14: RxOperator[M, V] | None = None,
+    ) -> PipeObservable[T, V]:
         pass
 
 
@@ -470,8 +468,8 @@ class _ObservableBase(Subscribable[T]):
     def __init__(self) -> None:
         self.__subscriptions: list[ObservableSubscription[Any]] = []
         self.__async_subscriptions: list[ObservableSubscription[Any]] = []
-        self._parent: Optional[_ObservableParent[T]] = None
-        self._last_val: Optional[T] = None
+        self._parent: _ObservableParent[T] | None = None
+        self._last_val: T | None = None
 
     def _notify_all_subs(self, val: T) -> None:
         self._last_val = val
@@ -483,12 +481,12 @@ class _ObservableBase(Subscribable[T]):
 
     def subscribe(
         self,
-        on_next: Optional[NextHandler[T]] = None,
+        on_next: NextHandler[T] | None = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
-        backpressure: Optional[BackpressureStrategy] = None,
+        backpressure: BackpressureStrategy | None = None,
     ) -> ObservableSubscription[Any]:
         """
         Subscribe to this pipe in either synchronous(default) or asynchronous mode.
@@ -505,7 +503,7 @@ class _ObservableBase(Subscribable[T]):
             on_dispose (DisposeHandler, optional): Dispose handler. Defaults to None.
             asynchronous (boolean): Flags if the subscription should be asynchronous. Asynchronous subscriptions
                                     are executed in a thread pool. Defaults to False.
-            backpressure (Optional[BackpressureStrategy]) Specifies what backpressure strategy should be used by this
+            backpressure (BackpressureStrategy | None) Specifies what backpressure strategy should be used by this
                                                           subscription. Defaults to None.
 
         Returns:
@@ -568,7 +566,7 @@ class _ObservableBase(Subscribable[T]):
             lambda s: s.is_paused()
         ).each(lambda s: s.resume())
 
-    def on_completed(self, val: Optional[T]) -> None:
+    def on_completed(self, val: T | None) -> None:
         for s in ConcatIterable(self.__async_subscriptions, self.__subscriptions):
             s.on_completed(val)
         # Clear all subscriptions. This subject is out of business
@@ -583,7 +581,7 @@ class _Observable(_ObservableBase[T], _ObservableParent[T]):
     def __init__(self) -> None:  # pylint: disable=useless-parent-delegation
         super().__init__()
 
-    def chain(self) -> "ChainBuilder[T]":
+    def chain(self) -> ChainBuilder[T]:
         return ChainBuilder(self)
 
 
@@ -601,12 +599,12 @@ class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
 
     def subscribe(
         self,
-        on_next: Optional[NextHandler[V]] = None,
+        on_next: NextHandler[V] | None = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[V] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
-        backpressure: Optional[BackpressureStrategy] = None,
+        backpressure: BackpressureStrategy | None = None,
     ) -> ObservableSubscription[V]:
         """
         Subscribe to this pipe in either synchronous(default) or asynchronous mode.
@@ -623,7 +621,7 @@ class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
             on_dispose (DisposeHandler, optional): Dispose handler. Defaults to None.
             asynchronous (boolean): Flags if the subscription should be asynchronous. Asynchronous subscriptions
                                     are executed in a thread pool. Defaults to False.
-            backpressure (Optional[BackpressureStrategy]) Specifies what backpressure strategy should be used by this
+            backpressure (BackpressureStrategy | None) Specifies what backpressure strategy should be used by this
                                                           subscription. Defaults to None.
 
         Returns:
@@ -649,7 +647,7 @@ class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
         def on_next_wrapped(val: T) -> None:
             clone_pipe.apply(val, on_next)
 
-        def on_completed_wrapped(val: Optional[T]) -> None:
+        def on_completed_wrapped(val: T | None) -> None:
             if val is None or on_completed is None:
                 return
             clone_pipe.apply(val, on_completed)
@@ -665,20 +663,20 @@ class PipeObservable(Generic[T, V], _Observable[V], Piped[T, V]):
     def pipe(
         self,
         op1: RxOperator[T, A],
-        op2: Optional[RxOperator[A, B]] = None,
-        op3: Optional[RxOperator[B, C]] = None,
-        op4: Optional[RxOperator[C, D]] = None,
-        op5: Optional[RxOperator[D, E]] = None,
-        op6: Optional[RxOperator[E, F]] = None,
-        op7: Optional[RxOperator[F, G]] = None,
-        op8: Optional[RxOperator[G, H]] = None,
-        op9: Optional[RxOperator[H, N]] = None,
-        op10: Optional[RxOperator[N, J]] = None,
-        op11: Optional[RxOperator[J, K]] = None,
-        op12: Optional[RxOperator[K, L]] = None,
-        op13: Optional[RxOperator[L, M]] = None,
-        op14: Optional[RxOperator[M, V]] = None,
-    ) -> "PipeObservable[T, V]":
+        op2: RxOperator[A, B] | None = None,
+        op3: RxOperator[B, C] | None = None,
+        op4: RxOperator[C, D] | None = None,
+        op5: RxOperator[D, E] | None = None,
+        op6: RxOperator[E, F] | None = None,
+        op7: RxOperator[F, G] | None = None,
+        op8: RxOperator[G, H] | None = None,
+        op9: RxOperator[H, N] | None = None,
+        op10: RxOperator[N, J] | None = None,
+        op11: RxOperator[J, K] | None = None,
+        op12: RxOperator[K, L] | None = None,
+        op13: RxOperator[L, M] | None = None,
+        op14: RxOperator[M, V] | None = None,
+    ) -> PipeObservable[T, V]:
         op_list = (
             Stream(
                 [
@@ -721,7 +719,7 @@ class _MergeSubscriptionManager(Generic[T]):
         sources: tuple[Subscribable[T], ...],
         merged_subscription: ObservableSubscription[T],
         asynchronous_sources: bool,
-        backpressure_sources: Optional[BackpressureStrategy],
+        backpressure_sources: BackpressureStrategy | None,
     ):
         self._sources = sources
         self._merged_subscription = merged_subscription
@@ -747,7 +745,7 @@ class _MergeSubscriptionManager(Generic[T]):
             self._merged_subscription.on_error(ex)
             self.dispose_all_inner()  # Cancel all other sources
 
-    def _on_completed_forward(self, _: Optional[Any] = None) -> None:
+    def _on_completed_forward(self, _: Any | None = None) -> None:
         should_complete_merged = False
         with self._lock:
             if self._errored:
@@ -813,7 +811,7 @@ class _CombineLatestSubscriptionManager(Generic[T, V]):
         combiner_fn: Callable[..., V],
         merged_subscription: ObservableSubscription[V],
         asynchronous_sources: bool,
-        backpressure_sources: Optional[BackpressureStrategy],
+        backpressure_sources: BackpressureStrategy | None,
     ):
         self._sources = sources
         self._combiner_fn = combiner_fn
@@ -852,10 +850,8 @@ class _CombineLatestSubscriptionManager(Generic[T, V]):
 
         return _on_next_for_source
 
-    def _create_on_completed_handler(
-        self, index: int
-    ) -> Callable[[Optional[Any]], None]:
-        def _on_completed_for_source(_: Optional[Any] = None) -> None:
+    def _create_on_completed_handler(self, index: int) -> Callable[[Any | None], None]:
+        def _on_completed_for_source(_: Any | None = None) -> None:
             with self._lock:
                 if self._errored:
                     return
@@ -927,7 +923,7 @@ class _ZipSubscriptionManager(Generic[T, V]):
         zipper_fn: Callable[..., V],  # Zipper function
         merged_subscription: ObservableSubscription[V],
         asynchronous_sources: bool,
-        backpressure_sources: Optional[BackpressureStrategy],
+        backpressure_sources: BackpressureStrategy | None,
     ):
         self._sources = sources
         self._zipper_fn = zipper_fn
@@ -976,10 +972,8 @@ class _ZipSubscriptionManager(Generic[T, V]):
                         self.dispose_all_inner()
                     return
 
-    def _create_on_completed_handler(
-        self, index: int
-    ) -> Callable[[Optional[Any]], None]:
-        def _on_completed_for_source(_: Optional[Any] = None) -> None:
+    def _create_on_completed_handler(self, index: int) -> Callable[[Any | None], None]:
+        def _on_completed_for_source(_: Any | None = None) -> None:
             with self._lock:
                 if self._errored or self._completed_flags[index]:
                     return
@@ -1049,12 +1043,12 @@ class MergeObservable(Subscribable[T]):
 
     def subscribe(
         self,
-        on_next: Optional[NextHandler[T]] = None,
+        on_next: NextHandler[T] | None = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
-        backpressure: Optional[BackpressureStrategy] = None,
+        backpressure: BackpressureStrategy | None = None,
     ) -> ObservableSubscription[T]:
         merged_subscription = ObservableSubscription(
             self,  # Parent for potential cancellation, though direct dispose is preferred
@@ -1093,7 +1087,7 @@ class CombineLatestObservable(Subscribable[V]):
     def __init__(
         self,
         sources: tuple[Subscribable[Any], ...],
-        combiner: Optional[Callable[[tuple[Any, ...]], V]],
+        combiner: Callable[[tuple[Any, ...]], V] | None,
     ):
         if not sources:
             # This case should ideally be handled by RX.combine_latest factory returning RX.empty()
@@ -1110,12 +1104,12 @@ class CombineLatestObservable(Subscribable[V]):
 
     def subscribe(
         self,
-        on_next: Optional[NextHandler[V]] = None,
+        on_next: NextHandler[V] | None = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[V] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,  # Asynchronicity of the combined emission
-        backpressure: Optional[BackpressureStrategy] = None,
+        backpressure: BackpressureStrategy | None = None,
     ) -> ObservableSubscription[V]:
         # The 'asynchronous' and 'backpressure' here apply to how the *combined* value is delivered.
         # The manager will also need to know if source subscriptions should be async.
@@ -1152,7 +1146,7 @@ class ZipObservable(Subscribable[V]):
     __slots__ = ("_sources", "_zipper_fn")
 
     def __init__(
-        self, sources: tuple[Subscribable[Any], ...], zipper: Optional[Callable[..., V]]
+        self, sources: tuple[Subscribable[Any], ...], zipper: Callable[..., V] | None
     ):
         self._sources = sources
         if zipper is None:
@@ -1162,12 +1156,12 @@ class ZipObservable(Subscribable[V]):
 
     def subscribe(
         self,
-        on_next: Optional[NextHandler[V]] = None,
+        on_next: NextHandler[V] | None = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[V] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
-        backpressure: Optional[BackpressureStrategy] = None,
+        backpressure: BackpressureStrategy | None = None,
     ) -> ObservableSubscription[V]:
         merged_subscription = ObservableSubscription(
             self,
@@ -1357,19 +1351,19 @@ class Observable(_Observable[T]):
     def pipe(
         self,
         op1: RxOperator[T, A],
-        op2: Optional[RxOperator[A, B]] = None,
-        op3: Optional[RxOperator[B, C]] = None,
-        op4: Optional[RxOperator[C, D]] = None,
-        op5: Optional[RxOperator[D, E]] = None,
-        op6: Optional[RxOperator[E, F]] = None,
-        op7: Optional[RxOperator[F, G]] = None,
-        op8: Optional[RxOperator[G, H]] = None,
-        op9: Optional[RxOperator[H, N]] = None,
-        op10: Optional[RxOperator[N, J]] = None,
-        op11: Optional[RxOperator[J, K]] = None,
-        op12: Optional[RxOperator[K, L]] = None,
-        op13: Optional[RxOperator[L, M]] = None,
-        op14: Optional[RxOperator[M, V]] = None,
+        op2: RxOperator[A, B] | None = None,
+        op3: RxOperator[B, C] | None = None,
+        op4: RxOperator[C, D] | None = None,
+        op5: RxOperator[D, E] | None = None,
+        op6: RxOperator[E, F] | None = None,
+        op7: RxOperator[F, G] | None = None,
+        op8: RxOperator[G, H] | None = None,
+        op9: RxOperator[H, N] | None = None,
+        op10: RxOperator[N, J] | None = None,
+        op11: RxOperator[J, K] | None = None,
+        op12: RxOperator[K, L] | None = None,
+        op13: RxOperator[L, M] | None = None,
+        op14: RxOperator[M, V] | None = None,
     ) -> PipeObservable[T, V]:
         op_list = (
             Stream(
@@ -1420,26 +1414,26 @@ class Flowable(Observable[T]):
 
 
 class Single(Flowable[T]):
-    def __init__(self, value: Optional[T]) -> None:
+    def __init__(self, value: T | None) -> None:
         super().__init__([value] if value is not None else [])
 
 
 class _EmptyObservable(Subscribable[Any]):
-    _instance: Optional["_EmptyObservable"] = None
+    _instance: _EmptyObservable | None = None
 
-    def __new__(cls) -> "_EmptyObservable":
+    def __new__(cls) -> _EmptyObservable:
         if cls._instance is None:
             cls._instance = super(_EmptyObservable, cls).__new__(cls)
         return cls._instance
 
     def subscribe(
         self,
-        on_next: Optional[NextHandler[Any]] = None,
+        on_next: NextHandler[Any] | None = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[Any] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
-        backpressure: Optional[BackpressureStrategy] = None,
+        backpressure: BackpressureStrategy | None = None,
     ) -> ObservableSubscription[Any]:
         def _complete_action() -> None:
             if on_completed:
@@ -1458,21 +1452,21 @@ class _EmptyObservable(Subscribable[Any]):
 
 
 class _NeverObservable(Subscribable[Any]):
-    _instance: Optional["_NeverObservable"] = None
+    _instance: _NeverObservable | None = None
 
-    def __new__(cls) -> "_NeverObservable":
+    def __new__(cls) -> _NeverObservable:
         if cls._instance is None:
             cls._instance = super(_NeverObservable, cls).__new__(cls)
         return cls._instance
 
     def subscribe(
         self,
-        on_next: Optional[NextHandler[Any]] = None,
+        on_next: NextHandler[Any] | None = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[Any] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
-        backpressure: Optional[BackpressureStrategy] = None,
+        backpressure: BackpressureStrategy | None = None,
     ) -> ObservableSubscription[Any]:
         # Returns a subscription that does nothing and can be disposed.
         return ObservableSubscription(
@@ -1487,17 +1481,17 @@ class _NeverObservable(Subscribable[Any]):
 
 
 class _ThrowErrorObservable(Subscribable[T]):
-    def __init__(self, error_or_factory: Union[Exception, Callable[[], Exception]]):
+    def __init__(self, error_or_factory: Exception | Callable[[], Exception]):
         self._error_or_factory = error_or_factory
 
     def subscribe(
         self,
-        on_next: Optional[NextHandler[T]] = None,
+        on_next: NextHandler[T] | None = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
-        backpressure: Optional[BackpressureStrategy] = None,
+        backpressure: BackpressureStrategy | None = None,
     ) -> ObservableSubscription[T]:
         try:
             error_to_throw = (
@@ -1538,12 +1532,12 @@ class _DeferObservable(
 
     def subscribe(
         self,
-        on_next: Optional[NextHandler[T]] = None,
+        on_next: NextHandler[T] | None = None,
         on_error: ErrorHandler = None,
         on_completed: CompletedHandler[T] = None,
         on_dispose: DisposeHandler = None,
         asynchronous: bool = False,
-        backpressure: Optional[BackpressureStrategy] = None,
+        backpressure: BackpressureStrategy | None = None,
     ) -> ObservableSubscription[T]:
         try:
             deferred_observable = self._factory()
@@ -1572,15 +1566,15 @@ class _DeferObservable(
 
 
 class SingleValueSubject(Single[T], _OnNext[T]):
-    def __init__(self, value: Optional[T]) -> None:  # pylint: disable=useless-parent-delegation
+    def __init__(self, value: T | None) -> None:  # pylint: disable=useless-parent-delegation
         super().__init__(value)
 
-    def _on_next(self, val: Optional[T]) -> None:
+    def _on_next(self, val: T | None) -> None:
         if val is not None:
             self._values = [val]
             self._notify_all_subs(val)
 
-    def latest(self) -> Optional[T]:
+    def latest(self) -> T | None:
         if is_empty_or_none(self._values):
             return None
         return self._values.__iter__().__next__()
@@ -1613,7 +1607,7 @@ class ReplaySubject(Flowable[T], _OnNext[T]):
         super().__init__(values)
         self.__value_list: list[T] = []
 
-    def _on_next(self, val: Optional[T]) -> None:
+    def _on_next(self, val: T | None) -> None:
         if val is not None:
             self.__value_list.append(val)
             self._notify_all_subs(val)
@@ -1669,7 +1663,7 @@ class Reduce(BaseFilteringOperator[T]):
             reducer (Callable[[T, T], T]): Reducer function
         """
         self.__reducer = reducer
-        self.__prev_val: Optional[T] = None
+        self.__prev_val: T | None = None
         super().__init__(self.__mapper)
 
     def init(self) -> None:
@@ -1915,7 +1909,7 @@ class Distinct(Generic[T, K], BaseFilteringOperator[T]):
     def __init__(
         self,
         typ: type[T],  # pylint: disable=unused-argument
-        key_selector: Optional[Callable[[T], K]] = None,
+        key_selector: Callable[[T], K] | None = None,
     ) -> None:
         super().__init__(self._is_new)
         self.__key_selector = key_selector
@@ -1941,7 +1935,7 @@ class DistinctUntilChanged(BaseFilteringOperator[T]):
     def __init__(
         self,
         typ: type[T],  # pylint: disable=unused-argument
-        key_selector: Optional[Callable[[T], K]] = None,
+        key_selector: Callable[[T], K] | None = None,
     ) -> None:
         self.__key_selector = key_selector
         self.__prev_key: Any = _SENTINEL  # Stores the key of the previous item
@@ -2017,7 +2011,7 @@ class Throttle(BaseFilteringOperator[T]):
             timespan (float): The timespan in seconds to wait before allowing another emission.
         """
         self.__timespan = timespan
-        self.__last_emitted: Optional[float] = None
+        self.__last_emitted: float | None = None
         super().__init__(self.__throttle)
 
     def init(self) -> None:
@@ -2044,8 +2038,8 @@ class Debounce(DelayedBaseFilteringOperator[T]):
             timespan (float): The timespan in seconds to wait before emitting the value.
         """
         self.__timespan = timespan
-        self.__interval: Optional[Timer] = None
-        self.__last_value: Optional[T] = None
+        self.__interval: Timer | None = None
+        self.__last_value: T | None = None
         super().__init__(self.__debounce)
 
     def init(self) -> None:
@@ -2078,11 +2072,11 @@ class Buffer(BaseMappingOperator[T, list[T]]):
         """
         self.__timespan = timespan
         self.__buffer: list[T] = []
-        self.__last_checked: Optional[float] = None
+        self.__last_checked: float | None = None
         # This type ignore is a bit of a hack. We don't want all buffer handlers
         # to receive optionals, but we do want the method to return None, in case the buffer
         # capacity is not reached.
-        # Using Optional[list[T]] will involve all downstream ops to handle optional values,
+        # Using list[T] | None will involve all downstream ops to handle optional values,
         # while we absolutely know that such value will never reach downstream
         super().__init__(self.__emit_buffer)  # type: ignore[arg-type]
 
@@ -2090,7 +2084,7 @@ class Buffer(BaseMappingOperator[T, list[T]]):
         self.__buffer = []
         self.__last_checked = None
 
-    def __emit_buffer(self, val: T) -> Optional[list[T]]:
+    def __emit_buffer(self, val: T) -> list[T] | None:
         current_time = time.time()
         if self.__last_checked is None:
             self.__last_checked = current_time
@@ -2123,14 +2117,14 @@ class BufferCount(BaseMappingOperator[T, list[T]]):
         # This type ignore is a bit of a hack. We don't want all buffer handlers
         # to receive optionals, but we do want the method to return None, in case the buffer
         # capacity is not reached.
-        # Using Optional[list[T]] will involve all downstream ops to handle optional values,
+        # Using list[T] | None will involve all downstream ops to handle optional values,
         # while we absolutely know that such value will never reach downstream
         super().__init__(self.__emit_buffer)  # type: ignore[arg-type]
 
     def init(self) -> None:
         self.__buffer = []
 
-    def __emit_buffer(self, val: T) -> Optional[list[T]]:
+    def __emit_buffer(self, val: T) -> list[T] | None:
         self.__buffer.append(val)
         if len(self.__buffer) >= self.__count:
             emitted_buffer = self.__buffer
@@ -2207,7 +2201,7 @@ class RX:
     @staticmethod
     def distinct_until_changed(
         typ: type[T],
-        key_selector: Optional[Callable[[T], Any]] = None,
+        key_selector: Callable[[T], Any] | None = None,
     ) -> RxOperator[T, T]:
         """
         Emits only items from an Observable that are distinct from their immediate
@@ -2418,7 +2412,7 @@ class RX:
 
     @staticmethod
     def throw(
-        error_or_factory: Union[Exception, Callable[[], Exception]],
+        error_or_factory: Exception | Callable[[], Exception],
     ) -> Subscribable[T]:
         """
         Creates an Observable that emits no items and terminates with an error.
@@ -2466,7 +2460,7 @@ class RX:
 
     @staticmethod
     def distinct(
-        typ: type[T], key_selector: Optional[Callable[[T], K]] = None
+        typ: type[T], key_selector: Callable[[T], K] | None = None
     ) -> RxOperator[T, T]:
         """
         Returns an Observable that emits all items emitted by the source Observable that are distinct.
@@ -2511,7 +2505,7 @@ class RX:
     def combine_latest(
         return_type: type[T],  # pylint: disable=unused-argument
         *sources: Subscribable[Any],
-        combiner: Optional[Callable[..., T]] = None,
+        combiner: Callable[..., T] | None = None,
     ) -> Subscribable[T]:
         """
         Combines multiple Observables to create an Observable whose values are
@@ -2532,7 +2526,7 @@ class RX:
     def zip(
         return_type: type[T],  # pylint: disable=unused-argument
         *sources: Subscribable[Any],
-        zipper: Optional[Callable[..., T]] = None,
+        zipper: Callable[..., T] | None = None,
     ) -> Subscribable[T]:
         """
         Combines multiple Observables to create an Observable whose values are
@@ -2677,7 +2671,7 @@ def rx_drop_until(predicate: Callable[[T], bool]) -> RxOperator[T, T]:
 
 def rx_distinct_until_changed(
     typ: type[T],
-    key_selector: Optional[Callable[[T], Any]] = None,
+    key_selector: Callable[[T], Any] | None = None,
 ) -> RxOperator[T, T]:
     """
     Emits only items from an Observable that are distinct from their immediate
@@ -2767,7 +2761,7 @@ def rx_never() -> Subscribable[Any]:
 
 
 def rx_throw(
-    error_or_factory: Union[Exception, Callable[[], Exception]],
+    error_or_factory: Exception | Callable[[], Exception],
 ) -> Subscribable[T]:
     """
     Creates an Observable that emits no items and terminates with an error.
@@ -2804,7 +2798,7 @@ def rx_scan(accumulator_fn: Callable[[A, T], A], seed: A) -> RxOperator[T, A]:
 
 
 def rx_distinct(
-    typ: type[T], key_selector: Optional[Callable[[T], K]] = None
+    typ: type[T], key_selector: Callable[[T], K] | None = None
 ) -> RxOperator[T, T]:
     """
     Returns an Observable that emits all items emitted by the source Observable that are distinct.
@@ -2852,7 +2846,7 @@ def rx_merge(*sources: Subscribable[T]) -> Subscribable[T]:
 def rx_combine_latest(
     return_type: type[T],
     *sources: Subscribable[Any],
-    combiner: Optional[Callable[..., T]] = None,
+    combiner: Callable[..., T] | None = None,
 ) -> Subscribable[T]:
     """
     Combines multiple Observables to create an Observable whose values are
@@ -2864,7 +2858,7 @@ def rx_combine_latest(
 def rx_zip(
     return_type: type[T],
     *sources: Subscribable[Any],
-    zipper: Optional[Callable[..., T]] = None,
+    zipper: Callable[..., T] | None = None,
 ) -> Subscribable[T]:
     """
     Combines multiple Observables to create an Observable whose values are
@@ -2888,130 +2882,130 @@ class ChainBuilder(Generic[T]):
     def __init__(self, obs: _Observable[T]) -> None:
         self.__observable = obs
         self.__ops: list[RxOperator[Any, Any]] = []
-        self.__error_handler: Optional[ErrorHandler] = None
-        self.__complete_handler: Optional[CompletedHandler[T]] = None
-        self.__dispose_handler: Optional[DisposeHandler] = None
-        self.__next_handler: Optional[NextHandler[T]] = None
+        self.__error_handler: ErrorHandler | None = None
+        self.__complete_handler: CompletedHandler[T] | None = None
+        self.__dispose_handler: DisposeHandler | None = None
+        self.__next_handler: NextHandler[T] | None = None
         self.__async: bool = False
-        self.__backpressure: Optional[BackpressureStrategy] = None
+        self.__backpressure: BackpressureStrategy | None = None
 
-    def debounce(self, timespan: float) -> "ChainBuilder[T]":
+    def debounce(self, timespan: float) -> ChainBuilder[T]:
         self.__ops.append(rx_debounce(T, timespan))  # type: ignore[misc]
         return self
 
-    def element_at(self, index: int) -> "ChainBuilder[T]":
+    def element_at(self, index: int) -> ChainBuilder[T]:
         self.__ops.append(rx_element_at(T, index))  # type: ignore[misc]
         return self
 
-    def take(self, count: int) -> "ChainBuilder[T]":
+    def take(self, count: int) -> ChainBuilder[T]:
         self.__ops.append(rx_take(T, count))  # type: ignore[misc]
         return self
 
     def distinct(
-        self, key_selector: Optional[Callable[[T], Any]] = None
-    ) -> "ChainBuilder[T]":
+        self, key_selector: Callable[[T], Any] | None = None
+    ) -> ChainBuilder[T]:
         self.__ops.append(rx_distinct(T, key_selector))  # type: ignore[misc]
         return self
 
-    def timestamp(self) -> "ChainBuilder[Timestamped[T]]":
+    def timestamp(self) -> ChainBuilder[Timestamped[T]]:
         self.__ops.append(rx_timestamp(T))  # type: ignore[misc]
         return self  # type: ignore[return-value]
 
-    def scan(self, seed: A) -> "ChainBuilder[A]":
+    def scan(self, seed: A) -> ChainBuilder[A]:
         self.__ops.append(rx_scan(A, seed))  # type: ignore[misc]
         return self  # type: ignore[return-value]
 
-    def map_to(self, value: V) -> "ChainBuilder[V]":
+    def map_to(self, value: V) -> ChainBuilder[V]:
         self.__ops.append(rx_map_to(value))
         return self  # type: ignore[return-value]
 
-    def buffer_count(self, count: int) -> "ChainBuilder[list[T]]":
+    def buffer_count(self, count: int) -> ChainBuilder[list[T]]:
         self.__ops.append(rx_buffer_count(T, count))  # type: ignore[misc]
         return self  # type: ignore[return-value]
 
-    def buffer(self, timespan: float) -> "ChainBuilder[list[T]]":
+    def buffer(self, timespan: float) -> ChainBuilder[list[T]]:
         self.__ops.append(rx_buffer(T, timespan))  # type: ignore[misc]
         return self  # type: ignore[return-value]
 
-    def throttle(self, timespan: float) -> "ChainBuilder[T]":
+    def throttle(self, timespan: float) -> ChainBuilder[T]:
         self.__ops.append(rx_throttle(T, timespan))  # type: ignore[misc]
         return self
 
-    def ignore_all(self) -> "ChainBuilder[T]":
+    def ignore_all(self) -> ChainBuilder[T]:
         self.__ops.append(rx_ignore_all())
         return self
 
-    def of_type(self, typ: type[V]) -> "ChainBuilder[V]":
+    def of_type(self, typ: type[V]) -> ChainBuilder[V]:
         self.__ops.append(rx_of_type(typ))
         return self  # type: ignore[return-value]
 
-    def tap(self, action: Callable[[T], Any]) -> "ChainBuilder[T]":
+    def tap(self, action: Callable[[T], Any]) -> ChainBuilder[T]:
         self.__ops.append(rx_tap(action))
         return self
 
     def distinct_until_changed(
-        self, key_selector: Optional[Callable[[T], Any]] = None
-    ) -> "ChainBuilder[T]":
+        self, key_selector: Callable[[T], Any] | None = None
+    ) -> ChainBuilder[T]:
         self.__ops.append(rx_distinct_until_changed(T, key_selector))  # type: ignore[misc]
         return self
 
-    def drop_until(self, predicate: Callable[[T], bool]) -> "ChainBuilder[T]":
+    def drop_until(self, predicate: Callable[[T], bool]) -> ChainBuilder[T]:
         self.__ops.append(rx_drop_until(predicate))
         return self
 
-    def drop_while(self, predicate: Callable[[T], bool]) -> "ChainBuilder[T]":
+    def drop_while(self, predicate: Callable[[T], bool]) -> ChainBuilder[T]:
         self.__ops.append(rx_drop_while(predicate))
         return self
 
-    def drop(self, count: int) -> "ChainBuilder[T]":
+    def drop(self, count: int) -> ChainBuilder[T]:
         self.__ops.append(rx_drop(T, count))  # type: ignore[misc]
         return self
 
-    def take_until(self, predicate: Callable[[T], bool]) -> "ChainBuilder[T]":
+    def take_until(self, predicate: Callable[[T], bool]) -> ChainBuilder[T]:
         self.__ops.append(rx_take_until(predicate))
         return self
 
-    def take_while(self, predicate: Callable[[T], bool]) -> "ChainBuilder[T]":
+    def take_while(self, predicate: Callable[[T], bool]) -> ChainBuilder[T]:
         self.__ops.append(rx_take_while(predicate))
         return self
 
-    def map(self, mapper: Callable[[T], V]) -> "ChainBuilder[V]":
+    def map(self, mapper: Callable[[T], V]) -> ChainBuilder[V]:
         self.__ops.append(rx_map(mapper))
         return self  # type: ignore[return-value]
 
-    def filter(self, predicate: Callable[[T], bool]) -> "ChainBuilder[T]":
+    def filter(self, predicate: Callable[[T], bool]) -> ChainBuilder[T]:
         self.__ops.append(rx_filter(predicate))
         return self
 
-    def reduce(self, reducer: Callable[[T, T], T]) -> "ChainBuilder[T]":
+    def reduce(self, reducer: Callable[[T, T], T]) -> ChainBuilder[T]:
         self.__ops.append(rx_reduce(reducer))
         return self
 
-    def custom(self, op: RxOperator[T, V]) -> "ChainBuilder[V]":
+    def custom(self, op: RxOperator[T, V]) -> ChainBuilder[V]:
         self.__ops.append(op)
         return self  # type: ignore[return-value]
 
-    def catch(self, error_handler: ErrorHandler) -> "ChainBuilder[T]":
+    def catch(self, error_handler: ErrorHandler) -> ChainBuilder[T]:
         self.__error_handler = error_handler
         return self
 
-    def completed(self, completed_handler: CompletedHandler[T]) -> "ChainBuilder[T]":
+    def completed(self, completed_handler: CompletedHandler[T]) -> ChainBuilder[T]:
         self.__complete_handler = completed_handler
         return self
 
-    def disposed(self, disposed_handler: DisposeHandler) -> "ChainBuilder[T]":
+    def disposed(self, disposed_handler: DisposeHandler) -> ChainBuilder[T]:
         self.__dispose_handler = disposed_handler
         return self
 
-    def backpressure(self, backpressure: BackpressureStrategy) -> "ChainBuilder[T]":
+    def backpressure(self, backpressure: BackpressureStrategy) -> ChainBuilder[T]:
         self.__backpressure = backpressure
         return self
 
-    def next(self, next_handler: NextHandler[T]) -> "ChainBuilder[T]":
+    def next(self, next_handler: NextHandler[T]) -> ChainBuilder[T]:
         self.__next_handler = next_handler
         return self
 
-    def asynchronous(self, asynchronous: bool) -> "ChainBuilder[T]":
+    def asynchronous(self, asynchronous: bool) -> ChainBuilder[T]:
         self.__async = asynchronous
         return self
 

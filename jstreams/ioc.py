@@ -153,7 +153,7 @@ class _Injector:
         self.__comp_cache: dict[tuple[type, str | None], Any] = {}
         self.__var_cache: dict[tuple[type, str], Any] = {}
 
-    def scan_modules(self, modules_to_scan: list[str]) -> "_Injector":
+    def scan_modules(self, modules_to_scan: list[str]) -> _Injector:
         self.__modules_to_scan = set(modules_to_scan)
         return self
 
@@ -197,7 +197,7 @@ class _Injector:
     def get_active_profile(self) -> str | None:
         return self.__get_profile_str()
 
-    def raise_bean_errors(self, flag: bool) -> "_Injector":
+    def raise_bean_errors(self, flag: bool) -> _Injector:
         self.__raise_beans_error = flag
         return self
 
@@ -296,7 +296,7 @@ class _Injector:
         return found_obj
 
     @staticmethod
-    def get_instance() -> "_Injector":
+    def get_instance() -> _Injector:
         # If the instance is not initialized
         if _Injector.instance is None:
             # Lock for instantiation
@@ -309,7 +309,7 @@ class _Injector:
 
     def provide_var_if_not_null(
         self, class_name: type, qualifier: str, value: Any
-    ) -> "_Injector":
+    ) -> _Injector:
         if value is not None:
             self.provide_var(class_name, qualifier, value)
         return self
@@ -320,7 +320,7 @@ class _Injector:
         qualifier: str,
         value: Any,
         profiles: list[str] | None = None,
-    ) -> "_Injector":
+    ) -> _Injector:
         with self.provide_lock:
             if (var_dep := self.__variables.get(class_name)) is None:
                 var_dep = _VariableDependency()
@@ -347,7 +347,7 @@ class _Injector:
         comp: Callable[[], Any] | Any,
         qualifier: str | None = None,
         profiles: list[str] | None = None,
-    ) -> "_Injector":
+    ) -> _Injector:
         self.__provide(class_name, comp, qualifier, profiles, False)
         return self
 
@@ -370,7 +370,7 @@ class _Injector:
         qualifier: str | None = None,
         profiles: list[str] | None = None,
         override_qualifier: bool = False,
-    ) -> "_Injector":
+    ) -> _Injector:
         with self.provide_lock:
             if (container_dep := self.__components.get(class_name)) is None:
                 container_dep = _ContainerDependency()
@@ -491,7 +491,7 @@ class _Injector:
 
     def provide_dependencies(
         self, dependencies: dict[type, Any], profiles: list[str] | None = None
-    ) -> "_Injector":
+    ) -> _Injector:
         for component_class in dependencies:
             svc = dependencies[component_class]
             self.provide(component_class, svc, profiles=profiles)
@@ -499,7 +499,7 @@ class _Injector:
 
     def provide_variables(
         self, variables: list[tuple[type, str, Any]], profiles: list[str] | None
-    ) -> "_Injector":
+    ) -> _Injector:
         for var_class, qualifier, value in variables:
             self.provide_var(var_class, qualifier, value, profiles)
         return self
@@ -590,9 +590,9 @@ def component(
 
     Args:
         strategy (Strategy, optional): The strategy used for instantiation: EAGER means instantiate as soon as possible, LAZY means instantiate when needed. Defaults to Strategy.LAZY.
-        class_name (Optional[type], optional): Specify which class to use with the container. Defaults to declared class.
-        qualifier (Optional[str], optional): Specify the qualifer to be used for the dependency. Defaults to None.
-        profiles (Optional[list[str]], optional): Specify the profiles for which this dependency should be available. Defaults to None.
+        class_name (type | None, optional): Specify which class to use with the container. Defaults to declared class.
+        qualifier (str | None, optional): Specify the qualifer to be used for the dependency. Defaults to None.
+        profiles (list[str] | None, optional): Specify the profiles for which this dependency should be available. Defaults to None.
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class
@@ -624,7 +624,7 @@ def configuration(profiles: list[str] | None = None) -> Callable[[type[T]], type
             return "test"
 
     Args:
-        profiles (Optional[list[str]], optional): The profiles for which the defined dependencies will be available for. Defaults to None.
+        profiles (list[str] | None, optional): The profiles for which the defined dependencies will be available for. Defaults to None.
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class
@@ -671,7 +671,7 @@ def provide(
 
     Args:
         class_name (type[T]): The dependency class
-        qualifier (Optional[str], optional): Optional dependency qualifier. Defaults to None.
+        qualifier (str | None, optional): Optional dependency qualifier. Defaults to None.
 
     Returns:
         Callable[[Callable[..., T]], Callable[..., None]]: The decorated method
@@ -771,7 +771,7 @@ def resolve(
     and the variable associated with 'strQualifier' into the 'str_value' member
 
     Args:
-        dependencies (dict[str, Union[type, Dependency, Variable]]): A map of dependencies
+        dependencies (dict[str, type | Dependency | Variable]): A map of dependencies
         eager (bool): Flag determining if the dependencies should be injected as soon as possible. Defaults to False.
 
 
@@ -903,7 +903,7 @@ def inject_args(
         # Output: arg1='explicit', arg2=50, arg3=9.99, arg4=False
 
     Args:
-        dependencies (dict[str, Union[type, Dependency, Variable]]):
+        dependencies (dict[str, type | Dependency | Variable]):
             A dictionary mapping argument names to their corresponding dependency type,
             Dependency object, or Variable object.
 
@@ -1060,7 +1060,7 @@ def autowired(
 
     Args:
         class_name (type[T]): The type of the dependency to inject.
-        qualifier (Optional[str], optional): The qualifier name. Defaults to None.
+        qualifier (str | None, optional): The qualifier name. Defaults to None.
 
     Returns:
         Callable[[Callable[..., T]], Callable[..., T]]: The decorator function.
@@ -1102,7 +1102,7 @@ def return_wired_optional(class_name: type[T]) -> T | None:  # pylint: disable=u
         class_name (type[T]): The type that will be injected.
 
     Returns:
-        Optional[T]: A placeholder value (None), primarily for type checking.
+        T | None: A placeholder value (None), primarily for type checking.
     """
     return None
 
@@ -1127,10 +1127,10 @@ def autowired_optional(
 
     Args:
         class_name (type[T]): The type of the dependency to inject.
-        qualifier (Optional[str], optional): The qualifier name. Defaults to None.
+        qualifier (str | None, optional): The qualifier name. Defaults to None.
 
     Returns:
-        Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]: The decorator function.
+        Callable[[Callable[..., T | None]], Callable[..., T | None]]: The decorator function.
     """
 
     optional_dependency = OptionalInjectedDependency(class_name, qualifier)
@@ -1173,7 +1173,7 @@ class InjectedDependency(Generic[T]):
 
         Args:
             typ (type[T]): The type of the dependency.
-            qualifier (Optional[str], optional): The qualifier name. Defaults to None.
+            qualifier (str | None, optional): The qualifier name. Defaults to None.
         """
         self.__typ = typ
         self.__quali = qualifier
@@ -1235,7 +1235,7 @@ class OptionalInjectedDependency(Generic[T]):
 
         Args:
             typ (type[T]): The type of the dependency.
-            qualifier (Optional[str], optional): The qualifier name. Defaults to None.
+            qualifier (str | None, optional): The qualifier name. Defaults to None.
         """
         self.__typ = typ
         self.__quali = qualifier
@@ -1246,7 +1246,7 @@ class OptionalInjectedDependency(Generic[T]):
         Retrieves the optional dependency from the injector.
 
         Returns:
-            Optional[T]: The dependency instance if found, otherwise None.
+            T | None: The dependency instance if found, otherwise None.
         """
         if self.__actual_value is not None:
             return self.__actual_value
@@ -1259,7 +1259,7 @@ class OptionalInjectedDependency(Generic[T]):
         Retrieves the optional dependency from the injector. Syntactic sugar for `get()`.
 
         Returns:
-            Optional[T]: The dependency instance if found, otherwise None.
+            T | None: The dependency instance if found, otherwise None.
         """
         return self.get()
 

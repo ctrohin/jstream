@@ -1,4 +1,4 @@
-from typing import Any, Optional, TypeVar, overload
+from typing import Any, TypeVar, overload
 from collections.abc import Callable
 import inspect
 from threading import RLock
@@ -254,23 +254,23 @@ def pipe(
 
 def pipe(
     f1: Callable[[A], B],
-    f2: Optional[Callable[[B], C]] = None,
-    f3: Optional[Callable[[C], D]] = None,
-    f4: Optional[Callable[[D], E]] = None,
-    f5: Optional[Callable[[E], F]] = None,
-    f6: Optional[Callable[[F], G]] = None,
-    f7: Optional[Callable[[G], H]] = None,
-    f8: Optional[Callable[[H], I_]] = None,
-    f9: Optional[Callable[[I_], J]] = None,
-    f10: Optional[Callable[[J], K]] = None,
-    f11: Optional[Callable[[K], L]] = None,
-    f12: Optional[Callable[[L], M]] = None,
-    f13: Optional[Callable[[M], N]] = None,
-    f14: Optional[Callable[[N], O_]] = None,
-    f15: Optional[Callable[[O_], P]] = None,
-    f16: Optional[Callable[[P], Q]] = None,
-    f17: Optional[Callable[[Q], R]] = None,
-    f18: Optional[Callable[[R], S]] = None,
+    f2: Callable[[B], C] | None = None,
+    f3: Callable[[C], D] | None = None,
+    f4: Callable[[D], E] | None = None,
+    f5: Callable[[E], F] | None = None,
+    f6: Callable[[F], G] | None = None,
+    f7: Callable[[G], H] | None = None,
+    f8: Callable[[H], I_] | None = None,
+    f9: Callable[[I_], J] | None = None,
+    f10: Callable[[J], K] | None = None,
+    f11: Callable[[K], L] | None = None,
+    f12: Callable[[L], M] | None = None,
+    f13: Callable[[M], N] | None = None,
+    f14: Callable[[N], O_] | None = None,
+    f15: Callable[[O_], P] | None = None,
+    f16: Callable[[P], Q] | None = None,
+    f17: Callable[[Q], R] | None = None,
+    f18: Callable[[R], S] | None = None,
 ) -> Callable[[A], S]:
     """
     Creates a function from the given function arguments, that accepts as the
@@ -293,7 +293,7 @@ def pipe(
         11
 
     """
-    fns: list[Optional[Callable[[Any], Any]]] = [
+    fns: list[Callable[[Any], Any] | None] = [
         f1,
         f2,
         f3,
@@ -316,7 +316,7 @@ def pipe(
     return _pipe_list(fns)
 
 
-def _pipe_list(fns: list[Optional[Callable[[Any], Any]]]) -> Callable[[Any], Any]:
+def _pipe_list(fns: list[Callable[[Any], Any] | None]) -> Callable[[Any], Any]:
     def wrap(param: Any) -> Any:
         for f in fns:
             if f is not None:
