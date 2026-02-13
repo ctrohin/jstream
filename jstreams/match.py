@@ -20,8 +20,8 @@ class Case(Generic[T, V]):
 
     def __init__(
         self,
-        matching: Union[T, Callable[[T], bool]],
-        resulting: Union[V, Callable[[], V]],
+        matching: T | Callable[[T], bool],
+        resulting: V | Callable[[], V],
     ) -> None:
         """
         Initializes a Case.
