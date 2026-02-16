@@ -1,6 +1,6 @@
 from typing import Optional, Union, Any, List
 
-from jstreams.annotations import default_on_error, validate_args
+from jstreams.annotations import TypeValidationError, default_on_error, validate_args
 from baseTest import BaseTestCase
 from jstreams.predicate import is_higher_than
 

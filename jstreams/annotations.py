@@ -20,6 +20,11 @@ NoneType = type(None)
 T = TypeVar("T")
 
 
+class TypeValidationError(TypeError):
+    def __init__(self, *args: Any) -> None:
+        super().__init__(*args)
+
+
 def builder() -> Callable[[type[T]], type[T]]:
     """
     A decorator that adds builder methods to a class.
@@ -454,7 +459,7 @@ def synchronized(
             """
             # 1. Check if used on an instance method and get the instance ('self')
             if not args:
-                raise TypeError(
+                raise TypeValidationError(
                     f"@{synchronized.__name__} requires 'self' (instance) argument. "
                     f"Decorator applied to '{func.__qualname__}' which seems to be a non-method function or static/class method."
                 )
@@ -479,7 +484,7 @@ def synchronized(
                             setattr(instance, attr_name, lock)
                         except AttributeError as e:
                             # Handle cases where attribute setting might fail (e.g., __slots__)
-                            raise TypeError(
+                            raise TypeValidationError(
                                 f"Could not set lock attribute '{attr_name}' on instance of {type(instance).__name__}. "
                                 f"Does the class use __slots__ without including '{attr_name}'?"
                             ) from e
@@ -526,7 +531,7 @@ def _args(require_all: bool) -> Callable[[type[T]], type[T]]:
             Constructs an object of the decorated class using the required members.
             """
             if len(args) + len(kwargs) != len(required_members):
-                raise TypeError(
+                raise TypeValidationError(
                     f"Class requires arguments: {list(required_members.keys())} and received {len(args) + len(kwargs)} arguments"
                 )
 
@@ -537,12 +542,12 @@ def _args(require_all: bool) -> Callable[[type[T]], type[T]]:
                     value = kwargs[param_name]
                 else:
                     if arg_index >= len(args):
-                        raise TypeError("too few arguments")
+                        raise TypeValidationError("too few arguments")
                     value = args[arg_index]
                     arg_index += 1
 
                 if not isinstance(value, param_type):
-                    raise TypeError(
+                    raise TypeValidationError(
                         f"argument '{param_name}' should be of type {param_type}, received type: {type(value)}"
                     )
 
@@ -696,12 +701,12 @@ def validate_args(
                 if rules is not None and param_name in rules:
                     rule = rules.get(param_name)
                     if rule is not None and not rule(value):
-                        raise TypeError(
+                        raise TypeValidationError(
                             f"Argument '{param_name}' for {func.__qualname__} does not match the given predicate"
                         )
 
                 if not is_valid:
-                    raise TypeError(
+                    raise TypeValidationError(
                         f"Argument '{param_name}' for {func.__qualname__} "
                         f"expected type {expected_type}, but got {type(value).__name__}."
                     )
@@ -757,11 +762,11 @@ def default_on_error(
         safe_divide(10, 0) # Returns 0.0 (ZeroDivisionError caught)
     """
     # Determine which exceptions to catch
-    exceptions_to_catch: list[type]
+    exceptions_to_catch: tuple[type, ...]
     if catch_exceptions is None or not catch_exceptions:
-        exceptions_to_catch = [BaseException]  # Catch any standard exception
+        exceptions_to_catch = (BaseException,)  # Catch any standard exception
     else:
-        exceptions_to_catch = catch_exceptions
+        exceptions_to_catch = (*catch_exceptions,)
 
     def decorator(func: F) -> F:
         def wrapper(
@@ -770,7 +775,7 @@ def default_on_error(
             try:
                 return func(*args, **kwargs)
             except BaseException as e:
-                if type(e) not in exceptions_to_catch:
+                if not issubclass(type(e), exceptions_to_catch):
                     raise e
                 if logger and hasattr(
                     logger, "warning"
