@@ -3,7 +3,7 @@ from enum import Enum
 import importlib
 import inspect
 from threading import Lock, RLock
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, Generic, TypeVar, cast, get_type_hints
 from collections.abc import Callable
 
 from jstreams.noop import NoOp, NoOpCls
@@ -1337,7 +1337,7 @@ class _InspectedElement:
 def _get_class_attributes(cls: type) -> list[_InspectedElement]:
     return_members: list[_InspectedElement] = []
     try:
-        hints = inspect.get_type_hints(cls)
+        hints = get_type_hints(cls)
     except Exception:
         hints = getattr(cls, "__annotations__", {})
 
