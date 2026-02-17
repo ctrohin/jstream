@@ -1335,25 +1335,25 @@ class _InspectedElement:
 
 
 def _get_class_attributes(cls: type) -> list[_InspectedElement]:
-    boring = dir(type("dummy", (object,), {}))
     return_members: list[_InspectedElement] = []
-    member_list = [item for item in inspect.getmembers(cls) if item[0] not in boring]
-    for member in member_list:
-        if not isinstance(member[1], dict):
-            continue
-        member_dict: dict[str, Any] = member[1]
+    try:
+        hints = inspect.get_type_hints(cls)
+    except Exception:
+        hints = getattr(cls, "__annotations__", {})
 
-        for var_name, var_type in member_dict.items():
-            inspected_element: _InspectedElement | None = None
-            if isinstance(var_type, type):
-                inspected_element = _InspectedElement(var_name, var_type, False)
-            elif str(var_type).startswith("typing.Optional"):
-                inspected_element = _InspectedElement(
-                    var_name, var_type.__args__[0], True
-                )
-            else:
-                continue
-            return_members.append(inspected_element)
+    for var_name, var_type in hints.items():
+        inspected_element: _InspectedElement | None = None
+        if isinstance(var_type, type):
+            inspected_element = _InspectedElement(var_name, var_type, False)
+        elif (
+            str(var_type).startswith("typing.Optional")
+            or "| None" in str(var_type)
+            or "None |" in str(var_type)
+        ):
+            inspected_element = _InspectedElement(var_name, var_type.__args__[0], True)
+        else:
+            continue
+        return_members.append(inspected_element)
     return return_members
 
 
