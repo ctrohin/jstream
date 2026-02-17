@@ -698,7 +698,7 @@ def match_opt(value: T | None) -> Match[T | None]:
     Example:
         from jstreams.predicate import is_none, is_not_none
 
-        opt_val: Optional[int] = None
+        opt_val: int | None = None
         result = match_opt(opt_val).of(
             case(is_none, "It was None"),
             case(is_not_none, "It had a value")

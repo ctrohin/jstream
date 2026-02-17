@@ -363,7 +363,7 @@ class Opt(Generic[T]):
 
         Args:
             with_val (K): The additional parameter
-            supplier (Callable[[K], Optional[T]]): The supplier
+            supplier (Callable[[K], T | None]): The supplier
 
         Returns:
             Opt[T]: The resulting Opt
@@ -1305,7 +1305,7 @@ class Stream(Generic[T]):
                  This operation requires storing seen keys/elements, potentially consuming memory.
 
         Args:
-            key (Optional[Callable[[T], Ay]]): A function to extract the key for uniqueness comparison. If None, the element itself is used. Defaults to None.
+            key (Callable[[T], Any] | None, optional): A function to extract the key for uniqueness comparison. If None, the element itself is used. Defaults to None.
         """
         return Stream(distinct(self.__arg, key))
 
