@@ -8,7 +8,12 @@ from collections.abc import Callable
 
 from jstreams.noop import NoOp, NoOpCls
 from jstreams.stream import Opt, Stream
-from jstreams.utils import is_mth_or_fn, require_non_null
+from jstreams.utils import (
+    TypeInjectionError,
+    ValueInjectionError,
+    is_mth_or_fn,
+    require_non_null,
+)
 from jstreams.environment import JStreamsEnv
 
 
@@ -191,7 +196,7 @@ class _Injector:
             ValueError: When a profile is already active.
         """
         if self.__profile is not None:
-            raise ValueError(f"Profile ${self.__profile} is already active")
+            raise ValueInjectionError(f"Profile ${self.__profile} is already active")
         self.__profile = profile
 
     def get_active_profile(self) -> str | None:
@@ -203,7 +208,7 @@ class _Injector:
 
     def handle_bean_error(self, message: str) -> None:
         if self.__raise_beans_error:
-            raise TypeError(message)
+            raise TypeInjectionError(message)
         print(message)
 
     def clear(self) -> None:
@@ -217,12 +222,12 @@ class _Injector:
 
     def get(self, class_name: type[T], qualifier: str | None = None) -> T:
         if (found_obj := self.find(class_name, qualifier)) is None:
-            raise ValueError("No object found for class " + str(class_name))
+            raise ValueInjectionError("No object found for class " + str(class_name))
         return found_obj
 
     def get_var(self, class_name: type[T], qualifier: str) -> T:
         if (found_var := self.find_var(class_name, qualifier)) is None:
-            raise ValueError(
+            raise ValueInjectionError(
                 "No variable found for class "
                 + str(class_name)
                 + " and qualifier "
@@ -722,7 +727,7 @@ def provide_variable(
 def validate_dependencies(dependencies: dict[str, Any]) -> None:
     for key in dependencies:
         if key.startswith("__"):
-            raise ValueError(
+            raise ValueInjectionError(
                 "Private attributes cannot be injected. Offending dependency "
                 + str(key)
             )
@@ -911,8 +916,8 @@ def inject_args(
         Callable[[Callable[..., T]], Callable[..., T]]: The decorated function or method.
 
     Raises:
-        ValueError: If a required dependency/variable cannot be resolved by the injector.
-        TypeError: If the arguments passed during the call are fundamentally incompatible
+        ValueInjectionError: If a required dependency/variable cannot be resolved by the injector.
+        TypeInjectionError: If the arguments passed during the call are fundamentally incompatible
                     with the function signature (e.g., too many positional arguments).
     """
     validate_dependencies(dependencies)  # Keep validation
@@ -929,7 +934,7 @@ def inject_args(
                 bound_args.apply_defaults()
             except TypeError as e:
                 # Reraise if basic binding fails (e.g., too many positional args)
-                raise TypeError(
+                raise TypeInjectionError(
                     f"Error binding arguments for {func.__qualname__}: {e}"
                 ) from e
 
@@ -944,7 +949,7 @@ def inject_args(
                         injected_kwds[param_name] = resolved_dep
                     except ValueError as e:
                         # Dependency not found - re-raise with more context
-                        raise ValueError(
+                        raise ValueInjectionError(
                             f"Failed to inject argument '{param_name}' for {func.__qualname__}: {e}"
                         ) from e
                     except Exception as e:
