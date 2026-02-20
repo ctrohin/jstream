@@ -22,6 +22,11 @@ class Strategy(Enum):
     LAZY = 1
 
 
+class Scope(Enum):
+    SINGLETON = 0
+    PROTOTYPE = 1
+
+
 class Dependency:
     __slots__ = ("__typ", "__qualifier", "_is_optional")
 
@@ -116,11 +121,23 @@ class AutoInit:
         pass
 
 
+class AutoClose:
+    __slots__ = ()
+    """
+    Interface notifying the container that a component must be closed/destroyed when the container
+    is cleared or shut down.
+    """
+
+    def close(self) -> None:
+        pass
+
+
 class _ContainerDependency:
-    __slots__ = ("qualified_dependencies", "lock")
+    __slots__ = ("qualified_dependencies", "qualified_scopes", "lock")
 
     def __init__(self) -> None:
         self.qualified_dependencies: dict[str, Any] = {}
+        self.qualified_scopes: dict[str, Scope] = {}
         self.lock = RLock()
 
 
@@ -212,6 +229,15 @@ class _Injector:
         print(message)
 
     def clear(self) -> None:
+        # Close all AutoClose components before clearing
+        for dep in self.__components.values():
+            for comp in dep.qualified_dependencies.values():
+                if isinstance(comp, AutoClose):
+                    try:
+                        comp.close()
+                    except Exception as e:
+                        print(f"Error closing component: {e}")
+
         self.__components = {}
         self.__variables = {}
         self.__profile = None
@@ -268,10 +294,10 @@ class _Injector:
             return cast(T, found_obj)
 
         # Try to get the dependency using the active profile
-        found_obj = self._get(class_name, qualifier)
+        found_obj, scope = self._get(class_name, qualifier)
         if found_obj is None:
             # or get it for the default profile
-            found_obj = self._get(
+            found_obj, scope = self._get(
                 class_name,
                 self.__get_component_key_with_profile(
                     qualifier or self.__default_qualifier,
@@ -279,8 +305,8 @@ class _Injector:
                 ),
                 True,
             )
-        # Store the object in cache if it's not None
-        if found_obj is not None:
+        # Store the object in cache if it's not None AND it is a Singleton
+        if found_obj is not None and scope == Scope.SINGLETON:
             self.__comp_cache[(class_name, qualifier)] = found_obj
         return found_obj if found_obj is None else cast(T, found_obj)
 
@@ -352,8 +378,9 @@ class _Injector:
         comp: Callable[[], Any] | Any,
         qualifier: str | None = None,
         profiles: list[str] | None = None,
+        scope: Scope = Scope.SINGLETON,
     ) -> _Injector:
-        self.__provide(class_name, comp, qualifier, profiles, False)
+        self.__provide(class_name, comp, qualifier, profiles, False, scope)
         return self
 
     def __compute_full_qualifier(
@@ -375,6 +402,7 @@ class _Injector:
         qualifier: str | None = None,
         profiles: list[str] | None = None,
         override_qualifier: bool = False,
+        scope: Scope = Scope.SINGLETON,
     ) -> _Injector:
         with self.provide_lock:
             if (container_dep := self.__components.get(class_name)) is None:
@@ -388,11 +416,13 @@ class _Injector:
                         qualifier, override_qualifier, profile
                     )
                     container_dep.qualified_dependencies[full_qualifier] = comp
+                    container_dep.qualified_scopes[full_qualifier] = scope
             else:
                 full_qualifier = self.__compute_full_qualifier(
                     qualifier, override_qualifier, None
                 )
                 container_dep.qualified_dependencies[full_qualifier] = comp
+                container_dep.qualified_scopes[full_qualifier] = scope
             self.__init_meta(comp)
 
         return self
@@ -403,7 +433,7 @@ class _Injector:
             dep = self.__components[key]
             for dependency_key in dep.qualified_dependencies:
                 if self.__is_dependency_active(dependency_key):
-                    comp = self._get(key, dependency_key, True)
+                    comp, _ = self._get(key, dependency_key, True)
                     if isinstance(comp, class_name):
                         elements.append(comp)
         return elements
@@ -429,7 +459,10 @@ class _Injector:
         return qualifier if override_qualifier else self.__get_component_key(qualifier)
 
     def __initialize_and_get(
-        self, container_dep: _ContainerDependency, full_qualifier: str
+        self,
+        container_dep: _ContainerDependency,
+        full_qualifier: str,
+        scope: Scope,
     ) -> Any:
         found_component = container_dep.qualified_dependencies.get(
             full_qualifier,
@@ -438,10 +471,11 @@ class _Injector:
 
         if is_mth_or_fn(found_component):
             comp = found_component()  # type: ignore[misc]
-            # Remove the old dependency, and replace it with the lazy initialized one
-            container_dep.qualified_dependencies[full_qualifier] = self.__init_meta(
-                comp
-            )
+            comp = self.__init_meta(comp)
+            if scope == Scope.SINGLETON:
+                # Remove the old dependency, and replace it with the lazy initialized one
+                # Only if it is a singleton. Prototypes should remain as factories.
+                container_dep.qualified_dependencies[full_qualifier] = comp
             return comp
         return found_component
 
@@ -451,27 +485,32 @@ class _Injector:
         class_name: type,
         qualifier: str | None,
         override_qualifier: bool = False,
-    ) -> Any:
+    ) -> tuple[Any, Scope]:
         self.__scan_packages()
         if (container_dep := self.__components.get(class_name)) is None:
-            return None
+            return None, Scope.SINGLETON
         full_qualifier = self.__get_full_qualifier(qualifier, override_qualifier)
         found_component = container_dep.qualified_dependencies.get(
             full_qualifier,
             None,
         )
+        scope = container_dep.qualified_scopes.get(full_qualifier, Scope.SINGLETON)
 
         if found_component is None:
-            return None
+            return None, Scope.SINGLETON
 
-        # We've got a lazy component
+        # We've got a lazy component or a prototype
         if is_mth_or_fn(found_component):
-            # We need to lock in the instantiation, so it will only happen once.
+            # We need to lock in the instantiation, so it will only happen once for singletons
+            # For prototypes, locking ensures thread safety during instantiation logic if needed
             with container_dep.lock:
                 # Once we've got the lock, get the component again, and make sure no other thread has already instatiated it
-                return self.__initialize_and_get(container_dep, full_qualifier)
+                return (
+                    self.__initialize_and_get(container_dep, full_qualifier, scope),
+                    scope,
+                )
 
-        return found_component
+        return found_component, scope
 
     def _get_var(
         self, class_name: type, qualifier: str, override_qualifier: bool = False
@@ -577,11 +616,12 @@ def service(
     class_name: type | None = None,
     qualifier: str | None = None,
     profiles: list[str] | None = None,
+    scope: Scope = Scope.SINGLETON,
 ) -> Callable[[type[T]], type[T]]:
     """
     Proxy for @component with the strategy always set to Strategy.LAZY
     """
-    return component(Strategy.LAZY, class_name, qualifier, profiles)
+    return component(Strategy.LAZY, class_name, qualifier, profiles, scope)
 
 
 def component(
@@ -589,6 +629,7 @@ def component(
     class_name: type | None = None,
     qualifier: str | None = None,
     profiles: list[str] | None = None,
+    scope: Scope = Scope.SINGLETON,
 ) -> Callable[[type[T]], type[T]]:
     """
     Decorates a component for container injection.
@@ -598,6 +639,7 @@ def component(
         class_name (type | None, optional): Specify which class to use with the container. Defaults to declared class.
         qualifier (str | None, optional): Specify the qualifer to be used for the dependency. Defaults to None.
         profiles (list[str] | None, optional): Specify the profiles for which this dependency should be available. Defaults to None.
+        scope (Scope, optional): The scope of the component. Defaults to Scope.SINGLETON.
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class
@@ -609,6 +651,7 @@ def component(
             cls() if strategy == Strategy.EAGER else lambda: cls(),
             qualifier,
             profiles,
+            scope,
         )
         return cls
 
@@ -667,7 +710,7 @@ def configuration(profiles: list[str] | None = None) -> Callable[[type[T]], type
 
 
 def provide(
-    class_name: type[T], qualifier: str | None = None
+    class_name: type[T], qualifier: str | None = None, scope: Scope = Scope.SINGLETON
 ) -> Callable[[Callable[..., T]], Callable[..., None]]:
     """
     Provide decorator. Used for methods inside @configuration classes.
@@ -677,6 +720,7 @@ def provide(
     Args:
         class_name (type[T]): The dependency class
         qualifier (str | None, optional): Optional dependency qualifier. Defaults to None.
+        scope (Scope, optional): The scope of the component. Defaults to Scope.SINGLETON.
 
     Returns:
         Callable[[Callable[..., T]], Callable[..., None]]: The decorated method
@@ -688,7 +732,9 @@ def provide(
             if "profiles" in kwds:
                 profiles = kwds.pop("profiles")
 
-            injector().provide(class_name, lambda: func(*args), qualifier, profiles)
+            injector().provide(
+                class_name, lambda: func(*args), qualifier, profiles, scope
+            )
 
         return wrapped
 
