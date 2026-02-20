@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 from jstreams.noop import NoOp, NoOpCls
 from jstreams.stream import Opt, Stream
+from jstreams.try_opt import Try
 from jstreams.utils import (
     TypeInjectionError,
     ValueInjectionError,
@@ -132,6 +133,22 @@ class AutoClose:
         pass
 
 
+def post_construct(fn: Callable[..., None]) -> Callable[..., None]:
+    """
+    Decorator to mark a method to be executed after dependency injection is complete.
+    """
+    setattr(fn, "__post_construct__", True)
+    return fn
+
+
+def pre_destroy(fn: Callable[..., None]) -> Callable[..., None]:
+    """
+    Decorator to mark a method to be executed before the container is cleared/destroyed.
+    """
+    setattr(fn, "__pre_destroy__", True)
+    return fn
+
+
 class _ContainerDependency:
     __slots__ = ("qualified_dependencies", "qualified_scopes", "lock")
 
@@ -237,6 +254,32 @@ class _Injector:
                         comp.close()
                     except Exception as e:
                         print(f"Error closing component: {e}")
+
+                # Handle @pre_destroy
+                for name in dir(comp):
+                    if name.startswith("__"):
+                        continue
+                    (
+                        Try(lambda: getattr(comp, name))
+                        .get()
+                        .filter(
+                            lambda attr: (
+                                callable(attr)
+                                and getattr(attr, "__pre_destroy__", False)
+                            )
+                        )
+                        .if_present(
+                            lambda attr: (
+                                Try(lambda: attr())
+                                .on_failure(
+                                    lambda e: print(
+                                        f"Error executing pre_destroy on {name}: {e}"
+                                    )
+                                )
+                                .get()
+                            )
+                        )
+                    )
 
         self.__components = {}
         self.__variables = {}
@@ -531,6 +574,17 @@ class _Injector:
             comp.init()
         if isinstance(comp, AutoStart):
             comp.start()
+
+        # Handle @post_construct
+        for name in dir(comp):
+            if name.startswith("__"):
+                continue
+            try:
+                attr = getattr(comp, name)
+                if callable(attr) and getattr(attr, "__post_construct__", False):
+                    attr()
+            except Exception:
+                pass
         return comp
 
     def provide_dependencies(
@@ -617,11 +671,12 @@ def service(
     qualifier: str | None = None,
     profiles: list[str] | None = None,
     scope: Scope = Scope.SINGLETON,
+    condition: Callable[[], bool] | None = None,
 ) -> Callable[[type[T]], type[T]]:
     """
     Proxy for @component with the strategy always set to Strategy.LAZY
     """
-    return component(Strategy.LAZY, class_name, qualifier, profiles, scope)
+    return component(Strategy.LAZY, class_name, qualifier, profiles, scope, condition)
 
 
 def component(
@@ -630,6 +685,7 @@ def component(
     qualifier: str | None = None,
     profiles: list[str] | None = None,
     scope: Scope = Scope.SINGLETON,
+    condition: Callable[[], bool] | None = None,
 ) -> Callable[[type[T]], type[T]]:
     """
     Decorates a component for container injection.
@@ -640,12 +696,16 @@ def component(
         qualifier (str | None, optional): Specify the qualifer to be used for the dependency. Defaults to None.
         profiles (list[str] | None, optional): Specify the profiles for which this dependency should be available. Defaults to None.
         scope (Scope, optional): The scope of the component. Defaults to Scope.SINGLETON.
+        condition (Callable[[], bool] | None, optional): A predicate that must return True for the component to be registered. Defaults to None.
 
     Returns:
         Callable[[type[T]], type[T]]: The decorated class
     """
 
     def wrap(cls: type[T]) -> type[T]:
+        if condition is not None and not condition():
+            return cls
+
         injector().provide(
             class_name if class_name is not None else cls,
             cls() if strategy == Strategy.EAGER else lambda: cls(),
@@ -710,7 +770,10 @@ def configuration(profiles: list[str] | None = None) -> Callable[[type[T]], type
 
 
 def provide(
-    class_name: type[T], qualifier: str | None = None, scope: Scope = Scope.SINGLETON
+    class_name: type[T],
+    qualifier: str | None = None,
+    scope: Scope = Scope.SINGLETON,
+    condition: Callable[[], bool] | None = None,
 ) -> Callable[[Callable[..., T]], Callable[..., None]]:
     """
     Provide decorator. Used for methods inside @configuration classes.
@@ -721,6 +784,7 @@ def provide(
         class_name (type[T]): The dependency class
         qualifier (str | None, optional): Optional dependency qualifier. Defaults to None.
         scope (Scope, optional): The scope of the component. Defaults to Scope.SINGLETON.
+        condition (Callable[[], bool] | None, optional): A predicate that must return True for the dependency to be provided. Defaults to None.
 
     Returns:
         Callable[[Callable[..., T]], Callable[..., None]]: The decorated method
@@ -728,6 +792,9 @@ def provide(
 
     def wrapper(func: Callable[..., T]) -> Callable[..., None]:
         def wrapped(*args: Any, **kwds: Any) -> None:
+            if condition is not None and not condition():
+                return
+
             profiles: list[str] | None = None
             if "profiles" in kwds:
                 profiles = kwds.pop("profiles")
