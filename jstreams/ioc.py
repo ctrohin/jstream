@@ -188,7 +188,7 @@ class _Injector:
         )
 
         self.__modules_scanned = False
-        self.__raise_beans_error = False
+        self.__raise_beans_error = jstreams_env.get_raise_bean_errors()
         self.__comp_cache: dict[tuple[type, str | None], Any] = {}
         self.__var_cache: dict[tuple[type, str], Any] = {}
 

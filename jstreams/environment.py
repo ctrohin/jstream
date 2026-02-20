@@ -13,6 +13,10 @@ JSTREAMS_PACKAGES_CAMEL: Final[str] = "jstreamsPackages"
 JSTREAMS_CONFIG_JSON: Final[str] = "JSTREAMS_CONFIG_JSON"
 DEFAULT_FILE: Final[str] = "jstreams.json"
 
+JSTREAMS_RAISE_BEAN_ERRORS: Final[str] = "JSTREAMS_RAISE_BEAN_ERRORS"
+JSTREAMS_RAISE_BEAN_ERRORS_LOWER: Final[str] = "jstreams_raise_bean_errors"
+JSTREAMS_RAISE_BEAN_ERRORS_CAMEL: Final[str] = "jstreamsRaiseBanErrors"
+
 
 def get_env_config_file() -> str:
     return os.getenv(JSTREAMS_CONFIG_JSON, DEFAULT_FILE)
@@ -53,6 +57,13 @@ class JStreamsEnv:
                             or config.get(JSTREAMS_PACKAGES_LOWER)
                             or config.get(JSTREAMS_PACKAGES_CAMEL)
                         )
+
+                    if self.__config.get(JSTREAMS_RAISE_BEAN_ERRORS) is None:
+                        self.__config[JSTREAMS_RAISE_BEAN_ERRORS] = (
+                            config.get(JSTREAMS_RAISE_BEAN_ERRORS)
+                            or config.get(JSTREAMS_RAISE_BEAN_ERRORS_LOWER)
+                            or config.get(JSTREAMS_RAISE_BEAN_ERRORS_CAMEL)
+                        )
             except Exception as e:
                 print(e)
 
@@ -62,6 +73,9 @@ class JStreamsEnv:
     def get_packages(self) -> list[str] | None:
         packages: list[str] | None = self.__config.get(JSTREAMS_PACKAGES)
         return packages
+
+    def get_raise_bean_errors(self) -> bool:
+        return self.__config.get(JSTREAMS_RAISE_BEAN_ERRORS, False)
 
     def __get_env_profile(self) -> str | None:
         return (
