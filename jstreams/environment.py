@@ -75,7 +75,7 @@ class JStreamsEnv:
         return packages
 
     def get_raise_bean_errors(self) -> bool:
-        return self.__config.get(JSTREAMS_RAISE_BEAN_ERRORS, False)
+        return bool(self.__config.get(JSTREAMS_RAISE_BEAN_ERRORS, False))
 
     def __get_env_profile(self) -> str | None:
         return (
