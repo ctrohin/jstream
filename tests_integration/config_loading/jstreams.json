@@ -1,3 +1,6 @@
 {
-  "jstreamsProfile": "testProfile"
+  "jstreamsProfile": "testProfile",
+  "variables": {
+    "test": 1
+  }
 }

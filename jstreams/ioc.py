@@ -174,6 +174,7 @@ class _Injector:
     instance_lock: Lock = Lock()
     provide_lock: Lock = Lock()
     load_modules_lock: Lock = Lock()
+    env: JStreamsEnv = JStreamsEnv()
 
     def __init__(self) -> None:
         self.__components: dict[type, _ContainerDependency] = {}
@@ -181,15 +182,16 @@ class _Injector:
         self.__default_qualifier: str = "__DEFAULT_QUALIFIER__"
         self.__default_profile: str = "__DEFAULT_PROFILE__"
 
-        jstreams_env = JStreamsEnv()
-        self.__profile: str | None = jstreams_env.get_profile()
-        env_packages = jstreams_env.get_packages()
+        self.env.initialize()
+
+        self.__profile: str | None = self.env.get_profile()
+        env_packages = self.env.get_packages()
         self.__modules_to_scan: set[str] = set(
             env_packages if env_packages is not None else []
         )
 
         self.__modules_scanned = False
-        self.__raise_beans_error = jstreams_env.get_raise_bean_errors()
+        self.__raise_beans_error = self.env.get_raise_bean_errors()
         self.__comp_cache: dict[tuple[type, str | None], Any] = {}
         self.__var_cache: dict[tuple[type, str], Any] = {}
         atexit.register(self.__auto_close)
@@ -315,8 +317,11 @@ class _Injector:
         if found_var is not None:
             return cast(T, found_var)
 
-        # Try to get the dependency using the active profile
-        found_var = self._get_var(class_name, qualifier)
+        # Try to get the variable from the configuration file
+        found_var = self.env.get_variable(qualifier)
+        # Otherwise try to get the dependency using the active profile and the provided values
+        if found_var is None:
+            found_var = self._get_var(class_name, qualifier)
         if found_var is None:
             found_var = self._get_var(
                 class_name,

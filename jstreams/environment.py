@@ -27,10 +27,13 @@ class JStreamsEnv:
     Class that holds all the environment variables used by JStreams
     """
 
-    __slots__ = ("__config",)
+    __slots__ = ("__config", "__variables")
 
     def __init__(self) -> None:
         self.__config: dict[str, Any] = {}
+        self.__variables: dict[str, Any] = {}
+
+    def initialize(self) -> None:
         self.__load_config()
 
     def __load_config(self) -> None:
@@ -64,11 +67,15 @@ class JStreamsEnv:
                             or config.get(JSTREAMS_RAISE_BEAN_ERRORS_LOWER)
                             or config.get(JSTREAMS_RAISE_BEAN_ERRORS_CAMEL)
                         )
+                    self.__variables = config.get("variables", {})
             except Exception as e:
                 print(e)
 
     def get_profile(self) -> str | None:
         return self.__config.get(JSTREAMS_PROFILE)
+
+    def get_variable(self, key: str) -> Any | None:
+        return self.__variables.get(key)
 
     def get_packages(self) -> list[str] | None:
         packages: list[str] | None = self.__config.get(JSTREAMS_PACKAGES)
