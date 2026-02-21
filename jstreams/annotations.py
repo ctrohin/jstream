@@ -14,15 +14,10 @@ from typing import (
 )
 
 from jstreams.predicate import Predicate
-from jstreams.utils import Value
+from jstreams.utils import TypeValidationError, Value
 
 NoneType = type(None)
 T = TypeVar("T")
-
-
-class TypeValidationError(TypeError):
-    def __init__(self, *args: Any) -> None:
-        super().__init__(*args)
 
 
 def builder() -> Callable[[type[T]], type[T]]:

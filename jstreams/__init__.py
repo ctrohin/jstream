@@ -192,6 +192,8 @@ from jstreams.ioc import (
     configuration,
     return_wired,
     return_wired_optional,
+    post_construct,
+    pre_destroy,
 )
 
 from jstreams.noop import (
@@ -732,4 +734,6 @@ __all__ = [
     "val4_matches",
     "tuple4",
     "tuple4_of",
+    "post_construct",
+    "pre_destroy",
 ]

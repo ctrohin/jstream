@@ -10,7 +10,7 @@ scheduler().enforce_minimum_period(False)
 scheduler().set_polling_period(1)
 
 scheduler().scan_modules(["schedule"])
-sleep(10)
+sleep(12)
 scheduler().stop()
 
 from schedule import two_seconds_counter, two_seconds_class_counter

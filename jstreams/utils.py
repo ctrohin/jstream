@@ -20,6 +20,21 @@ C = TypeVar("C")
 V = TypeVar("V")
 
 
+class TypeValidationError(TypeError):
+    def __init__(self, *args: Any) -> None:
+        super().__init__(*args)
+
+
+class TypeInjectionError(TypeError):
+    def __init__(self, *args: Any) -> None:
+        super().__init__(*args)
+
+
+class ValueInjectionError(ValueError):
+    def __init__(self, *args: Any) -> None:
+        super().__init__(*args)
+
+
 def is_mth_or_fn(var: Any) -> bool:
     """
     Checks if the given argument is either a function or a method in a class.
