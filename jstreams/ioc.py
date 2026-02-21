@@ -1,4 +1,5 @@
 from __future__ import annotations
+import atexit
 from enum import Enum
 import importlib
 import inspect
@@ -191,6 +192,7 @@ class _Injector:
         self.__raise_beans_error = jstreams_env.get_raise_bean_errors()
         self.__comp_cache: dict[tuple[type, str | None], Any] = {}
         self.__var_cache: dict[tuple[type, str], Any] = {}
+        atexit.register(self.__auto_close)
 
     def scan_modules(self, modules_to_scan: list[str]) -> _Injector:
         self.__modules_to_scan = set(modules_to_scan)
@@ -246,6 +248,17 @@ class _Injector:
         print(message)
 
     def clear(self) -> None:
+        self.__auto_close()
+
+        self.__components = {}
+        self.__variables = {}
+        self.__profile = None
+        self.__modules_scanned = False
+        self.__modules_to_scan = set()
+        self.__comp_cache = {}
+        self.__var_cache = {}
+
+    def __auto_close(self) -> None:
         # Close all AutoClose components before clearing
         for dep in self.__components.values():
             for comp in dep.qualified_dependencies.values():
@@ -280,14 +293,6 @@ class _Injector:
                             )
                         )
                     )
-
-        self.__components = {}
-        self.__variables = {}
-        self.__profile = None
-        self.__modules_scanned = False
-        self.__modules_to_scan = set()
-        self.__comp_cache = {}
-        self.__var_cache = {}
 
     def get(self, class_name: type[T], qualifier: str | None = None) -> T:
         if (found_obj := self.find(class_name, qualifier)) is None:
