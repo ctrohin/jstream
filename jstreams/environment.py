@@ -67,7 +67,7 @@ class JStreamsEnv:
                             or config.get(JSTREAMS_RAISE_BEAN_ERRORS_LOWER)
                             or config.get(JSTREAMS_RAISE_BEAN_ERRORS_CAMEL)
                         )
-                    self.__process_variables(config.get("variables", {}))
+                    self.__process_variables(config.get("values", {}))
             except Exception as e:
                 print(e)
 
