@@ -1,6 +1,14 @@
 {
   "jstreamsProfile": "testProfile",
   "variables": {
-    "test": 1
+    "test": 1,
+    "test2": {
+      "var1": "test",
+      "var2": 10,
+      "var3": {
+        "var31": "test31"
+      },
+      "listVar": [1, 2, 3]
+    }
   }
 }

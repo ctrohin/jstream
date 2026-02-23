@@ -67,9 +67,24 @@ class JStreamsEnv:
                             or config.get(JSTREAMS_RAISE_BEAN_ERRORS_LOWER)
                             or config.get(JSTREAMS_RAISE_BEAN_ERRORS_CAMEL)
                         )
-                    self.__variables = config.get("variables", {})
+                    self.__process_variables(config.get("variables", {}))
             except Exception as e:
                 print(e)
+
+    def __process_variables(self, variables: dict[str, Any]) -> None:
+        self.__variables = {}
+        for key, value in variables.items():
+            if isinstance(value, dict):
+                self.__process_dict_vars(key, value)
+            else:
+                self.__variables[key] = value
+
+    def __process_dict_vars(self, prefix: str, variables: dict[str, Any]) -> None:
+        for key, value in variables.items():
+            if isinstance(value, dict):
+                self.__process_dict_vars(f"{prefix}.{key}", value)
+            else:
+                self.__variables[f"{prefix}.{key}"] = value
 
     def get_profile(self) -> str | None:
         return self.__config.get(JSTREAMS_PROFILE)
