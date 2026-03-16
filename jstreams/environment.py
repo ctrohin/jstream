@@ -2,6 +2,8 @@ import os
 from typing import Any, Final
 from json import load
 
+from jstreams.stream import optional
+
 JSTREAMS_PROFILE: Final[str] = "JSTREAMS_PROFILE"
 JSTREAMS_PROFILE_LOWER: Final[str] = "jstreams_profile"
 JSTREAMS_PROFILE_CAMEL: Final[str] = "jstreamsProfile"
@@ -90,7 +92,7 @@ class JStreamsEnv:
         return self.__config.get(JSTREAMS_PROFILE)
 
     def get_variable(self, key: str) -> Any | None:
-        return self.__variables.get(key)
+        return optional(self.__variables.get(key)).or_else_get(lambda: os.getenv(key))
 
     def get_packages(self) -> list[str] | None:
         packages: list[str] | None = self.__config.get(JSTREAMS_PACKAGES)
