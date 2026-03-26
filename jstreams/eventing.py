@@ -570,6 +570,10 @@ def event(event_type: type[T], event_name: str = __DEFAULT_EVENT_NAME__) -> _Eve
     return _EventBroadcaster.get_instance().get_event(event_type, event_name)
 
 
+def event_publish(event_object: T) -> None:
+    event(type(event_object)).publish(event_object)
+
+
 def on_event(
     event_type: type, event_name: str = __DEFAULT_EVENT_NAME__
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:

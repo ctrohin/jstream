@@ -2,8 +2,6 @@ import os
 from typing import Any, Final
 from json import load
 
-from jstreams.stream import optional
-
 JSTREAMS_PROFILE: Final[str] = "JSTREAMS_PROFILE"
 JSTREAMS_PROFILE_LOWER: Final[str] = "jstreams_profile"
 JSTREAMS_PROFILE_CAMEL: Final[str] = "jstreamsProfile"
@@ -51,23 +49,34 @@ class JStreamsEnv:
                 with open(config_file, encoding="utf-8") as f:
                     config = load(f)
                     if self.__config.get(JSTREAMS_PROFILE) is None:
-                        self.__config[JSTREAMS_PROFILE] = (
-                            config.get(JSTREAMS_PROFILE)
-                            or config.get(JSTREAMS_PROFILE_LOWER)
-                            or config.get(JSTREAMS_PROFILE_CAMEL)
+                        self.__config[JSTREAMS_PROFILE] = self.__first_non_null(
+                            config,
+                            [
+                                JSTREAMS_PROFILE,
+                                JSTREAMS_PROFILE_LOWER,
+                                JSTREAMS_PROFILE_CAMEL,
+                            ],
                         )
                     if self.__config.get(JSTREAMS_PACKAGES) is None:
-                        self.__config[JSTREAMS_PACKAGES] = (
-                            config.get(JSTREAMS_PACKAGES)
-                            or config.get(JSTREAMS_PACKAGES_LOWER)
-                            or config.get(JSTREAMS_PACKAGES_CAMEL)
+                        self.__config[JSTREAMS_PACKAGES] = self.__first_non_null(
+                            config,
+                            [
+                                JSTREAMS_PACKAGES,
+                                JSTREAMS_PACKAGES_LOWER,
+                                JSTREAMS_PACKAGES_CAMEL,
+                            ],
                         )
 
                     if self.__config.get(JSTREAMS_RAISE_BEAN_ERRORS) is None:
                         self.__config[JSTREAMS_RAISE_BEAN_ERRORS] = (
-                            config.get(JSTREAMS_RAISE_BEAN_ERRORS)
-                            or config.get(JSTREAMS_RAISE_BEAN_ERRORS_LOWER)
-                            or config.get(JSTREAMS_RAISE_BEAN_ERRORS_CAMEL)
+                            self.__first_non_null(
+                                config,
+                                [
+                                    JSTREAMS_RAISE_BEAN_ERRORS,
+                                    JSTREAMS_RAISE_BEAN_ERRORS_LOWER,
+                                    JSTREAMS_RAISE_BEAN_ERRORS_CAMEL,
+                                ],
+                            )
                         )
                     self.__process_variables(config.get("values", {}))
             except Exception as e:
@@ -92,7 +101,9 @@ class JStreamsEnv:
         return self.__config.get(JSTREAMS_PROFILE)
 
     def get_variable(self, key: str) -> Any | None:
-        return optional(self.__variables.get(key)).or_else_get(lambda: os.getenv(key))
+        if (var := self.__variables.get(key)) is not None:
+            return var
+        return os.getenv(key)
 
     def get_packages(self) -> list[str] | None:
         packages: list[str] | None = self.__config.get(JSTREAMS_PACKAGES)
@@ -102,18 +113,25 @@ class JStreamsEnv:
         return bool(self.__config.get(JSTREAMS_RAISE_BEAN_ERRORS, False))
 
     def __get_env_profile(self) -> str | None:
-        return (
-            os.getenv(JSTREAMS_PROFILE)
-            or os.getenv(JSTREAMS_PROFILE_LOWER)
-            or os.getenv(JSTREAMS_PROFILE_CAMEL)
+        return self.__first_env_non_null(
+            [JSTREAMS_PROFILE, JSTREAMS_PROFILE_LOWER, JSTREAMS_PROFILE_CAMEL]
         )
 
     def __get_env_packages(self) -> list[str] | None:
-        packages = (
-            os.getenv(JSTREAMS_PACKAGES)
-            or os.getenv(JSTREAMS_PACKAGES_LOWER)
-            or os.getenv(JSTREAMS_PACKAGES_CAMEL)
-        )
-        if packages is None:
-            return None
-        return packages.split(",")
+        if packages := self.__first_env_non_null(
+            [JSTREAMS_PACKAGES, JSTREAMS_PACKAGES_LOWER, JSTREAMS_PACKAGES_CAMEL]
+        ):
+            return packages.split(",")
+        return None
+
+    def __first_env_non_null(self, keys: list[str]) -> str | None:
+        for key in keys:
+            if (value := os.getenv(key)) is not None:
+                return value
+        return None
+
+    def __first_non_null(self, dct: dict[str, Any], keys: list[str]) -> Any | None:
+        for key in keys:
+            if (value := dct.get(key)) is not None:
+                return value
+        return None

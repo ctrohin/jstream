@@ -6,7 +6,7 @@ import unittest
 
 sys.path.append("../../")
 
-from jstreams.eventing import managed_events, on_event, event
+from jstreams.eventing import event_publish, managed_events, on_event, event
 
 
 class IntEvent:
@@ -71,7 +71,7 @@ managed_subscriber = ManagedSubscriber()
 
 def publish_events(events: list[Any], event_type: type) -> None:
     for ev in events:
-        event(event_type).publish(event_type(ev))
+        event_publish(event_type(ev))
 
 
 tc = unittest.TestCase()
