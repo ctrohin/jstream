@@ -1,7 +1,8 @@
-from typing import Generic, TypeVar, final, overload
 from collections.abc import Callable
-from jstreams.stream import Opt
+from typing import Generic, TypeVar, final, overload
+
 from jstreams.predicate import Predicate, _extract_predicate_fn
+from jstreams.stream import Opt
 
 T = TypeVar("T")
 V = TypeVar("V")

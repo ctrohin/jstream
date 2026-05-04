@@ -1,6 +1,7 @@
 import os
 from typing import Any, Final
 from json import load
+from collections.abc import Mapping
 
 JSTREAMS_PROFILE: Final[str] = "JSTREAMS_PROFILE"
 JSTREAMS_PROFILE_LOWER: Final[str] = "jstreams_profile"
@@ -127,7 +128,7 @@ class JStreamsEnv:
     def __first_env_non_null(self, keys: list[str]) -> str | None:
         return self.__first_non_null(os.environ, keys)
 
-    def __first_non_null(self, dct: dict[str, Any], keys: list[str]) -> Any | None:
+    def __first_non_null(self, dct: Mapping[str, Any], keys: list[str]) -> Any | None:
         for key in keys:
             if (value := dct.get(key)) is not None:
                 return value
