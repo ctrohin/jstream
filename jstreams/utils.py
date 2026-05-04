@@ -416,11 +416,7 @@ def key_by(data: Iterable[T], key_fn: Callable[[T], K]) -> dict[K, T]:
     Returns:
         dict[K, T]: A dictionary where keys are K and values are T.
     """
-    result: dict[K, T] = {}
-    for item in data:
-        key = key_fn(item)
-        result[key] = item
-    return result
+    return {key_fn(item): item for item in data}
 
 
 def pick(source_dict: dict[K, V], keys: Iterable[K]) -> dict[K, V]:
@@ -546,3 +542,17 @@ def repeat_value(value: T, n: int) -> Iterable[T]:
     if n == 0:
         return []
     return itertools.repeat(value, n)
+
+
+def objects_equal(obj1: Any, obj2: Any) -> bool:
+    """
+    Compares two objects for equality.
+
+    Args:
+        obj1 (Any): The first object.
+        obj2 (Any): The second object.
+
+    Returns:
+        bool: True if the objects are equal, False otherwise. If both objects are None, True is returned.
+    """
+    return (obj1 is obj2) or (obj1 == obj2)
